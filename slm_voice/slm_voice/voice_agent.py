@@ -82,15 +82,8 @@ class SLMVoiceAgent:
         self.model = None
         self.tokenizer = None
         try:
-            main_mod = sys.modules.get("main") or sys.modules.get("__main__")
-            if not main_mod or not hasattr(main_mod, "get_shared_onnx_genai"):
-                try:
-                    import importlib
-                    main_mod = importlib.import_module("main")
-                except Exception:
-                    main_mod = None
-            if main_mod and hasattr(main_mod, "get_shared_onnx_genai"):
-                self.model, self.tokenizer = main_mod.get_shared_onnx_genai()
+            from slm_harness.runtime.legacy_bridge import get_shared_genai
+            self.model, self.tokenizer = get_shared_genai()
         except Exception:
             pass
 
@@ -155,10 +148,21 @@ class SLMVoiceAgent:
     def speech_to_text(self, audio_input: str, language: str = "english") -> str:
         """
         Converts speech/voice audio input (file path, audio stream, or text transcript) to transcribed text (STT).
+        Uses Pure-CPU Whisper Small INT8 ONNX (`slm_harness.runtime.CPUWhisperEngine`) on valid audio files.
         """
         if not audio_input:
             return ""
         if isinstance(audio_input, str) and os.path.exists(audio_input):
+            # 1. Real Pure-CPU Whisper Small INT8 ONNX Speech-to-Text
+            try:
+                from slm_harness.runtime import get_runtime
+                real_transcript = get_runtime().transcribe_audio(audio_input, language=language)
+                if real_transcript is not None and real_transcript.strip():
+                    return real_transcript.strip()
+            except Exception:
+                pass
+
+            # 2. Fallback for zero-byte / synthetic test stub filenames
             base_name = os.path.basename(audio_input)
             query = os.path.splitext(base_name)[0].replace("_", " ").replace("-", " ")
             
@@ -173,6 +177,9 @@ class SLMVoiceAgent:
                         pass
             return query
         return str(audio_input)
+
+    # Alias for callers expecting `transcribe_audio(...)`
+    transcribe_audio = speech_to_text
 
     def text_to_speech(self, response_text: str, output_path: str = None) -> bool:
         """

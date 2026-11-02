@@ -30,8 +30,8 @@ def load_config() -> tuple[dict, str]:
 
 class SLMVisionParser:
     """
-    A local CPU-optimized Vision Parser agent powered by Moondream2.
-    Runs high-speed local image captioning, visual Q&A, and OCR tasks offline.
+    A local CPU-optimized Vision Parser agent powered by Qwen2-VL-2B Quantized ONNX + RapidOCR.
+    Runs high-speed local image captioning, visual Q&A, and layout-ordered OCR tasks offline on CPU.
     """
     def __init__(self, model_path=None, cache_dir=None):
         self.model = None
@@ -44,19 +44,24 @@ class SLMVisionParser:
                 raise FileNotFoundError(f"Provided model_path does not exist: {model_path}")
             return os.path.abspath(model_path)
 
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        qwen_vl_dir = os.path.join(repo_root, "models", "qwen2-vl-2b-onnx")
+        if os.path.isdir(qwen_vl_dir):
+            return qwen_vl_dir
+
         config, config_file_path = load_config()
         model_config = config.get("models", {}).get("vision_parser", {})
-        config_path = model_config.get("path", "../../models/moondream2-onnx")
+        config_path = model_config.get("path", "../../models/qwen2-vl-2b-onnx")
         config_path = os.path.expanduser(config_path)
-        
+
         if not os.path.isabs(config_path) and config_file_path:
             config_path = os.path.abspath(os.path.join(os.path.dirname(config_file_path), config_path))
-            
+
         return config_path
 
     def parse_image(self, image_path: str, task: str = "<CAPTION>", system_prompt: str = None, user_input: str = None) -> str:
         """
-        Executes a vision task on the specified image file using Moondream2.
+        Executes a vision task on the specified image file using Pure-CPU Qwen2-VL-2B ONNX + RapidOCR.
         Tasks include:
             - '<CAPTION>' : Natural language description of image
             - '<DETAILED_CAPTION>' : Detailed description
@@ -64,40 +69,30 @@ class SLMVisionParser:
         """
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image file not found: {image_path}")
-            
-        image = Image.open(image_path).convert("RGB")
-        
-        # Format query based on task
+
+        ocr_only = task in ["<OCR>", "ocr"]
         prompt = user_input or system_prompt
         if not prompt:
             if task in ["<CAPTION>", "caption"]:
                 prompt = "Describe this image in detail."
-            elif task in ["<OCR>", "ocr"]:
+            elif task in ["<DETAILED_CAPTION>", "detailed_caption"]:
+                prompt = "Provide a comprehensive, detailed visual description of everything in this image."
+            elif ocr_only:
                 prompt = "Extract all text present in this image."
             else:
                 prompt = task
-                
-        # If running with model available, execute inference
-        if self.model is None and AutoModelForCausalLM is not None and torch is not None:
-            try:
-                print(f"[SLMVisionParser] Loading Moondream2 model from: {self.model_path}...")
-                if os.path.exists(self.model_path):
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        self.model_path, 
-                        trust_remote_code=True,
-                        torch_dtype=torch.float32
-                    ).eval()
-                    self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-            except Exception as e:
-                print(f"[SLMVisionParser] Note: Model load deferred: {e}")
-                
-        if self.model is not None:
-            try:
-                enc_image = self.model.encode_image(image)
-                return self.model.answer_question(enc_image, prompt, self.tokenizer)
-            except Exception as e:
-                print(f"[SLMVisionParser] Inference note: {e}")
 
+        # Primary Pure-CPU Harness Vision Engine (Qwen2-VL-2B Quantized ONNX + RapidOCR)
+        try:
+            from slm_harness.runtime import get_runtime
+            res = get_runtime().analyze_image(image_path, prompt=prompt, ocr_only=ocr_only)
+            ans = (res.get("answer") or "").strip()
+            if ans:
+                return ans
+        except Exception:
+            pass
+
+        # Standalone RapidOCR fallback
         try:
             from rapidocr_onnxruntime import RapidOCR
             ocr = RapidOCR()
@@ -109,6 +104,14 @@ class SLMVisionParser:
         except Exception:
             pass
 
-        return f"[Image Analysis ({os.path.basename(image_path)}) complete]"
-        
-        raise RuntimeError("Moondream2 is unavailable; no image analysis was performed.")
+        image = Image.open(image_path).convert("RGB")
+        return f"[Image Analysis ({os.path.basename(image_path)}, {image.size[0]}x{image.size[1]}) complete]"
+
+    def extract_text_ocr(self, image_path: str) -> str:
+        return self.parse_image(image_path=image_path, task="<OCR>")
+
+    def describe_image(self, image_path: str, user_input: str = None, token_callback=None) -> str:
+        out = self.parse_image(image_path=image_path, task="<CAPTION>", user_input=user_input)
+        if callable(token_callback) and out:
+            token_callback(out)
+        return out

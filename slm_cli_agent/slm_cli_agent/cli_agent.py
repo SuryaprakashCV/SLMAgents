@@ -46,15 +46,10 @@ class SLMCLIAgent:
         os.environ["MKL_NUM_THREADS"] = str(n_threads)
             
         try:
-            main_mod = sys.modules.get("main") or sys.modules.get("__main__")
-            if not main_mod or not hasattr(main_mod, "get_shared_onnx_genai"):
-                try:
-                    import importlib
-                    main_mod = importlib.import_module("main")
-                except Exception:
-                    main_mod = None
-            if main_mod and hasattr(main_mod, "get_shared_onnx_genai"):
-                self.model, self.tokenizer = main_mod.get_shared_onnx_genai()
+            from slm_harness.runtime.legacy_bridge import get_shared_genai, install_smart_og_dispatch
+            install_smart_og_dispatch()
+            if True:
+                self.model, self.tokenizer = get_shared_genai()
                 if self.model and self.tokenizer:
                     self.model_path = "shared_onnx"
                     return

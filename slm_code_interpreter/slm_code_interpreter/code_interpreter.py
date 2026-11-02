@@ -67,6 +67,11 @@ class SLMCodeInterpreter:
         if _shared_code_model is None:
             with _shared_code_lock:
                 if _shared_code_model is None:
+                    try:
+                        from slm_harness.runtime.legacy_bridge import install_smart_og_dispatch
+                        install_smart_og_dispatch()
+                    except Exception:
+                        pass
                     print(f"[SLMCodeInterpreter] Loading shared ONNX model from: {self.model_path} (threads={n_threads})...")
                     _shared_code_model = og.Model(self.model_path)
                     _shared_code_tokenizer = og.Tokenizer(_shared_code_model)

@@ -2098,6 +2098,21 @@ function loadChatSessionsFromStorage() {
     const raw = localStorage.getItem("slm_chat_sessions");
     if (raw) {
       chatSessions = JSON.parse(raw);
+      let mutated = false;
+      chatSessions.forEach(sess => {
+        (sess.messages || []).forEach(msg => {
+          if (Array.isArray(msg.thoughts) && msg.thoughts.length > 0) {
+            const cleaned = dedupeThoughtSteps(msg.thoughts);
+            if (cleaned.length !== msg.thoughts.length) {
+              msg.thoughts = cleaned;
+              mutated = true;
+            }
+          }
+        });
+      });
+      if (mutated) {
+        saveChatSessionsToStorage();
+      }
     } else {
       chatSessions = [];
     }
@@ -2408,7 +2423,7 @@ function renderCurrentSessionMessages() {
   
   viewport.innerHTML = "";
   session.messages.forEach(msg => {
-    appendMessageElementToViewport(msg.role, msg.text, msg.attachments, msg.routedAgent, msg.thoughts, false);
+    appendMessageElementToViewport(msg.role, msg.text, msg.attachments, msg.routedAgent, msg.thoughts, false, msg.meta || null);
   });
 
   // If this session is actively generating, render the live in-progress streaming card
@@ -2472,7 +2487,111 @@ function renderCurrentSessionMessages() {
   viewport.scrollTop = viewport.scrollHeight;
 }
 
-function appendMessageElementToViewport(role, text, attachments = [], routedAgent = "", thoughts = [], animateScroll = true) {
+const HUMAN_AGENT_NAMES = {
+  direct_assistant: "SLM Core Assistant",
+  slm_rag: "SLM Document RAG",
+  slm_pdf: "SLM PDF Intelligence",
+  slm_pkb: "SLM Knowledge Graph",
+  slm_summarizer: "SLM Summarizer",
+  slm_meeting: "SLM Meeting Summarizer",
+  slm_email: "SLM Email Assistant",
+  slm_voice: "SLM Voice Agent",
+  slm_memory: "SLM Memory Manager",
+  slm_task_planner: "SLM Task Planner",
+  slm_orchestrator: "SLM Orchestrator",
+  slm_text_to_sql: "SLM Text-to-SQL",
+  slm_code_interpreter: "SLM Code Interpreter",
+  slm_cli_agent: "SLM CLI Agent",
+  slm_git_repo_manager: "SLM Git Repo Manager",
+  slm_db_migration: "SLM Database Migrator",
+  slm_web_agent: "SLM Web Agent",
+  slm_web_scraper: "SLM Web Scraper",
+  slm_search_orchestrator: "SLM Search Orchestrator",
+  slm_json_cleaner: "SLM JSON Cleaner",
+  slm_document_parser: "SLM Document Parser",
+  slm_vision_parser: "SLM Vision Parser",
+  slm_data: "SLM Data Analyst",
+  slm_translation: "SLM Translation Hub",
+  slm_math: "SLM Math Solver",
+  slm_security: "SLM Security Audit",
+  slm_embeddings: "SLM Embeddings Engine"
+};
+
+const HUMAN_MODE_NAMES = {
+  fast_direct: "Direct Synthesis",
+  react_loop: "ReAct Tool Loop",
+  plan_dag: "Multi-Step Plan",
+  evaluator_optimizer: "Verified Synthesis"
+};
+
+function stripThoughtEmojis(str) {
+  return String(str || "")
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\uFFFD]/gu, "")
+    .replace(/\*\*|__/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function dedupeThoughtSteps(thoughts) {
+  if (!Array.isArray(thoughts)) return [];
+  const cleaned = thoughts
+    .map(t => (typeof t === "string" ? stripThoughtEmojis(t) : ""))
+    .filter(Boolean);
+  const result = [];
+  for (let i = 0; i < cleaned.length; i++) {
+    const curr = cleaned[i];
+    // Skip noisy partial "Drafting section:" rows from streaming prefixes
+    if (curr.startsWith("Drafting section:")) {
+      continue;
+    }
+    const next = i + 1 < cleaned.length ? cleaned[i + 1] : "";
+    if (next && next.startsWith(curr.slice(0, -1)) && Math.abs(next.length - curr.length) < 25) {
+      continue;
+    }
+    if (!result.includes(curr)) {
+      result.push(curr);
+    }
+  }
+  return result;
+}
+
+function formatHumanAgentName(rawId) {
+  if (!rawId) return "SLM Orchestrator";
+  const cleaned = stripThoughtEmojis(rawId);
+  const key = cleaned.toLowerCase();
+  if (HUMAN_AGENT_NAMES[key]) return HUMAN_AGENT_NAMES[key];
+  if (key.startsWith("slm_")) {
+    return "SLM " + key.slice(4).split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  }
+  return cleaned;
+}
+
+function formatThoughtStepHtml(rawThought) {
+  const clean = stripThoughtEmojis(rawThought);
+  // Match routing telemetry e.g. "Routed to: slm_rag • mode=fast_direct • stage=stage0_mime_document (12.4ms)"
+  const routeMatch = clean.match(/^Routed to:\s*([A-Za-z0-9_.-]+)(?:.*?mode=([A-Za-z0-9_.-]+))?(?:.*?\(([\d.]+)\s*ms\))?/i);
+  if (routeMatch) {
+    const agentLabel = formatHumanAgentName(routeMatch[1]);
+    const modeKey = (routeMatch[2] || "").toLowerCase();
+    const modeLabel = HUMAN_MODE_NAMES[modeKey] || (routeMatch[2] ? routeMatch[2].replace(/_/g, " ") : "");
+    const msVal = routeMatch[3] ? `${Math.max(1, Math.round( parseFloat(routeMatch[3]) ))} ms` : "";
+    let html = `<span>Routed to <strong>${agentLabel}</strong></span>`;
+    if (modeLabel) html += `<span class="step-meta-pill">${modeLabel}</span>`;
+    if (msVal) html += `<span class="step-meta-pill">${msVal}</span>`;
+    return html;
+  }
+  // Match "Executing <agent> (<mode>) on CPU..."
+  const execMatch = clean.match(/^Executing\s+([A-Za-z0-9_.-]+)\s*(?:\(([A-Za-z0-9_.-]+)\))?\s*on CPU/i);
+  if (execMatch) {
+    const agentLabel = formatHumanAgentName(execMatch[1]);
+    const modeKey = (execMatch[2] || "").toLowerCase();
+    const modeLabel = HUMAN_MODE_NAMES[modeKey] || "";
+    return `<span>Running <strong>${agentLabel}</strong> on local CPU</span>${modeLabel ? `<span class="step-meta-pill">${modeLabel}</span>` : ""}`;
+  }
+  return `<span>${clean.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`;
+}
+
+function appendMessageElementToViewport(role, text, attachments = [], routedAgent = "", thoughts = [], animateScroll = true, meta = null) {
   const viewport = document.getElementById("chat-messages-viewport");
   if (!viewport) return;
   
@@ -2518,31 +2637,42 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
     body.className = "chat-assistant-body";
 
     const rawAgent = routedAgent || "SLM Orchestrator";
-    const agentLabel = rawAgent.replace(/[🎯🧠🤖👤⚡📊📝🧮📄🖼️]/g, "").trim();
+    const agentLabel = formatHumanAgentName(rawAgent);
     
     const header = document.createElement("div");
     header.className = "chat-assistant-header";
+    let metricsBadgeHtml = "";
+    if (meta && (meta.tok_per_sec || meta.ttft_ms || meta.model_id)) {
+      const parts = [];
+      if (meta.model_id) parts.push(meta.model_id);
+      if (meta.ttft_ms) parts.push(`TTFT ${Math.round(meta.ttft_ms)}ms`);
+      if (meta.tok_per_sec) parts.push(`${Number(meta.tok_per_sec).toFixed(1)} tok/s`);
+      if (parts.length > 0) {
+        metricsBadgeHtml = `<span class="turn-metrics-badge">${parts.join(" • ")}</span>`;
+      }
+    }
     header.innerHTML = `
       <span class="assistant-agent-tag">
         <span class="tag-status-dot"></span>
         <span>${agentLabel}</span>
       </span>
+      ${metricsBadgeHtml}
     `;
     body.appendChild(header);
 
     if (thoughts && thoughts.length > 0) {
-      const cleanThoughts = thoughts.map(t => typeof t === "string" ? t.replace(/[🎯🧠🤖👤⚡📊📝🧮📄🖼️]/g, "").trim() : t);
+      const cleanThoughts = dedupeThoughtSteps(thoughts);
       const reasoning = document.createElement("div");
-      reasoning.className = "thought-accordion";
+      reasoning.className = "thought-accordion open";
       reasoning.innerHTML = `
         <div class="thought-header" onclick="this.parentElement.classList.toggle('open')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-          <span>Reasoning Pipeline (${cleanThoughts.length} steps)</span>
+          <span>Thought Process (${cleanThoughts.length} steps)</span>
           <svg class="thought-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
         </div>
         <div class="thought-content">
           <div class="thought-timeline">
-            ${cleanThoughts.map(t => `<div class="thought-step">${t}</div>`).join("")}
+            ${cleanThoughts.map(t => `<div class="thought-step">${formatThoughtStepHtml(t)}</div>`).join("")}
           </div>
         </div>
       `;
@@ -2598,21 +2728,70 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
 
     body.appendChild(contentEl);
 
+    if (meta && Array.isArray(meta.citations) && meta.citations.length > 0) {
+      const citeRow = document.createElement("div");
+      citeRow.className = "citation-chip-row";
+      const citeJson = encodeURIComponent(JSON.stringify(meta.citations));
+      meta.citations.forEach((c, idx) => {
+        const cid = c.citation_id || (idx + 1);
+        const src = (c.source || c.doc_id || "source").split("/").pop();
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "citation-chip";
+        btn.textContent = `[${cid}] ${src}`;
+        btn.onclick = () => inspectTurnCitations(decodeURIComponent(citeJson));
+        citeRow.appendChild(btn);
+      });
+      body.appendChild(citeRow);
+    }
+
     // Ghost Actions
     const actionRow = document.createElement("div");
     actionRow.className = "chat-msg-actions";
     const encoded = encodeURIComponent(cleanedText);
     const safeAgent = (routedAgent || "SLM Agents").replace(/'/g, "\\'");
+    const traceBtnHtml = (meta && meta.run_id)
+      ? `<button class="btn-ghost-action" onclick="inspectRunTrace('${meta.run_id}')" title="View 10-Plane Waterfall Span Trace">
+           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+           <span>Waterfall Trace</span>
+         </button>`
+      : "";
+    const safeEncoded = encoded.replace(/'/g, "\\'");
     actionRow.innerHTML = `
-      <button class="btn-ghost-action" onclick="copyMsgText(this, decodeURIComponent('${encoded.replace(/'/g, "\\'")}'))" title="Copy response">
+      <button class="btn-ghost-action" onclick="copyMsgText(this, decodeURIComponent('${safeEncoded}'))" title="Copy response">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
         <span>Copy</span>
       </button>
-      <button class="btn-ghost-action" onclick="playMessageSpeech('${encoded.replace(/'/g, "\\'")}', this)" title="Listen to response">
+      <button class="btn-ghost-action" onclick="exportAssistantMessage('pdf', decodeURIComponent('${safeEncoded}'), null, this)" title="Download as PDF (.pdf)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <span>PDF</span>
+      </button>
+      <button class="btn-ghost-action" onclick="exportAssistantMessage('docx', decodeURIComponent('${safeEncoded}'), null, this)" title="Download as Word (.docx)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+        <span>DOCX</span>
+      </button>
+      <select class="msg-export-select" onchange="if(this.value){exportAssistantMessage(this.value, decodeURIComponent('${safeEncoded}'), null, this); this.value='';}" title="Download response in any file format">
+        <option value="">Export Format...</option>
+        <option value="pdf">PDF Document (.pdf)</option>
+        <option value="docx">Word Document (.docx)</option>
+        <option value="xlsx">Excel Workbook (.xlsx)</option>
+        <option value="csv">CSV Table (.csv)</option>
+        <option value="pptx">PowerPoint Deck (.pptx)</option>
+        <option value="md">Markdown (.md)</option>
+        <option value="html">HTML Page (.html)</option>
+        <option value="json">JSON Data (.json)</option>
+        <option value="txt">Plain Text (.txt)</option>
+      </select>
+      <button class="btn-ghost-action" onclick="playMessageSpeech('${safeEncoded}', this)" title="Listen to response">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
         <span>Listen</span>
       </button>
-      <button class="btn-ghost-action" onclick="openCreateIssueModal('${encoded.replace(/'/g, "\\'")}', '${safeAgent}')" title="Create GitHub Issue from this response">
+      ${traceBtnHtml}
+      <button class="btn-ghost-action" onclick="saveResponseAsSkill(decodeURIComponent('${safeEncoded}'), '${safeAgent}', this)" title="Save this workflow as a reusable SKILL.md in .slm/skills/">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        <span>Save as Skill</span>
+      </button>
+      <button class="btn-ghost-action" onclick="openCreateIssueModal('${safeEncoded}', '${safeAgent}')" title="Create GitHub Issue from this response">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
         <span>Create Issue</span>
       </button>
@@ -3188,6 +3367,20 @@ async function handleChatSubmit(event) {
   const attachments = Array.from(chatAttachments);
   
   if (!message && attachments.length === 0) return;
+
+  if (typeof hideSlashCommandPalette === "function") {
+    hideSlashCommandPalette();
+  }
+  if (message.toLowerCase() === "/skills" || message.toLowerCase() === "/skill") {
+    if (inputEl) {
+      inputEl.value = "";
+      autoResizeChatTextarea(inputEl);
+    }
+    if (typeof openSkillsRepoModal === "function") {
+      openSkillsRepoModal();
+    }
+    return;
+  }
   
   chatAttachments = [];
   renderAttachmentsTray();
@@ -3284,13 +3477,32 @@ async function handleChatSubmit(event) {
     let accumulatedThoughts = ["Analyzing query & extracting execution constraints..."];
     let accumulatedTokens = "";
     let accumulatedRoutedAgent = "";
+    window.activeHarnessRunId = reqId;
+    setHarnessStopButtonVisible(true);
     try {
+      let cleanMsg = message;
+      let forcedMode = "";
+      let webSearchFlag = window.isWebSearchEnabled !== false;
+      if (cleanMsg.toLowerCase().startsWith("/plan ")) {
+        cleanMsg = cleanMsg.slice(6).trim();
+        forcedMode = "plan_dag";
+      } else if (cleanMsg.toLowerCase().startsWith("/web ")) {
+        cleanMsg = cleanMsg.slice(5).trim();
+        webSearchFlag = true;
+      }
+      const toneSelectEl = document.getElementById("chat-tone-select");
+      const selectedDesignTone = toneSelectEl ? toneSelectEl.value : "";
       const payload = {
         session_id: targetSessionId,
         req_id: reqId,
-        message: message,
+        message: cleanMsg,
         target_agent: targetAgent,
         attachments: attachments,
+        forced_mode: forcedMode,
+        web_search: webSearchFlag,
+        design_tone: selectedDesignTone,
+        active_skills: Array.from(window.pinnedSkillsSet || []),
+        use_harness: true,
         history: session.messages.slice(-6).map(m => ({ role: m.role, content: m.text }))
       };
       
@@ -3328,36 +3540,44 @@ async function handleChatSubmit(event) {
             }
             
             if (data.type === "thought") {
-              const cleanThought = data.thought.replace(/[🎯🧠🤖👤⚡📊📝🧮📄🖼️]/g, "").trim();
-              if (!accumulatedThoughts.includes(cleanThought)) {
+              if (data.payload && data.payload.skill && typeof loadSkillsFromRepo === "function") {
+                loadSkillsFromRepo();
+              }
+              const cleanThought = stripThoughtEmojis(data.thought);
+              if (cleanThought && !accumulatedThoughts.includes(cleanThought)) {
                 accumulatedThoughts.push(cleanThought);
               }
-              if (data.thought.includes("Routed to: ")) {
-                const ag = data.thought.split("Routed to: ")[1].trim().replace(/[🎯🧠🤖👤⚡📊📝🧮📄🖼️]/g, "");
-                accumulatedRoutedAgent = `Routed: ${ag}`;
+              if (data.routed_agent) {
+                accumulatedRoutedAgent = formatHumanAgentName(data.routed_agent);
+              } else if (data.thought && data.thought.includes("Routed to: ")) {
+                const ag = data.thought.split("Routed to: ")[1].split(/[•·(]/)[0].trim();
+                accumulatedRoutedAgent = formatHumanAgentName(ag);
               }
-              if (currentSessionId === targetSessionId) {
+              if (currentSessionId === targetSessionId && cleanThought) {
                 const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
                 if (activeRow) {
                   const liveTitle = activeRow.querySelector(".live-thought-title");
                   const liveTimeline = activeRow.querySelector(".live-step-timeline");
                   const livePill = activeRow.querySelector(".live-routed-pill");
-                  if (liveTitle) liveTitle.textContent = cleanThought.length > 44 ? cleanThought.substring(0, 44) + "..." : cleanThought;
+                  if (liveTitle) {
+                    liveTitle.innerHTML = formatThoughtStepHtml(cleanThought);
+                  }
                   if (livePill && accumulatedRoutedAgent) {
-                    const label = livePill.querySelector(".ghost-text");
+                    const spans = livePill.querySelectorAll("span");
+                    const label = spans.length > 1 ? spans[spans.length - 1] : null;
                     if (label) label.textContent = accumulatedRoutedAgent;
                   }
                   if (liveTimeline) {
                     liveTimeline.querySelectorAll(".live-step-row").forEach(row => {
                       row.className = "live-step-row completed";
                       const icon = row.querySelector(".live-step-icon");
-                      if (icon) icon.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                      if (icon) icon.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
                     });
                     const newStep = document.createElement("div");
                     newStep.className = "live-step-row active";
                     newStep.innerHTML = `
                       <div class="live-step-icon"><div class="step-spinner"></div></div>
-                      <div class="live-step-text">${cleanThought}</div>
+                      <div class="live-step-text">${formatThoughtStepHtml(cleanThought)}</div>
                     `;
                     liveTimeline.appendChild(newStep);
                     const vp = document.getElementById("chat-messages-viewport");
@@ -3365,7 +3585,33 @@ async function handleChatSubmit(event) {
                   }
                 }
               }
+            } else if (data.type === "run_started") {
+              window.activeHarnessRunId = data.run_id || reqId;
+              updateHarnessTelemetryPill(data.primary_model ? `${data.primary_model} • starting` : "CPU Running...");
+            } else if (data.type === "prefill_progress" && data.payload) {
+              const pd = data.payload.prefill_done || 0;
+              const pt = data.payload.prefill_total || 0;
+              if (pt > 0) {
+                updateHarnessTelemetryPill(`Prefill ${pd}/${pt} tok`);
+                if (currentSessionId === targetSessionId) {
+                  const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
+                  if (activeRow) {
+                    const liveTitle = activeRow.querySelector(".live-thought-title");
+                    if (liveTitle) {
+                      liveTitle.innerHTML = `<span>Prefilling context on local CPU (${pd}/${pt} tokens)...</span>`;
+                    }
+                  }
+                }
+              }
+            } else if (data.type === "approval_required" && data.payload) {
+              renderInlineApprovalCard(reqId, data.run_id || reqId, data.payload);
+            } else if (data.type === "clarification_needed" && data.payload) {
+              renderInlineClarificationCard(reqId, data.run_id || reqId, data.payload);
             } else if (data.type === "token") {
+              if (data.tok_per_sec) {
+                const ttftLbl = data.ttft_ms ? `TTFT ${Math.round(data.ttft_ms)}ms • ` : "";
+                updateHarnessTelemetryPill(`${ttftLbl}${Number(data.tok_per_sec).toFixed(1)} tok/s`);
+              }
               if (data.token && !data.token.includes("<think>") && !data.token.includes("</think>")) {
                 accumulatedTokens += data.token;
                 if (currentSessionId === targetSessionId) {
@@ -3379,10 +3625,43 @@ async function handleChatSubmit(event) {
                       const vp = document.getElementById("chat-messages-viewport");
                       autoScrollChatViewport(vp, false);
                     }
+                    // Update a single in-place status indicator only when a complete heading line finishes (\n)
+                    const completedHeadings = accumulatedTokens.match(/(?:^|\n)(?:#{1,3}\s+|(?:Slide\s+\d+\s*:))([^\n]{4,75})\n/gi);
+                    if (completedHeadings && completedHeadings.length > 0) {
+                      const rawLast = completedHeadings[completedHeadings.length - 1].replace(/\n$/, "");
+                      const latestHeading = stripThoughtEmojis(rawLast.replace(/^[\s#*•-]+/, ""));
+                      if (latestHeading && latestHeading.length >= 4) {
+                        const stepMsg = `Synthesizing section: ${latestHeading}`;
+                        const liveTitle = activeRow.querySelector(".live-thought-title");
+                        const liveTimeline = activeRow.querySelector(".live-step-timeline");
+                        if (liveTitle) liveTitle.innerHTML = formatThoughtStepHtml(stepMsg);
+                        if (liveTimeline) {
+                          let draftRow = liveTimeline.querySelector('.live-step-row[data-draft-progress="true"]');
+                          if (!draftRow) {
+                            liveTimeline.querySelectorAll(".live-step-row").forEach(row => {
+                              row.className = "live-step-row completed";
+                              const icon = row.querySelector(".live-step-icon");
+                              if (icon) icon.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                            });
+                            draftRow = document.createElement("div");
+                            draftRow.className = "live-step-row active";
+                            draftRow.dataset.draftProgress = "true";
+                            draftRow.innerHTML = `
+                              <div class="live-step-icon"><div class="step-spinner"></div></div>
+                              <div class="live-step-text">${formatThoughtStepHtml(stepMsg)}</div>
+                            `;
+                            liveTimeline.appendChild(draftRow);
+                          } else {
+                            const txtEl = draftRow.querySelector(".live-step-text");
+                            if (txtEl) txtEl.innerHTML = formatThoughtStepHtml(stepMsg);
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
-            } else if (data.type === "done") {
+            } else if (data.type === "done" || data.type === "cancelled") {
               finalPayload = data;
             } else if (data.type === "error") {
               throw new Error(data.error);
@@ -3415,11 +3694,32 @@ async function handleChatSubmit(event) {
         rawResp = rawResp.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>/g, "").replace(/<\/think>/g, "").trim();
       }
 
+      const turnMeta = {
+        run_id: finalPayload.run_id || reqId,
+        citations: finalPayload.citations || [],
+        artifacts: finalPayload.artifacts || [],
+        ttft_ms: finalPayload.ttft_ms || 0,
+        tok_per_sec: finalPayload.tok_per_sec || 0,
+        total_ms: finalPayload.total_ms || 0,
+        model_id: finalPayload.model_id || "",
+        mode: finalPayload.mode || "",
+        trace: finalPayload.trace || null
+      };
+      if (turnMeta.tok_per_sec || turnMeta.total_ms) {
+        const tpsPart = turnMeta.tok_per_sec ? `${Number(turnMeta.tok_per_sec).toFixed(1)} tok/s` : `${Math.round(turnMeta.total_ms)}ms`;
+        const mdlPart = turnMeta.model_id ? `${turnMeta.model_id} • ` : "";
+        updateHarnessTelemetryPill(`${mdlPart}${tpsPart}`);
+      } else if (finalPayload.type === "cancelled") {
+        updateHarnessTelemetryPill("Stopped (<40ms)");
+      }
+      window.latestInspectorState = turnMeta;
+
       const assistantMsg = {
         role: "assistant",
         text: rawResp,
         routedAgent: finalPayload ? (finalPayload.routed_agent || "SLM Orchestrator") : "SLM Orchestrator",
         thoughts: extractedThoughts,
+        meta: turnMeta,
         timestamp: new Date().toISOString()
       };
       activeTargetSession.messages.push(assistantMsg);
@@ -3438,13 +3738,17 @@ async function handleChatSubmit(event) {
         if (activeRow) {
           activeRow.remove();
         }
-        appendMessageElementToViewport("assistant", assistantMsg.text, [], assistantMsg.routedAgent, assistantMsg.thoughts);
+        appendMessageElementToViewport("assistant", assistantMsg.text, [], assistantMsg.routedAgent, assistantMsg.thoughts, true, turnMeta);
         const liveBadge = document.getElementById("chat-current-agent-text");
         if (liveBadge) liveBadge.textContent = `Routed: ${assistantMsg.routedAgent}`;
         const vp = document.getElementById("chat-messages-viewport");
         autoScrollChatViewport(vp, false);
       }
+      setHarnessStopButtonVisible(false);
+      window.activeHarnessRunId = null;
     } catch (err) {
+      setHarnessStopButtonVisible(false);
+      window.activeHarnessRunId = null;
       clearInterval(timerInterval);
       const activeTargetSession = chatSessions.find(s => s.id === targetSessionId) || session;
       const remainingInFlight = document.querySelectorAll(`.typing-indicator-row[data-session-id="${targetSessionId}"]`);
@@ -3859,3 +4163,1036 @@ function animateShowcaseReplay(mode) {
 
 
 
+
+/* =========================================================================
+   10-Plane Pure-CPU Agent Harness Studio Controller
+   ========================================================================= */
+
+window.activeHarnessRunId = null;
+window.currentInspectorTab = "trace";
+window.latestInspectorState = null;
+
+function setHarnessStopButtonVisible(visible) {
+  const stopBtn = document.getElementById("chat-stop-btn");
+  const sendBtn = document.getElementById("chat-send-btn");
+  const formEl = document.getElementById("chat-input-form");
+  if (stopBtn) {
+    stopBtn.style.display = visible ? "inline-flex" : "none";
+  }
+  if (sendBtn) {
+    sendBtn.style.display = visible ? "none" : "inline-flex";
+  }
+  if (formEl) {
+    formEl.classList.toggle("is-generating", Boolean(visible));
+  }
+}
+
+function updateHarnessTelemetryPill(text) {
+  const pill = document.getElementById("harness-telemetry-pill");
+  if (pill && text) {
+    pill.textContent = text;
+  }
+}
+
+async function stopActiveGeneration() {
+  const rid = window.activeHarnessRunId;
+  if (!rid) return;
+  updateHarnessTelemetryPill("Stopping...");
+  try {
+    await fetch(getApiEndpoint(`/api/runs/${encodeURIComponent(rid)}/cancel`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "Stopped via Web AI Studio Stop button" })
+    });
+  } catch (e) {
+    console.warn("Stop request notice:", e);
+  }
+}
+
+async function handleHarnessProfileChange() {
+  const profEl = document.getElementById("harness-profile-select");
+  const backEl = document.getElementById("harness-backend-select");
+  if (!profEl || !backEl) return;
+  updateHarnessTelemetryPill("Switching...");
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/profile"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profile: profEl.value,
+        preferred_backend: backEl.value
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const st = data.status || {};
+      const mdl = (st.primary_model && st.primary_model.model_id) || profEl.value;
+      updateHarnessTelemetryPill(`${mdl} • Ready`);
+      if (typeof fetchSystemRamStats === "function") {
+        fetchSystemRamStats();
+      }
+    }
+  } catch (e) {
+    console.warn("Profile switch notice:", e);
+  }
+}
+
+async function syncHarnessStatusHud() {
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/status"));
+    if (!res.ok) return;
+    const st = await res.json();
+    const profEl = document.getElementById("harness-profile-select");
+    const backEl = document.getElementById("harness-backend-select");
+    if (profEl && st.profile) profEl.value = st.profile;
+    if (backEl && st.preferred_backend) backEl.value = st.preferred_backend;
+    if (st.primary_model && st.primary_model.model_id && !window.activeHarnessRunId) {
+      updateHarnessTelemetryPill(`${st.primary_model.model_id} • CPU`);
+    }
+  } catch (e) {
+    // Silent fallback when static file opened without server
+  }
+}
+
+function escapeHtmlSafe(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderInlineApprovalCard(reqId, runId, payload) {
+  const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
+  if (!activeRow) return;
+  const body = activeRow.querySelector(".chat-assistant-body");
+  if (!body) return;
+
+  const ticketId = payload.ticket_id || runId;
+  const card = document.createElement("div");
+  card.className = "hitl-approval-card";
+  card.dataset.ticketId = ticketId;
+  card.innerHTML = `
+    <div class="hitl-card-title">Capability Approval Required — <code>${escapeHtmlSafe(payload.tool_name || "tool")}</code> (Risk L${escapeHtmlSafe(payload.risk_level)})</div>
+    <div>${escapeHtmlSafe(payload.summary || "")}</div>
+    <div class="hitl-preview-box">${escapeHtmlSafe(payload.preview || "")}</div>
+    <div class="hitl-btn-row">
+      <button type="button" class="btn-hitl-allow" onclick="submitHarnessApproval('${escapeHtmlSafe(runId)}', '${escapeHtmlSafe(ticketId)}', true, false, this)">Allow Once</button>
+      <button type="button" class="btn-hitl-always" onclick="submitHarnessApproval('${escapeHtmlSafe(runId)}', '${escapeHtmlSafe(ticketId)}', true, true, this)">Always Allow (Session)</button>
+      <button type="button" class="btn-hitl-deny" onclick="submitHarnessApproval('${escapeHtmlSafe(runId)}', '${escapeHtmlSafe(ticketId)}', false, false, this)">Deny</button>
+    </div>
+  `;
+  body.appendChild(card);
+}
+
+async function submitHarnessApproval(runId, ticketId, approved, rememberForSession, btnEl) {
+  const card = btnEl ? btnEl.closest(".hitl-approval-card") : null;
+  try {
+    await fetch(getApiEndpoint(`/api/runs/${encodeURIComponent(runId)}/approve`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        approved: approved,
+        remember_for_session: rememberForSession,
+        ticket_id: ticketId
+      })
+    });
+    if (card) {
+      card.innerHTML = `<div class="hitl-card-title">${approved ? "Approved by user — resuming CPU execution..." : "Denied by user."}</div>`;
+    }
+  } catch (e) {
+    console.warn("Approval submit error:", e);
+  }
+}
+
+function renderInlineClarificationCard(reqId, runId, payload) {
+  const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
+  if (!activeRow) return;
+  const body = activeRow.querySelector(".chat-assistant-body");
+  if (!body) return;
+
+  const ticketId = payload.ticket_id || runId;
+  const options = Array.isArray(payload.options) ? payload.options : [];
+  const card = document.createElement("div");
+  card.className = "clarify-chips-card";
+  const chipsHtml = options.map(opt => {
+    const safeOpt = escapeHtmlSafe(opt);
+    const encOpt = encodeURIComponent(opt);
+    return `<button type="button" class="btn-clarify-chip" onclick="submitHarnessClarification('${escapeHtmlSafe(runId)}', '${escapeHtmlSafe(ticketId)}', decodeURIComponent('${encOpt}'), this)">${safeOpt}</button>`;
+  }).join("");
+  card.innerHTML = `
+    <div class="hitl-card-title">Clarification Needed: ${escapeHtmlSafe(payload.question || "Please choose an option:")}</div>
+    <div class="clarify-options-row">${chipsHtml}</div>
+  `;
+  body.appendChild(card);
+}
+
+async function submitHarnessClarification(runId, ticketId, answer, btnEl) {
+  const card = btnEl ? btnEl.closest(".clarify-chips-card") : null;
+  try {
+    await fetch(getApiEndpoint(`/api/runs/${encodeURIComponent(runId)}/clarify`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer: answer, ticket_id: ticketId })
+    });
+    if (card) {
+      card.innerHTML = `<div class="hitl-card-title">Selected: ${escapeHtmlSafe(answer)}</div>`;
+    }
+  } catch (e) {
+    console.warn("Clarification submit error:", e);
+  }
+}
+
+function toggleHarnessInspector(forceState) {
+  const drawer = document.getElementById("harness-inspector-drawer");
+  if (!drawer) return;
+  const nextOpen = typeof forceState === "boolean" ? forceState : (drawer.style.display === "none");
+  drawer.style.display = nextOpen ? "flex" : "none";
+  if (nextOpen) {
+    switchInspectorTab(window.currentInspectorTab || "trace");
+  }
+}
+
+function switchInspectorTab(tabName) {
+  window.currentInspectorTab = tabName;
+  document.querySelectorAll(".inspector-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tabName);
+  });
+  if (tabName === "trace") {
+    const rid = window.latestInspectorState && window.latestInspectorState.run_id;
+    if (rid) {
+      inspectRunTrace(rid, false);
+    } else {
+      loadRecentTraces();
+    }
+  } else if (tabName === "citations") {
+    const cites = (window.latestInspectorState && window.latestInspectorState.citations) || [];
+    renderInspectorCitations(cites);
+  } else if (tabName === "artifacts") {
+    loadInspectorArtifacts();
+  } else if (tabName === "skills") {
+    renderInspectorSkillsTab();
+  }
+}
+
+async function loadRecentTraces() {
+  const body = document.getElementById("inspector-body");
+  if (!body) return;
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/traces?limit=8"));
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = data.traces || [];
+    if (list.length === 0) {
+      body.innerHTML = `<div class="inspector-empty">No traces recorded in this session yet.</div>`;
+      return;
+    }
+    inspectRunTrace(list[0].run_id, false);
+  } catch (e) {
+    body.innerHTML = `<div class="inspector-empty">Trace store unavailable.</div>`;
+  }
+}
+
+async function inspectRunTrace(runId, openDrawer = true) {
+  if (openDrawer) {
+    window.currentInspectorTab = "trace";
+    toggleHarnessInspector(true);
+  }
+  const body = document.getElementById("inspector-body");
+  if (!body) return;
+  body.innerHTML = `<div class="inspector-empty">Loading Waterfall Span Trace for <code>${escapeHtmlSafe(runId)}</code>...</div>`;
+  try {
+    const res = await fetch(getApiEndpoint(`/api/harness/traces/${encodeURIComponent(runId)}`));
+    if (!res.ok) {
+      body.innerHTML = `<div class="inspector-empty">Trace <code>${escapeHtmlSafe(runId)}</code> not found on server.</div>`;
+      return;
+    }
+    const tr = await res.json();
+    body.innerHTML = `
+      <div class="inspector-card">
+        <div><strong>Run:</strong> <code>${escapeHtmlSafe(tr.run_id)}</code></div>
+        <div><strong>Agent / Mode:</strong> ${escapeHtmlSafe(tr.agent_used || "-")} (${escapeHtmlSafe(tr.mode || "-")})</div>
+        <div><strong>Total Latency:</strong> ${Math.round(tr.total_ms || 0)} ms • <strong>Peak RSS:</strong> ${escapeHtmlSafe(tr.peak_rss_mb)} MB</div>
+      </div>
+      <pre class="inspector-pre">${escapeHtmlSafe(tr.ascii_waterfall || JSON.stringify(tr.spans || [], null, 2))}</pre>
+    `;
+  } catch (e) {
+    body.innerHTML = `<div class="inspector-empty">Failed to load trace: ${escapeHtmlSafe(e.message)}</div>`;
+  }
+}
+
+function inspectTurnCitations(citationsJsonOrArr) {
+  let cites = citationsJsonOrArr;
+  if (typeof cites === "string") {
+    try { cites = JSON.parse(cites); } catch (e) { cites = []; }
+  }
+  if (!window.latestInspectorState) window.latestInspectorState = {};
+  window.latestInspectorState.citations = cites;
+  window.currentInspectorTab = "citations";
+  toggleHarnessInspector(true);
+  renderInspectorCitations(cites);
+}
+
+function renderInspectorCitations(cites) {
+  const body = document.getElementById("inspector-body");
+  if (!body) return;
+  if (!Array.isArray(cites) || cites.length === 0) {
+    body.innerHTML = `<div class="inspector-empty">No grounded RAG citations attached to the selected turn. Attach a PDF, CSV, or document to inspect grounded chunks.</div>`;
+    return;
+  }
+  body.innerHTML = cites.map((c, idx) => `
+    <div class="inspector-card">
+      <div><strong>[${escapeHtmlSafe(c.citation_id || (idx + 1))}] ${escapeHtmlSafe(c.source || c.doc_id || "Document")}</strong></div>
+      <div style="color:#64748b;font-size:0.73rem;margin:3px 0;">Score: ${c.score !== undefined ? Number(c.score).toFixed(3) : "-"}</div>
+      <div style="margin-top:6px;white-space:pre-wrap;line-height:1.45;">${escapeHtmlSafe(c.snippet || c.text || "")}</div>
+    </div>
+  `).join("");
+}
+
+async function loadInspectorArtifacts() {
+  const body = document.getElementById("inspector-body");
+  if (!body) return;
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/artifacts"));
+    if (!res.ok) return;
+    const data = await res.json();
+    const arts = data.artifacts || [];
+    if (arts.length === 0) {
+      body.innerHTML = `<div class="inspector-empty">No offloaded artifacts ingested yet. Attach a CSV, Excel, SQLite DB, PDF, Image, or Audio file to inspect its structural handle.</div>`;
+      return;
+    }
+    body.innerHTML = arts.map(a => `
+      <div class="inspector-card">
+        <div><strong>${escapeHtmlSafe(a.name)}</strong> <span style="color:#64748b;">(${escapeHtmlSafe(a.kind)} • ${escapeHtmlSafe(a.byte_size)} B)</span></div>
+        <div style="font-size:0.72rem;color:#0369a1;margin:2px 0;"><code>${escapeHtmlSafe(a.uri)}</code></div>
+        <pre class="inspector-pre" style="margin-top:6px;white-space:pre-wrap;">${escapeHtmlSafe((a.descriptor || "").slice(0, 600))}</pre>
+      </div>
+    `).join("");
+  } catch (e) {
+    body.innerHTML = `<div class="inspector-empty">Failed to load artifacts.</div>`;
+  }
+}
+
+async function rewindCurrentSession() {
+  const session = typeof getOrCreateCurrentSession === "function" ? getOrCreateCurrentSession() : null;
+  if (!session) return;
+  try {
+    await fetch(getApiEndpoint("/api/harness/session/rewind"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: session.id, turns: 1 })
+    });
+    if (session.messages.length >= 2) {
+      session.messages.splice(-2, 2);
+    } else if (session.messages.length === 1) {
+      session.messages.pop();
+    }
+    saveChatSessionsToStorage();
+    renderCurrentChatSession();
+    updateHarnessTelemetryPill("Rewound 1 turn");
+  } catch (e) {
+    console.warn("Rewind error:", e);
+  }
+}
+
+async function forkCurrentSession() {
+  const session = typeof getOrCreateCurrentSession === "function" ? getOrCreateCurrentSession() : null;
+  if (!session) return;
+  const branchName = "fork-" + Math.random().toString(36).slice(2, 6);
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/session/fork"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: session.id, branch_name: branchName })
+    });
+    if (res.ok) {
+      updateHarnessTelemetryPill(`Branch: ${branchName}`);
+    }
+  } catch (e) {
+    console.warn("Fork error:", e);
+  }
+}
+
+window.isWebSearchEnabled = true;
+
+function toggleWebSearchMode() {
+  window.isWebSearchEnabled = !window.isWebSearchEnabled;
+  const btn = document.getElementById("chat-websearch-btn");
+  if (btn) {
+    btn.classList.toggle("active", window.isWebSearchEnabled);
+    btn.title = window.isWebSearchEnabled
+      ? "Live Web Search Enabled (Click to toggle)"
+      : "Live Web Search Disabled (Click to enable)";
+  }
+}
+
+async function exportAssistantMessage(fmt, contentText, customFilename, triggerEl) {
+  const session = typeof getOrCreateCurrentSession === "function" ? getOrCreateCurrentSession() : null;
+  const sid = session ? session.id : "default_session";
+  const span = triggerEl && triggerEl.querySelector ? triggerEl.querySelector("span") : null;
+  const origLabel = span ? span.textContent : "";
+  if (span) span.textContent = "Building...";
+
+  try {
+    const toneSelectEl = document.getElementById("chat-tone-select");
+    const selectedTone = toneSelectEl ? toneSelectEl.value : "";
+    const res = await fetch(getApiEndpoint("/api/harness/export"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: contentText || "",
+        format: fmt || "pdf",
+        filename: customFilename || null,
+        tone: selectedTone || "",
+        session_id: sid
+      })
+    });
+    if (!res.ok) throw new Error(`Export HTTP ${res.status}`);
+    const data = await res.json();
+    if (data && data.download_url) {
+      const a = document.createElement("a");
+      a.href = data.download_url;
+      a.download = data.filename || `exported_document.${fmt || "pdf"}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (span) {
+        span.textContent = "Downloaded!";
+        setTimeout(() => { span.textContent = origLabel; }, 1800);
+      }
+    }
+  } catch (err) {
+    console.error("Document export error:", err);
+    if (span) span.textContent = origLabel;
+  }
+}
+
+function setupDownloadLinkInterceptor() {
+  document.addEventListener("click", (e) => {
+    const link = e.target && e.target.closest ? e.target.closest(".chat-assistant-content a[href]") : null;
+    if (!link) return;
+    const rawHref = (link.getAttribute("href") || "").trim();
+    if (!rawHref) return;
+
+    // 1. Real local harness download URL -> force immediate local browser download
+    if (rawHref.startsWith("/api/harness/download/")) {
+      link.setAttribute("download", "");
+      return;
+    }
+
+    if (rawHref.startsWith("mailto:")) {
+      return;
+    }
+
+    const lowerHref = rawHref.toLowerCase();
+    const linkLabel = (link.innerText || link.textContent || "").toLowerCase();
+
+    // 2. Intercept ANY hallucinated download link (e.g. designstudio.slma.ground.com/suryaprakash-cv-v9-docx, example.com, etc.)
+    // and compile + download the requested file 100% locally on the spot!
+    const isHallucinatedOrExportLink = (
+      lowerHref.includes("example.") ||
+      lowerHref.includes("slma") ||
+      lowerHref.includes("designstudio") ||
+      lowerHref.includes("ground.com") ||
+      lowerHref.includes("your-domain") ||
+      lowerHref.includes("files.local") ||
+      lowerHref.startsWith("sandbox:") ||
+      lowerHref.startsWith("file:///") ||
+      /[.\-](pdf|docx|doc|xlsx|xls|csv|tsv|pptx|ppt|md|html|json|txt)(?:$|\?)/i.test(lowerHref) ||
+      /(download|click here|pdf|docx|word|ppt|powerpoint|presentation|slide|cv|resume)/i.test(linkLabel)
+    );
+
+    if (isHallucinatedOrExportLink) {
+      e.preventDefault();
+      e.stopPropagation();
+      const extMatch = lowerHref.match(/\/?([a-z0-9_.\-]+?)[.\-](pdf|docx|doc|xlsx|xls|csv|tsv|pptx|ppt|md|html|json|txt)(?:\?.*)?$/i);
+      let fmt = extMatch ? extMatch[2].toLowerCase() : "pdf";
+      if (!extMatch) {
+        if (/pptx|ppt|powerpoint|presentation|slide/i.test(linkLabel + " " + lowerHref)) fmt = "pptx";
+        else if (/docx|word|\.doc/i.test(linkLabel + " " + lowerHref)) fmt = "docx";
+        else if (/xlsx|excel/i.test(linkLabel + " " + lowerHref)) fmt = "xlsx";
+        else if (/html/i.test(linkLabel + " " + lowerHref)) fmt = "html";
+      }
+      if (fmt === "ppt") fmt = "pptx";
+      if (fmt === "doc") fmt = "docx";
+      if (fmt === "xls") fmt = "xlsx";
+      const stem = extMatch ? extMatch[1] : "slm_exported_document";
+      const fname = `${stem}.${fmt}`;
+      const msgBody = link.closest(".chat-assistant-content");
+      const textContent = msgBody ? msgBody.innerText : (document.body.innerText || "");
+      exportAssistantMessage(fmt, textContent, fname, link);
+      return;
+    }
+
+    // 3. Genuine external web links (e.g. LinkedIn or Web Search Citations) -> open in new tab, never redirect AI Studio
+    if (lowerHref.startsWith("http://") || lowerHref.startsWith("https://")) {
+      link.setAttribute("target", "_blank");
+      link.setAttribute("rel", "noopener noreferrer");
+    }
+  }, true);
+}
+
+/* ============================================================================
+   Declarative Skill Repository (.slm/skills/<name>/SKILL.md) & Slash Palette
+   ============================================================================ */
+
+window.skillsRepoCache = [];
+window.pinnedSkillsSet = new Set();
+
+async function loadSkillsFromRepo() {
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/skills"));
+    if (!res.ok) return;
+    const data = await res.json();
+    window.skillsRepoCache = Array.isArray(data.skills) ? data.skills : [];
+    const dirLabel = document.getElementById("skills-repo-dir-label");
+    if (dirLabel && data.repo_dir) {
+      dirLabel.textContent = ".slm/skills/";
+      dirLabel.title = data.repo_dir;
+    }
+    updateSkillsToolbarBadge();
+    renderPinnedSkillsTray();
+    renderSkillsRepoList();
+    if (window.currentInspectorTab === "skills") {
+      renderInspectorSkillsTab();
+    }
+  } catch (e) {
+    // Non-fatal
+  }
+}
+
+function updateSkillsToolbarBadge() {
+  const btn = document.getElementById("chat-skills-btn");
+  const lbl = document.getElementById("chat-skills-btn-label");
+  const badge = document.getElementById("chat-skills-count-badge");
+  const totalEnabled = (window.skillsRepoCache || []).filter(s => s.enabled !== false).length;
+  const pinnedCount = window.pinnedSkillsSet ? window.pinnedSkillsSet.size : 0;
+
+  if (btn) {
+    btn.classList.toggle("has-pinned", pinnedCount > 0);
+  }
+  if (lbl) {
+    lbl.textContent = pinnedCount > 0 ? "Skills Pinned" : "Skills";
+  }
+  if (badge) {
+    badge.textContent = pinnedCount > 0 ? String(pinnedCount) : String(totalEnabled || 8);
+  }
+}
+
+function renderPinnedSkillsTray() {
+  const tray = document.getElementById("chat-active-skills-tray");
+  if (!tray) return;
+  const pinnedNames = Array.from(window.pinnedSkillsSet || []);
+  if (pinnedNames.length === 0) {
+    tray.style.display = "none";
+    tray.innerHTML = "";
+    return;
+  }
+  tray.style.display = "flex";
+  tray.innerHTML = pinnedNames.map(name => {
+    const sk = (window.skillsRepoCache || []).find(s => s.name === name) || { name, title: name };
+    return `
+      <span class="active-skill-chip" title="Active skill from .slm/skills/${escapeHtmlSafe(sk.name)}/SKILL.md">
+        <span>Skill: ${escapeHtmlSafe(sk.title || sk.name)}</span>
+        <button type="button" onclick="togglePinSkill('${escapeHtmlSafe(sk.name)}')" aria-label="Unpin skill">&times;</button>
+      </span>
+    `;
+  }).join("");
+}
+
+function togglePinSkill(skillName) {
+  if (!window.pinnedSkillsSet) window.pinnedSkillsSet = new Set();
+  if (window.pinnedSkillsSet.has(skillName)) {
+    window.pinnedSkillsSet.delete(skillName);
+  } else {
+    window.pinnedSkillsSet.add(skillName);
+    const sk = (window.skillsRepoCache || []).find(s => s.name === skillName);
+    if (sk && sk.preferred_tone) {
+      const toneSelect = document.getElementById("chat-tone-select");
+      if (toneSelect && !toneSelect.value) {
+        toneSelect.value = sk.preferred_tone;
+      }
+    }
+  }
+  updateSkillsToolbarBadge();
+  renderPinnedSkillsTray();
+  renderSkillsRepoList();
+  if (window.currentInspectorTab === "skills") {
+    renderInspectorSkillsTab();
+  }
+}
+
+function clearPinnedSkills() {
+  if (window.pinnedSkillsSet) window.pinnedSkillsSet.clear();
+  updateSkillsToolbarBadge();
+  renderPinnedSkillsTray();
+  renderSkillsRepoList();
+}
+
+function openSkillsRepoModal() {
+  const modal = document.getElementById("skills-repo-modal");
+  if (!modal) return;
+  modal.style.display = "flex";
+  loadSkillsFromRepo();
+}
+
+function closeSkillsRepoModal(event) {
+  if (event && event.target && event.target.id !== "skills-repo-modal") return;
+  const modal = document.getElementById("skills-repo-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function renderSkillsRepoList() {
+  const container = document.getElementById("skills-repo-list");
+  const statsEl = document.getElementById("skill-repo-stats-label");
+  if (!container) return;
+
+  const qInput = document.getElementById("skill-search-input");
+  const q = ((qInput && qInput.value) || "").trim().toLowerCase();
+  const allSkills = window.skillsRepoCache || [];
+
+  const filtered = allSkills.filter(sk => {
+    if (!q) return true;
+    const hay = [
+      sk.name,
+      sk.title,
+      sk.description,
+      ...(sk.triggers || []),
+      ...(sk.tags || [])
+    ].join(" ").toLowerCase();
+    return hay.includes(q);
+  });
+
+  if (statsEl) {
+    const pinnedCount = window.pinnedSkillsSet ? window.pinnedSkillsSet.size : 0;
+    statsEl.textContent = `${filtered.length} of ${allSkills.length} skills in .slm/skills/ • ${pinnedCount > 0 ? pinnedCount + " pinned" : "Auto-Match Active"}`;
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="inspector-empty" style="grid-column:1/-1;">No matching skills found. Use the <strong>Autonomous Skill Creator</strong> above to generate and save a new skill to <code>.slm/skills/</code>!</div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(sk => {
+    const isPinned = window.pinnedSkillsSet && window.pinnedSkillsSet.has(sk.name);
+    const isEnabled = sk.enabled !== false;
+    const srcClass = sk.source === "ai-generated" || sk.source === "user" ? sk.source : "builtin";
+    const srcLabel = sk.source === "ai-generated" ? "AI Created" : (sk.source === "user" ? "Custom" : "Built-in");
+    const verNum = sk.version || 1;
+    const trigs = (sk.triggers || []).slice(0, 5).map(t => `<span class="skill-trigger-pill">${escapeHtmlSafe(t)}</span>`).join("");
+    const safeName = escapeHtmlSafe(sk.name);
+    const safeTitle = escapeHtmlSafe(sk.title || sk.name);
+
+    return `
+      <div class="skill-repo-card ${isPinned ? "pinned" : ""} ${!isEnabled ? "disabled" : ""}">
+        <div class="skill-card-head">
+          <div>
+            <div class="skill-card-title">${safeTitle} <span style="font-size:0.68rem; font-weight:700; color:#4f46e5; background:#eef2ff; padding:1px 6px; border-radius:999px; margin-left:4px;">v${verNum}</span></div>
+            <div class="skill-card-path">${escapeHtmlSafe(sk.rel_path || (".slm/skills/" + sk.name + "/SKILL.md"))}</div>
+          </div>
+          <span class="skill-source-badge ${srcClass}">${srcLabel}</span>
+        </div>
+        <div class="skill-card-desc">${escapeHtmlSafe(sk.description || "")}</div>
+        <div class="skill-card-triggers">${trigs}</div>
+        <div class="skill-card-actions">
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn-skill-mini ${isPinned ? "active" : ""}" onclick="togglePinSkill('${safeName}')">
+              ${isPinned ? "Pinned (Active)" : "Pin for Chat"}
+            </button>
+            <button type="button" class="btn-skill-mini" onclick="promptImproveSkill('${safeName}')" title="Tell the AI how to improve or evolve this skill">
+              Improve Skill
+            </button>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn-skill-mini" onclick="openSkillEditorForm('${safeName}')">Edit SKILL.md</button>
+            <button type="button" class="btn-skill-mini" onclick="toggleSkillEnabled('${safeName}', ${!isEnabled})">
+              ${isEnabled ? "On" : "Off"}
+            </button>
+            <button type="button" class="btn-skill-mini" onclick="deleteSkillFromRepo('${safeName}')" title="Delete skill from .slm/skills/">&times;</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderInspectorSkillsTab() {
+  const body = document.getElementById("inspector-body");
+  if (!body) return;
+  const skills = window.skillsRepoCache || [];
+  if (skills.length === 0) {
+    loadSkillsFromRepo();
+    body.innerHTML = `<div class="inspector-empty">Loading skills from <code>.slm/skills/</code>...</div>`;
+    return;
+  }
+  const topBar = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <span style="font-size:0.76rem; color:#475569; font-weight:600;">${skills.length} skills in <code>.slm/skills/</code></span>
+      <button type="button" class="btn-skill-mini active" onclick="openSkillsRepoModal()">Open Skill Studio</button>
+    </div>
+  `;
+  const cards = skills.map(sk => {
+    const isPinned = window.pinnedSkillsSet && window.pinnedSkillsSet.has(sk.name);
+    const safeName = escapeHtmlSafe(sk.name);
+    return `
+      <div class="inspector-card" style="margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>${escapeHtmlSafe(sk.title || sk.name)}</strong>
+          <button type="button" class="btn-skill-mini ${isPinned ? "active" : ""}" onclick="togglePinSkill('${safeName}')">
+            ${isPinned ? "Pinned" : "Pin"}
+          </button>
+        </div>
+        <div style="font-size:0.71rem; color:#64748b; font-family:var(--font-mono); margin:2px 0;">${escapeHtmlSafe(sk.rel_path || "")}</div>
+        <div style="font-size:0.76rem; color:#334155; margin-top:4px;">${escapeHtmlSafe(sk.description || "")}</div>
+      </div>
+    `;
+  }).join("");
+  body.innerHTML = topBar + cards;
+}
+
+async function generateSkillWithAI() {
+  const input = document.getElementById("skill-ai-prompt-input");
+  const btn = document.getElementById("btn-generate-skill-ai");
+  const promptText = input ? input.value.trim() : "";
+  if (!promptText) {
+    if (input) input.focus();
+    return;
+  }
+  const origHtml = btn ? btn.innerHTML : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = "<span>Synthesizing SKILL.md...</span>";
+  }
+  try {
+    const toneEl = document.getElementById("chat-tone-select");
+    const res = await fetch(getApiEndpoint("/api/harness/skills/generate"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: promptText,
+        session_id: currentSessionId || "default_session",
+        preferred_tone: toneEl ? toneEl.value : ""
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.skills) window.skillsRepoCache = data.skills;
+      if (data.skill && data.skill.name) {
+        if (!window.pinnedSkillsSet) window.pinnedSkillsSet = new Set();
+        window.pinnedSkillsSet.add(data.skill.name);
+      }
+      if (input) input.value = "";
+      updateSkillsToolbarBadge();
+      renderPinnedSkillsTray();
+      renderSkillsRepoList();
+    }
+  } catch (e) {
+    console.error("Failed to generate skill:", e);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+}
+
+async function learnSkillFromCurrentSession() {
+  const sess = getOrCreateCurrentSession();
+  const lastAssistant = [...(sess.messages || [])].reverse().find(m => m.role === "assistant" && m.text);
+  const lastUser = [...(sess.messages || [])].reverse().find(m => m.role === "user" && m.text);
+  const promptTopic = (lastUser && lastUser.text) || sess.title || "Learned Session Workflow";
+  const ctxText = (lastAssistant && lastAssistant.text) || "";
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/skills/generate"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: promptTopic,
+        session_id: sess.id || "default_session",
+        context_text: ctxText
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.skills) window.skillsRepoCache = data.skills;
+      if (data.skill && data.skill.name) {
+        if (!window.pinnedSkillsSet) window.pinnedSkillsSet = new Set();
+        window.pinnedSkillsSet.add(data.skill.name);
+      }
+      updateSkillsToolbarBadge();
+      renderPinnedSkillsTray();
+      renderSkillsRepoList();
+    }
+  } catch (e) {
+    console.error("Failed to learn skill from session:", e);
+  }
+}
+
+async function saveResponseAsSkill(responseText, agentName, btnEl) {
+  const origHtml = btnEl ? btnEl.innerHTML : "";
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.innerHTML = `<span>Saving to .slm/skills/...</span>`;
+  }
+  try {
+    const firstHeadingMatch = (responseText || "").match(/^#{1,3}\s+(.+)$/m);
+    const derivedTopic = firstHeadingMatch
+      ? firstHeadingMatch[1].replace(/[^\w\s\-&]/g, "").trim().slice(0, 52)
+      : `${agentName || "Executive"} Workflow Playbook`;
+    const toneEl = document.getElementById("chat-tone-select");
+    const res = await fetch(getApiEndpoint("/api/harness/skills/generate"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: derivedTopic,
+        session_id: currentSessionId || "default_session",
+        context_text: responseText || "",
+        preferred_tone: toneEl ? toneEl.value : ""
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.skills) window.skillsRepoCache = data.skills;
+      if (data.skill && data.skill.name) {
+        if (!window.pinnedSkillsSet) window.pinnedSkillsSet = new Set();
+        window.pinnedSkillsSet.add(data.skill.name);
+      }
+      updateSkillsToolbarBadge();
+      renderPinnedSkillsTray();
+      renderSkillsRepoList();
+      if (btnEl) {
+        btnEl.innerHTML = `<span>Saved to Skill Repo!</span>`;
+        setTimeout(() => {
+          btnEl.disabled = false;
+          btnEl.innerHTML = origHtml;
+        }, 2000);
+      }
+      return;
+    }
+  } catch (e) {
+    console.error("Save as skill error:", e);
+  }
+  if (btnEl) {
+    btnEl.disabled = false;
+    btnEl.innerHTML = origHtml;
+  }
+}
+
+function openSkillEditorForm(skillName) {
+  const panel = document.getElementById("skill-editor-panel");
+  if (!panel) return;
+  panel.style.display = "flex";
+  const sk = skillName ? (window.skillsRepoCache || []).find(s => s.name === skillName) : null;
+
+  document.getElementById("skill-edit-title").value = sk ? (sk.title || "") : "";
+  document.getElementById("skill-edit-name").value = sk ? (sk.name || "") : "";
+  document.getElementById("skill-edit-desc").value = sk ? (sk.description || "") : "";
+  document.getElementById("skill-edit-triggers").value = sk ? (sk.triggers || []).join(", ") : "";
+  document.getElementById("skill-edit-tone").value = sk ? (sk.preferred_tone || "") : "";
+  document.getElementById("skill-edit-formats").value = sk ? (sk.output_formats || []).join(", ") : "pdf, docx, pptx";
+  document.getElementById("skill-edit-instructions").value = sk ? (sk.instructions || "") : "";
+}
+
+function closeSkillEditorForm() {
+  const panel = document.getElementById("skill-editor-panel");
+  if (panel) panel.style.display = "none";
+}
+
+async function saveSkillFromEditorForm() {
+  const title = (document.getElementById("skill-edit-title").value || "").trim();
+  const name = (document.getElementById("skill-edit-name").value || title || "custom-skill").trim();
+  const description = (document.getElementById("skill-edit-desc").value || "").trim();
+  const triggersRaw = (document.getElementById("skill-edit-triggers").value || "").trim();
+  const preferred_tone = (document.getElementById("skill-edit-tone").value || "").trim();
+  const formatsRaw = (document.getElementById("skill-edit-formats").value || "").trim();
+  const instructions = (document.getElementById("skill-edit-instructions").value || "").trim();
+
+  const triggers = triggersRaw.split(",").map(s => s.trim()).filter(Boolean);
+  const output_formats = formatsRaw.split(",").map(s => s.trim().replace(/^\./, "")).filter(Boolean);
+
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/skills"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        title,
+        description,
+        instructions,
+        preferred_tone,
+        triggers,
+        output_formats,
+        enabled: true
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.skills) window.skillsRepoCache = data.skills;
+      closeSkillEditorForm();
+      updateSkillsToolbarBadge();
+      renderSkillsRepoList();
+    }
+  } catch (e) {
+    console.error("Failed to save skill:", e);
+  }
+}
+
+async function toggleSkillEnabled(skillName, enabledState) {
+  try {
+    const res = await fetch(getApiEndpoint(`/api/harness/skills/${encodeURIComponent(skillName)}/toggle`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: enabledState })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.skills) window.skillsRepoCache = data.skills;
+      updateSkillsToolbarBadge();
+      renderSkillsRepoList();
+    }
+  } catch (e) {
+    console.error("Failed to toggle skill:", e);
+  }
+}
+
+async function deleteSkillFromRepo(skillName) {
+  try {
+    const res = await fetch(getApiEndpoint(`/api/harness/skills/${encodeURIComponent(skillName)}`), {
+      method: "DELETE"
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.skills) window.skillsRepoCache = data.skills;
+      if (window.pinnedSkillsSet) window.pinnedSkillsSet.delete(skillName);
+      updateSkillsToolbarBadge();
+      renderPinnedSkillsTray();
+      renderSkillsRepoList();
+    }
+  } catch (e) {
+    console.error("Failed to delete skill:", e);
+  }
+}
+
+function promptImproveSkill(skillName) {
+  const sk = (window.skillsRepoCache || []).find(s => s.name === skillName);
+  const label = sk ? (sk.title || sk.name) : skillName;
+  const input = document.getElementById("skill-ai-prompt-input");
+  if (input) {
+    input.value = `Improve the ${label} skill to also `;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+}
+
+function handleSlashCommandAutocomplete(textareaEl) {
+  const palette = document.getElementById("chat-slash-palette");
+  if (!palette || !textareaEl) return;
+  const val = textareaEl.value || "";
+  if (!val.startsWith("/") || val.includes("\n")) {
+    palette.style.display = "none";
+    return;
+  }
+
+  const query = val.slice(1).toLowerCase().trim();
+  const baseCommands = [
+    { cmd: "/skill ", desc: "Create a new reusable SKILL.md and save it in .slm/skills/", tag: "Skill Creator" },
+    { cmd: "/skill improve ", desc: "Evolve & refine an existing skill in .slm/skills/ (auto-increments version)", tag: "Self-Improving" },
+    { cmd: "/learn ", desc: "Distill current workflow into a permanent skill in .slm/skills/", tag: "Skill Repo" },
+    { cmd: "/skills", desc: "Open the Local Skill Repository & AI Skill Studio modal", tag: "Studio" },
+    { cmd: "/plan ", desc: "Decompose complex goal into a multi-step topological DAG", tag: "DAG Planner" },
+    { cmd: "/web ", desc: "Run query with live multi-source web search grounding", tag: "Web Search" }
+  ];
+
+  const skillCommands = (window.skillsRepoCache || []).map(sk => ({
+    cmd: `/use:${sk.name} `,
+    desc: `${sk.title} — ${sk.description || ""}`,
+    tag: ".slm/skills",
+    skillName: sk.name
+  }));
+
+  const allItems = [...baseCommands, ...skillCommands].filter(item => {
+    if (!query) return true;
+    return item.cmd.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
+  }).slice(0, 8);
+
+  if (allItems.length === 0) {
+    palette.style.display = "none";
+    return;
+  }
+
+  palette.style.display = "block";
+  palette.innerHTML = allItems.map(item => `
+    <div class="slash-palette-item" onclick="selectSlashCommandItem('${escapeHtmlSafe(item.cmd)}', '${escapeHtmlSafe(item.skillName || "")}')">
+      <span class="slash-cmd-code">${escapeHtmlSafe(item.cmd.trim())}</span>
+      <span class="slash-cmd-desc">${escapeHtmlSafe(item.desc)}</span>
+      <span class="slash-cmd-tag">${escapeHtmlSafe(item.tag)}</span>
+    </div>
+  `).join("");
+}
+
+function hideSlashCommandPalette() {
+  const palette = document.getElementById("chat-slash-palette");
+  if (palette) palette.style.display = "none";
+}
+
+function selectSlashCommandItem(cmdText, skillName) {
+  const inputEl = document.getElementById("chat-text-input");
+  hideSlashCommandPalette();
+  if (cmdText === "/skills") {
+    if (inputEl) inputEl.value = "";
+    openSkillsRepoModal();
+    return;
+  }
+  if (skillName) {
+    if (!window.pinnedSkillsSet) window.pinnedSkillsSet = new Set();
+    window.pinnedSkillsSet.add(skillName);
+    updateSkillsToolbarBadge();
+    renderPinnedSkillsTray();
+    if (inputEl) {
+      inputEl.value = "";
+      inputEl.focus();
+    }
+    return;
+  }
+  if (inputEl) {
+    inputEl.value = cmdText;
+    inputEl.focus();
+    autoResizeChatTextarea(inputEl);
+  }
+}
+
+window.stopActiveGeneration = stopActiveGeneration;
+window.toggleWebSearchMode = toggleWebSearchMode;
+window.exportAssistantMessage = exportAssistantMessage;
+window.handleHarnessProfileChange = handleHarnessProfileChange;
+window.submitHarnessApproval = submitHarnessApproval;
+window.submitHarnessClarification = submitHarnessClarification;
+window.toggleHarnessInspector = toggleHarnessInspector;
+window.switchInspectorTab = switchInspectorTab;
+window.inspectRunTrace = inspectRunTrace;
+window.inspectTurnCitations = inspectTurnCitations;
+window.rewindCurrentSession = rewindCurrentSession;
+window.forkCurrentSession = forkCurrentSession;
+window.openSkillsRepoModal = openSkillsRepoModal;
+window.closeSkillsRepoModal = closeSkillsRepoModal;
+window.togglePinSkill = togglePinSkill;
+window.clearPinnedSkills = clearPinnedSkills;
+window.generateSkillWithAI = generateSkillWithAI;
+window.learnSkillFromCurrentSession = learnSkillFromCurrentSession;
+window.saveResponseAsSkill = saveResponseAsSkill;
+window.openSkillEditorForm = openSkillEditorForm;
+window.closeSkillEditorForm = closeSkillEditorForm;
+window.saveSkillFromEditorForm = saveSkillFromEditorForm;
+window.toggleSkillEnabled = toggleSkillEnabled;
+window.deleteSkillFromRepo = deleteSkillFromRepo;
+window.renderSkillsRepoList = renderSkillsRepoList;
+window.promptImproveSkill = promptImproveSkill;
+window.handleSlashCommandAutocomplete = handleSlashCommandAutocomplete;
+window.selectSlashCommandItem = selectSlashCommandItem;
+window.hideSlashCommandPalette = hideSlashCommandPalette;
+
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(syncHarnessStatusHud, 200);
+  setTimeout(loadSkillsFromRepo, 250);
+  setupDownloadLinkInterceptor();
+});

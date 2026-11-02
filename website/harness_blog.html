@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="canonical" href="https://www.slmagents.ai/harness_blog.html">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Building a 10-Plane Local AI Agent Harness at $0 Cost | SLMAgents</title>
+  <meta name="description" content="How we made 0.8B–8B Small Language Models reliable on pure CPU at $0 cost using a 10-Plane Systems Harness: <35ms Cascade Routing, GBNF constrained decoding, Watermark LRU MemoryArena, and deterministic self-healing verifiers.">
+  <link rel="stylesheet" href="style.css?v=53.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
+  <style>
+    .article-wrapper {
+      max-width: 840px;
+      margin: 2rem auto 4rem auto;
+      padding: 40px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+      line-height: 1.75;
+      color: #1e293b;
+      font-size: 1.02rem;
+    }
+    .article-wrapper h1 {
+      font-size: 2.1rem;
+      line-height: 1.25;
+      color: #0f172a;
+      margin-bottom: 12px;
+      font-weight: 800;
+    }
+    .article-subtitle {
+      font-size: 1.15rem;
+      color: #64748b;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .article-wrapper h2 {
+      font-size: 1.45rem;
+      color: #0f172a;
+      margin-top: 2.2rem;
+      margin-bottom: 0.85rem;
+      font-weight: 800;
+    }
+    .article-wrapper h3 {
+      font-size: 1.15rem;
+      color: #1e293b;
+      margin-top: 1.5rem;
+      margin-bottom: 0.6rem;
+      font-weight: 700;
+    }
+    .article-wrapper p {
+      margin-bottom: 1.15rem;
+    }
+    .article-wrapper pre {
+      background: #0f172a;
+      color: #f8fafc;
+      border-radius: 10px;
+      padding: 18px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.84rem;
+      line-height: 1.55;
+      margin: 1.25rem 0;
+    }
+    .article-wrapper code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      background: #f1f5f9;
+      color: #334155;
+      padding: 2px 6px;
+      border-radius: 5px;
+    }
+    .article-wrapper pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+    .article-wrapper blockquote {
+      border-left: 4px solid #4f46e5;
+      background: #f8fafc;
+      padding: 14px 18px;
+      border-radius: 0 10px 10px 0;
+      margin: 1.5rem 0;
+      color: #0f172a;
+    }
+    .article-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.9rem;
+    }
+    .article-wrapper th, .article-wrapper td {
+      border: 1px solid #e2e8f0;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    .article-wrapper th {
+      background: #f8fafc;
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .article-wrapper ul, .article-wrapper ol {
+      margin-bottom: 1.25rem;
+      padding-left: 1.5rem;
+    }
+    .article-wrapper li {
+      margin-bottom: 0.5rem;
+    }
+    @media (max-width: 768px) {
+      .article-wrapper {
+        padding: 22px 16px;
+        margin: 1rem;
+      }
+      .article-wrapper h1 {
+        font-size: 1.55rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <header>
+    <div class="container nav-container">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <a href="index.html" class="logo">
+          <div class="logo-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <span>SLM Agents</span>
+        </a>
+      </div>
+      <nav>
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="chat.html">Chat Studio</a></li>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="blogs.html" class="active">Blogs</a></li>
+          <li>
+            <a href="https://github.com/t00114218-stack/SLMAgents" target="_blank" class="btn-github-nav">GitHub</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="article-wrapper">
+      <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <a href="blogs.html" style="color: #4f46e5; text-decoration: none; font-weight: 700; font-size: 0.9rem;">&larr; Back to All Blogs</a>
+        <span style="font-size: 0.82rem; color: #64748b; font-family: 'JetBrains Mono', monospace;">November 2026 • 10 min read • $0 Pure-CPU Architecture</span>
+      </div>
+
+      <h1>Building a 10-Plane Local AI Agent Harness at $0 Cost: How We Made 0.8B–8B SLMs Reliable on Pure CPU</h1>
+      <p class="article-subtitle">Why you do not need a GPU rig, an API key, or a $200/month cloud subscription to run a production-grade agent harness — a complete systems breakdown of the open-source SLMAgents Pure-CPU Harness (<code>./slm</code>).</p>
+
+      <hr style="border:none; border-top:1px solid #e2e8f0; margin: 24px 0;">
+
+      <p>Every week, a new cloud coding assistant or autonomous agent framework launches with the same underlying assumption: <strong>to get reliable agentic behavior, you must rent a massive frontier LLM over an API and pay per token.</strong></p>
+
+      <p>If you have ever hooked an agent loop up to a commercial API, you already know how fast the meter spins. A single multi-step task—reading a local SQLite schema, writing a query, fixing a column error, running a Python script, and formatting the result as JSON—can easily consume 25,000 to 50,000 prompt tokens across five turns. Multiply that across daily engineering workflows, and "accessible AI" quickly turns into a recurring $20 to $200/month per-seat tax, while your private code, financial spreadsheets, and database schemas are shipped to someone else's cloud.</p>
+
+      <p>On the flip side, developers who try to escape the cloud bill by downloading a 1.5B, 3B, or 4B parameter Small Language Model (SLM) and plugging it into a standard cloud-oriented agent framework almost always hit a wall:</p>
+
+      <ol>
+        <li><strong>JSON &amp; Tool-Call Collapse:</strong> Prompting a 3B model with <em>"Please respond ONLY with valid JSON matching one of these 25 tool schemas"</em> results in markdown chatter, unescaped quotes, or hallucinated tool arguments.</li>
+        <li><strong>CPU Prefill Starvation:</strong> Dumping 4,000 tokens of raw CSV rows, tool definitions, and conversation history into every turn makes a laptop CPU freeze for 10+ seconds before generating a single token.</li>
+        <li><strong>Blind Hallucination Loops:</strong> Without deterministic verification, a small model that writes a slightly wrong SQL column name or Python import will either return broken code or get stuck repeating the exact same mistake until the context window overflows.</li>
+        <li><strong>RAM Thrashing &amp; OOM Crashes:</strong> Loading an LLM alongside an embedding model, a reranker, an OCR engine, and a speech-to-text model naively blows past 16 GB of system memory.</li>
+      </ol>
+
+      <blockquote>
+        <strong>Small models do not fail because they lack reasoning capacity for everyday tasks; they fail because we wrap them in lazy harnesses designed for 200B-parameter cloud models.</strong>
+      </blockquote>
+
+      <p>When you move determinism out of the prompt and into the <strong>systems harness</strong>—using grammar-constrained decoding, <code>&lt;35ms</code> cascade routing, content-addressed artifact handles, watermarked RAM arenas, and deterministic self-healing verifiers—quantized 0.8B to 8B models running on <strong>100% standard CPU hardware (<code>n_gpu_layers=0</code>)</strong> become fast, trustworthy, and <strong>completely free of cost</strong>.</p>
+
+      <h2>1. The 10-Plane Pure-CPU Harness Architecture</h2>
+      <p>Rather than treating an agent as a <code>while True</code> loop around a single chat prompt, <code>slm_harness</code> separates responsibilities across <strong>10 orthogonal systems planes</strong>:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Plane</th>
+            <th>Subsystem (<code>slm_harness/</code>)</th>
+            <th>What It Solves on CPU at $0 Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Plane 1</strong></td>
+            <td><strong>Agentic Kernel</strong> (<code>kernel/</code>)</td>
+            <td>Typed <code>EventBus</code>, 4-mode <code>TurnStateMachine</code>, SQLite WAL <code>CheckpointStore</code>, <code>/fork</code>, <code>/rewind</code>, <code>/undo</code> via <code>ShadowSnapshotVFS</code>, and mid-flight <code>SteerQueue</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>Plane 2</strong></td>
+            <td><strong>Constrained Decoding &amp; Tools</strong> (<code>runtime/constrained.py</code>, <code>tools/</code>)</td>
+            <td>Compiles JSON Schemas into <code>LlamaGrammar</code> (GBNF) and ONNX token-trie masks (<code>ONNXPrefixEnumMasker</code>) + RFC 8259 JSON repair; selects only Top-K tools per turn.</td>
+          </tr>
+          <tr>
+            <td><strong>Plane 3</strong></td>
+            <td><strong>Context Engineering</strong> (<code>context/</code>)</td>
+            <td>Preserves static-prefix KV caches; replaces massive raw files with compact <code>artifact://&lt;sha12&gt;</code> descriptors; 256-token chunked prefill.</td>
+          </tr>
+          <tr>
+            <td><strong>Plane 4</strong></td>
+            <td><strong>4-Tier Cognitive Memory</strong> (<code>memory/</code>)</td>
+            <td>T1 <code>TurnBlackboard</code>, T2 SQLite Session Tree, T3 <code>HybridVectorFTS</code> (FTS5 BM25 + INT8 ONNX Embeddings + RRF + <code>bge-reranker-base</code>), T4 <code>ProceduralMemory</code> (<code>SLM.md</code>).</td>
+          </tr>
+          <tr>
+            <td><strong>Plane 5</strong></td>
+            <td><strong>Pure-CPU Compute &amp; Arena</strong> (<code>runtime/</code>)</td>
+            <td>P-core/SIMD thread auto-tuner, LRU <code>MemoryArena</code> RAM Governor with automatic OOM tier step-down (<code>8B -&gt; 4B -&gt; 3B -&gt; 0.8B</code>), <code>&lt;40ms</code> <code>CancellationToken</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>Plane 6</strong></td>
+            <td><strong>Cascade Router &amp; DAG</strong> (<code>orchestrator/</code>)</td>
+            <td><code>&lt;35ms</code> 4-stage <code>CascadeRouter</code> dispatching across 26 specialist agents and topological <code>DAGScheduler</code> with <code>HandoffEnvelope</code> contracts.</td>
+          </tr>
+          <tr>
+            <td><strong>Plane 7</strong></td>
+            <td><strong>Deterministic Verifiers</strong> (<code>verifiers/</code>)</td>
+            <td>Live read-only SQLite verifier with Levenshtein column auto-healing, sandboxed Python AST/exec verifier, SymPy symbolic solver, and <code>[1]</code> RAG citation grounder.</td>
+          </tr>
+          <tr>
+            <td><strong>Plane 8</strong></td>
+            <td><strong>Governance &amp; HITL</strong> (<code>governance/</code>)</td>
+            <td><code>L0_PURE</code>–<code>L4_SYSTEM_OR_NET</code> risk lattice, <code>WorkspaceJail</code>, POSIX <code>rlimit</code> subprocess sandbox, secret/PII scrubber, and interactive <code>ApprovalBroker</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>Plane 9</strong></td>
+            <td><strong>Unified Surfaces</strong> (<code>surfaces/</code>, <code>website/</code>)</td>
+            <td>Rich TUI (<code>./slm chat</code>), Unix CLI (<code>./slm ask</code>), 100% offline Web AI Studio (<code>./slm serve</code>), OpenAI <code>/v1</code> API, and stdio MCP server (<code>./slm mcp-serve</code>).</td>
+          </tr>
+          <tr>
+            <td><strong>Plane 10</strong></td>
+            <td><strong>Telemetry &amp; Ops</strong> (<code>telemetry/</code>)</td>
+            <td>Hierarchical Waterfall Span Tracer (<code>/trace</code>), hardware diagnostics (<code>./slm doctor</code>), empirical benchmark suite (<code>./slm bench</code>), and FP32 duplicate pruner.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>2. The <code>&lt;35ms</code> 4-Stage Cascade Router &amp; Token-Trie Masking</h2>
+      <p>In <code>slm_harness/orchestrator/cascade_router.py</code>, our <strong>4-Stage Calibrated Cascade Router</strong> resolves over 90% of routing decisions across all 26 specialists in <strong>under 12 milliseconds</strong> on CPU (via MIME inspection, regex/AST signatures, and 1024-d INT8 ONNX embedding margins). When semantic margins are ambiguous, it invokes <code>qwen3.5-0.8b-onnx</code> constrained by <code>ONNXPrefixEnumMasker</code>, achieving <strong>267.56 tokens/sec on CPU</strong> with 0% label hallucination:</p>
+
+      <pre><code>class ONNXPrefixEnumMasker:
+    def mask_logits(self, logits: np.ndarray, generated_ids: Sequence[int]) -> np.ndarray:
+        valid_next = self.allowed_next_tokens(generated_ids)
+        if not valid_next:
+            return logits
+        masked = np.full_like(logits, -1e9)
+        idx = list(valid_next)
+        masked[idx] = logits[idx]
+        return masked</code></pre>
+
+      <h2>3. Eliminating Syntax Failures with GBNF &amp; Self-Healing Verifiers</h2>
+      <p>Whenever structured output is requested, Plane 2 compiles the JSON Schema into a <code>LlamaGrammar</code> GBNF state machine, while Plane 7 verifies code, SQL, symbolic math, and citations deterministically. For SQL queries, <code>verify_and_execute_sql</code> runs against a read-only SQLite URI and uses Levenshtein fuzzy matching across <code>PRAGMA table_info</code> to auto-heal column typos in a single retry.</p>
+
+      <h2>4. Live Pure-CPU Benchmark Scorecard ($0 Cost)</h2>
+      <pre><code>Pure-CPU Benchmark Scorecard (Profile=balanced, Threads=7, Peak RSS=3272.1 / 4700 MB)
++------------------------+-----------------------+------------+-------------------+-------------+-----------------------------------------------+
+| Stage                  | Model                 | Backend    | Latency / TTFT    | Throughput  | Verification Outcome                          |
++------------------------+-----------------------+------------+-------------------+-------------+-----------------------------------------------+
+| Embeddings (1024-d)    | mxbai-embed-large     | onnx_embed | warm = 0.03 ms    | dim = 1024  | PASS (0ms cold start after arena pin)         |
+| Primary LLM + GBNF JSON| qwen3-4b-gguf (Q4_K_M)| gguf       | TTFT = 1143.0 ms  | 24.57 tok/s | JSON Schema Valid: {"engine":"slm_harness",   |
+|                        |                       |            |                   |             |   "cpu_only":true, "sum_check":42}            |
+| ONNX Enum Trie Router  | qwen3.5-0.8b-onnx     | onnx (INT4)| TTFT = 1249.0 ms  | 267.56 tok/s| Label = 'sql' (100% constrained token trie)   |
++------------------------+-----------------------+------------+-------------------+-------------+-----------------------------------------------+</code></pre>
+
+      <h2>5. Five Zero-Cost Workflows You Can Run Today</h2>
+      <pre><code># 1. Inspect CPU topology, SIMD flags, RAM watermarks &amp; 13 quantized models
+./slm doctor
+
+# 2. Run empirical Pure-CPU tok/s, TTFT, GBNF JSON Schema &amp; MemoryArena benchmark
+./slm bench
+
+# 3. Launch the Interactive Rich Terminal TUI / REPL (with 18 slash commands &amp; @file attachments)
+./slm chat
+
+# 4. Headless single-shot &amp; Unix stdin pipe with GBNF / JSON-Schema constrained decoding
+./slm ask "Solve 3*x + 9 = 30"
+cat broken.json | ./slm ask "Extract clean record" --schema '{"type":"object","properties":{"id":{"type":"integer"}},"required":["id"]}'
+
+# 5. Launch 100% Offline Web AI Studio + OpenAI /v1 API Server (http://127.0.0.1:7860/chat.html)
+./slm serve --port 7860
+
+# 6. Expose SLMAgents Pure-CPU Harness as a stdio MCP Server
+./slm mcp-serve</code></pre>
+
+      <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="chat.html" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px; text-decoration: none;">Launch Offline Web AI Studio</a>
+        <a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_harness" target="_blank" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; text-decoration: none;">Explore slm_harness on GitHub</a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

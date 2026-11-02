@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import threading
 import yaml
 import json
 import time
@@ -71,14 +72,21 @@ class SLMMemoryManager:
     _session_store: dict[str, SessionState] = {}
 
     def __init__(self, db_path=None):
+        self._lock = threading.RLock()
         self.config, _ = load_config()
         path = db_path or self.config.get("storage", {}).get("db_path", "~/.cache/slm_memory/user_state.db")
         self.db_path = os.path.expanduser(path)
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_db()
 
+    def _connect(self):
+        conn = sqlite3.connect(self.db_path, timeout=15.0, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        return conn
+
     def _init_db(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS facts ("

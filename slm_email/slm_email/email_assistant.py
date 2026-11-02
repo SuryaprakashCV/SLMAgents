@@ -46,9 +46,10 @@ class SLMEmailAssistant:
 
     def _init_model(self, model_path=None):
         try:
-            import main
-            if hasattr(main, "get_shared_onnx_genai"):
-                self.model, self.tokenizer = main.get_shared_onnx_genai()
+            from slm_harness.runtime.legacy_bridge import get_shared_genai, install_smart_og_dispatch
+            install_smart_og_dispatch()
+            if True:
+                self.model, self.tokenizer = get_shared_genai()
                 if self.model and self.tokenizer:
                     return
         except Exception:

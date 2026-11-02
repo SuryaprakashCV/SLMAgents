@@ -69,17 +69,25 @@ except ImportError:
 thread_local_data = threading.local()
 
 def prewarm_all_models():
-    print("[System] 🚀 Pre-warming fine-tuned Qwen 2.5 Coder Text2SQL & Orchestrator ONNX models in RAM...")
     try:
-        get_shared_onnx_genai()
-        get_shared_orchestrator()
-        from slm_text_to_sql import SLMTextToSQL
-        SLMTextToSQL()
-        import gc
-        gc.collect()
-        print("[System] ✅ Fine-tuned Qwen 2.5 Coder Text2SQL & Orchestrator pre-warmed with minimal RAM.")
+        from slm_harness.runtime import get_runtime
+        from slm_harness.runtime.legacy_bridge import install_smart_og_dispatch
+        from slm_harness.memory import WorkspaceIndexWatcher
+        from slm_harness.config import get_config
+
+        rt = get_runtime()
+        install_smart_og_dispatch()
+        cfg = get_config()
+        WorkspaceIndexWatcher().start_background_sync(cfg.workspace_dir)
+        print(
+            f"[System] ✅ SLMAgents 10-Plane Pure-CPU Harness ready "
+            f"(CPU={rt.topology.brand}, threads={rt.topology.recommended_inference_threads}, "
+            f"profile={cfg.profile.value}, RAM cap={cfg.ram_hard_limit_mb} MB)."
+        )
+        if os.environ.get("SLM_EAGER_PREWARM", "0") == "1":
+            get_shared_onnx_genai()
     except Exception as e:
-        print(f"[System] Pre-warm note: {e}")
+        print(f"[System] Harness startup note: {e}")
 
 if FastAPI is not None:
     app = FastAPI(title="SLM Agents Developer Portal")
@@ -247,8 +255,8 @@ class Qwen35ONNXGenerator:
             target_max = int(self.params.search_options["max_length"])
             self.max_tokens = max(1, target_max - seq_len)
         else:
-            self.max_tokens = 1024
-        global_token_cap = max(16, int(os.environ.get("SLM_MAX_GENERATED_TOKENS", 1200)))
+            self.max_tokens = 2400
+        global_token_cap = max(16, int(os.environ.get("SLM_MAX_GENERATED_TOKENS", 2400)))
         self.max_tokens = min(self.max_tokens, global_token_cap)
         
         with self.model.inference_lock:
@@ -349,68 +357,10 @@ class Qwen35ONNXGenerator:
 def get_shared_onnx_genai():
     global shared_model, shared_tokenizer
     if shared_model is None:
-        if os.path.exists(os.path.join(MODEL_PATH, "genai_config.json")) or os.path.exists(os.path.join(MODEL_PATH, "model.onnx")):
-            print(f"[System] Loading native ONNX GenAI model from: {MODEL_PATH}...")
-            try:
-                import onnxruntime_genai as native_og
-                shared_model = native_og.Model(MODEL_PATH)
-                shared_tokenizer = native_og.Tokenizer(shared_model)
-                print("[System] ✅ Native onnxruntime-genai model loaded successfully!")
-                return shared_model, shared_tokenizer
-            except Exception as e:
-                print(f"[System] Native ONNX GenAI load note: {e}")
+        from slm_harness.runtime.legacy_bridge import get_shared_genai, install_smart_og_dispatch
 
-
-        has_int4_weights = os.path.exists(os.path.join(MODEL_PATH, "genai_config.json")) or any(os.path.exists(os.path.join(MODEL_PATH, "onnx", f)) for f in ["model_q4.onnx", "decoder_model_merged_q4.onnx", "decoder_model_merged_quantized.onnx"])
-        if not has_int4_weights:
-            print(f"[System] Qwen2.5 Coder 3B ONNX model not found at {MODEL_PATH}. Downloading onnx-community/Qwen2.5-Coder-3B-Instruct (INT4)...")
-            if snapshot_download is not None:
-                snapshot_download(
-                    repo_id="onnx-community/Qwen2.5-Coder-3B-Instruct",
-                    local_dir=MODEL_PATH,
-                    allow_patterns=["*.json", "tokenizer*", "onnx/model_q4.*", "onnx/embed_tokens*"]
-                )
-            
-        print(f"[System] Initializing shared INT4 Quantized Qwen2.5-Coder 3B ONNX model from: {MODEL_PATH}...")
-
-        shared_model = Qwen35ONNXModel(MODEL_PATH)
-
-        shared_tokenizer = Qwen35ONNXTokenizer(shared_model)
-        
-        class MockModel:
-            def __new__(cls, *args, **kwargs):
-                return shared_model
-        class MockTokenizer:
-            def __new__(cls, *args, **kwargs):
-                return shared_tokenizer
-        class MockParams:
-            def __init__(self, model):
-                self.model = model
-                self.search_options = {}
-                self.input_ids = []
-            def set_search_options(self, **kwargs):
-                self.search_options.update(kwargs)
-        class MockGenerator:
-            def __new__(cls, model, params=None):
-                generator = Qwen35ONNXGenerator(shared_model, params)
-                input_ids = getattr(params, "input_ids", None) if params is not None else None
-                if input_ids is not None and len(input_ids) > 0:
-                    generator.append_tokens(input_ids)
-                return generator
-        
-        og.Model = MockModel
-        og.Tokenizer = MockTokenizer
-        og.GeneratorParams = MockParams
-        og.Generator = MockGenerator
-        if "onnxruntime_genai" in sys.modules:
-            sys.modules["onnxruntime_genai"].Model = MockModel
-            sys.modules["onnxruntime_genai"].Tokenizer = MockTokenizer
-            sys.modules["onnxruntime_genai"].GeneratorParams = MockParams
-            sys.modules["onnxruntime_genai"].Generator = MockGenerator
-        print("[System] Monkeypatched onnxruntime_genai classes globally with Qwen 3.5 0.8B ONNX runner successfully.")
-        if DynamicBatchEngine is not None:
-            DynamicBatchEngine.get_instance(shared_model, shared_tokenizer)
-            print("[System] 🚀 Dynamic Batching Engine initialized for 2 vCPU parallel inference.")
+        install_smart_og_dispatch()
+        shared_model, shared_tokenizer = get_shared_genai("coding")
     return shared_model, shared_tokenizer
 
 shared_orchestrator = None
@@ -449,6 +399,13 @@ class ChatRequest(BaseModel):
     attachments: list[ChatAttachment] = []
     history: list[dict] = []
     system_prompt: str = ""
+    use_harness: bool = True
+    web_search: bool = False
+    design_tone: str = ""
+    active_skills: list[str] = []
+    forced_mode: str = ""
+    json_schema: dict | None = None
+    max_tokens: int = 2400
 
 from slm_memory import SLMMemoryManager
 memory_mgr = SLMMemoryManager()
@@ -750,7 +707,23 @@ def parse_document_attachment(filename: str, b64_data: str) -> str:
             if content_parts:
                 return "\n".join(content_parts)
         except Exception as e:
-            print(f"[Docx Extraction] Failed: {e}")
+            print(f"[Docx Extraction] python-docx note: {e}")
+        try:
+            import io, zipfile, xml.etree.ElementTree as ET
+            with zipfile.ZipFile(io.BytesIO(raw_bytes)) as zf:
+                if "word/document.xml" in zf.namelist():
+                    root = ET.fromstring(zf.read("word/document.xml"))
+                    w_p = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+                    w_t = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+                    paras = []
+                    for p_node in root.iter(w_p):
+                        txt = "".join(t.text for t in p_node.iter(w_t) if t.text).strip()
+                        if txt and (not paras or paras[-1] != txt):
+                            paras.append(txt)
+                    if paras:
+                        return "\n".join(paras)
+        except Exception as e:
+            print(f"[Docx XML Extraction] Failed: {e}")
 
     # 4. PowerPoint Presentations (.pptx, .ppt)
     if name_lower.endswith(".pptx") or name_lower.endswith(".ppt"):
@@ -2856,6 +2829,23 @@ async def run_agent(req: RunAgentRequest):
 
 @app.post("/api/chat")
 def chat_endpoint(req: ChatRequest):
+    if getattr(req, "use_harness", True):
+        from slm_harness.surfaces.api_server import build_harness_chat_streaming_response
+
+        return build_harness_chat_streaming_response(
+            session_id=req.session_id,
+            req_id=req.req_id,
+            message=req.message,
+            target_agent=req.target_agent,
+            attachments=req.attachments,
+            forced_mode_str=req.forced_mode or None,
+            json_schema=req.json_schema,
+            web_search=req.web_search,
+            design_tone=req.design_tone,
+            active_skills=req.active_skills,
+            max_tokens=req.max_tokens,
+        )
+
     thought_queue = queue.Queue()
     token_queue = queue.Queue()
     result_container = {"result": None, "error": None, "done": False, "routed_agent": "SLMOrchestrator"}
@@ -2978,7 +2968,7 @@ def chat_endpoint(req: ChatRequest):
                     tmp_img_path = tmp_img.name
 
                 try:
-                    from slm_vision import SLMVisionParser
+                    from slm_vision_parser import SLMVisionParser
                     vision = SLMVisionParser()
                     thought_queue.put("Analyzing visual layout and OCR via Moondream2 ONNX...")
                     
@@ -3286,22 +3276,53 @@ async def get_system_stats():
     if ram_pct is None:
         ram_pct = round((used_gb / total_gb) * 100, 1)
 
+    active_model_label = "Qwen3 4B GGUF / Qwen2.5 ONNX (Pure CPU)"
+    profile_val = "balanced"
+    hard_limit_mb = 4700
+    loaded_models = []
+    cpu_brand = "CPU Neural Engine"
+    try:
+        from slm_harness.config import get_config
+        from slm_harness.runtime import get_process_rss_mb, get_runtime
+
+        rt = get_runtime()
+        cfg = get_config()
+        mem_mb = get_process_rss_mb()
+        profile_val = cfg.profile.value
+        hard_limit_mb = cfg.ram_hard_limit_mb
+        cpu_brand = f"{rt.topology.brand} ({rt.topology.recommended_inference_threads}T CPU)"
+        arena_st = rt.arena.status()
+        loaded_models = arena_st.get("loaded_models", [])
+        prim = cfg.resolve_model_spec("primary")
+        active_model_label = f"{prim.model_id} ({prim.backend.upper()} {prim.quantization})"
+    except Exception:
+        pass
+
     return {
         "process_ram_mb": mem_mb,
         "total_gb": total_gb,
         "total_ram_gb": total_gb,
         "used_ram_gb": used_gb,
         "ram_percent": ram_pct,
-        "model": "Qwen 2.5 Coder 3B ONNX (INT4 O4 Engine)",
-        "device": "CPU Neural Engine"
+        "profile": profile_val,
+        "ram_hard_limit_mb": hard_limit_mb,
+        "loaded_models": loaded_models,
+        "model": active_model_label,
+        "device": cpu_brand
     }
 
 @app.post("/api/system/clear-cache")
 async def clear_system_cache():
     try:
+        evicted = []
+        try:
+            from slm_harness.runtime import get_runtime
+            evicted = get_runtime().arena.evict_all()
+        except Exception:
+            pass
         import gc
         gc.collect()
-        return {"status": "success", "message": "RAM cache pruned and garbage collected successfully"}
+        return {"status": "success", "evicted_models": evicted, "message": "RAM cache pruned and garbage collected successfully"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -3322,6 +3343,13 @@ async def clear_session_endpoint(request: Request = None):
             mm.clear_all()
         else:
             mm.clear_session(session_id)
+            try:
+                from slm_harness.kernel import get_checkpoint_store
+                from slm_harness.memory import get_blackboard
+                get_checkpoint_store().clear_session(session_id)
+                get_blackboard().clear_session(session_id)
+            except Exception:
+                pass
         return {"status": "success", "cleared": True}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -3366,7 +3394,12 @@ async def handle_seo_redirects(request, call_next):
     path = request.url.path.rstrip("/")
     if path in PAGE_REDIRECTS:
         return RedirectResponse(url=PAGE_REDIRECTS[path], status_code=301)
-    return await call_next(request)
+    response = await call_next(request)
+    if path in ("", "/chat.html", "/index.html") or path.endswith((".html", ".js", ".css")):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 @app.get("/sitemap.xml")
 async def get_sitemap_xml():
@@ -3389,6 +3422,13 @@ async def get_robots_txt():
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(website_path, "chat.html"))
+
+if app is not None:
+    try:
+        from slm_harness.surfaces.api_server import mount_harness_routes
+        mount_harness_routes(app)
+    except Exception as _mount_exc:
+        print(f"[System] Warning mounting harness routes: {_mount_exc}")
 
 if os.path.exists(website_path):
     app.mount("/", StaticFiles(directory=website_path, html=True), name="website")

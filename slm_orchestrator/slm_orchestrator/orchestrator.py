@@ -598,8 +598,24 @@ class SLMOrchestrator:
         if is_simple_greeting or primary_agent == "SLMGeneralAssistant":
             return [primary_agent]
 
-        # Step 1: SLMTaskPlanner retrieves memory context, understands intent, and prepares detailed plan
-        # Step 2: Orchestrator gives the plan to the primary specialized agent
+        needs_planner = (
+            primary_agent == "SLMTaskPlanner"
+            or any(
+                w in q_lower
+                for w in [
+                    "pipeline",
+                    "multi-agent",
+                    "multi agent",
+                    "chain agents",
+                    "step by step plan",
+                    "and then",
+                    "roadmap",
+                ]
+            )
+        )
+        if not needs_planner:
+            return [primary_agent]
+
         pipeline = ["SLMTaskPlanner"]
         if primary_agent == "SLMTaskPlanner":
             if any(w in q_lower for w in ["execute", "implement", "build", "run", "code", "develop", "create"]):
@@ -987,15 +1003,10 @@ class SLMOrchestrator:
 
         # Ensure shared ONNX model is attached
         try:
-            main_mod = sys.modules.get("main") or sys.modules.get("__main__")
-            if not main_mod or not hasattr(main_mod, "get_shared_onnx_genai"):
-                try:
-                    import importlib
-                    main_mod = importlib.import_module("main")
-                except Exception:
-                    main_mod = None
-            if main_mod and hasattr(main_mod, "get_shared_onnx_genai"):
-                m, tok = main_mod.get_shared_onnx_genai()
+            from slm_harness.runtime.legacy_bridge import get_shared_genai, install_smart_og_dispatch
+            install_smart_og_dispatch()
+            if True:
+                m, tok = get_shared_genai()
                 if m and tok:
                     self.model = m
                     self.tokenizer = tok

@@ -36,11 +36,12 @@ class SLMTaskPlanner:
 
     def _init_model(self, model_path=None):
         try:
-            import main
-            if hasattr(main, "get_shared_onnx_genai"):
-                self.model, self.tokenizer = main.get_shared_onnx_genai()
+            from slm_harness.runtime.legacy_bridge import get_shared_genai, install_smart_og_dispatch
+            install_smart_og_dispatch()
+            if True:
+                self.model, self.tokenizer = get_shared_genai()
                 if self.model and self.tokenizer:
-                    self.model_path = getattr(main, "MODEL_PATH", "shared_onnx")
+                    self.model_path = getattr(self.model, "model_dir", "shared_onnx")
                     return
         except Exception as e:
             print(f"[SLMTaskPlanner] Shared model note: {e}")
@@ -53,7 +54,7 @@ class SLMTaskPlanner:
             os.path.join(base_models, "qwen2.5-coder-3b-onnx"),
             os.path.join(base_models, "qwen3.5-0.8b-onnx"),
             os.path.join(base_models, "phi-3.5-mini-instruct-onnx", "cpu_and_mobile", "cpu-int4-awq-block-128-acc-level-4"),
-            self.config.get("model", {}).get("path")
+            getattr(self, "config", {}).get("model", {}).get("path")
         ]
         resolved = None
         for c in candidates:
@@ -147,8 +148,8 @@ class SLMTaskPlanner:
             memory_manager=memory_manager or kwargs.get("memory_manager")
         )
 
-        # Re-verify model availability
-        if getattr(self, "model", None) is None or getattr(self, "tokenizer", None) is None:
+        # Re-verify model availability when initialized normally via __init__
+        if (getattr(self, "model", None) is None or getattr(self, "tokenizer", None) is None) and hasattr(self, "config"):
             self._init_model()
 
         # 1. Primary: Use LLM Neural Engine to generate rich, tailored milestone roadmap

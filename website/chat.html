@@ -6,15 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Chat Studio: Local Multi-Agent SLM Orchestrator | SLMAgents</title>
   <meta name="description" content="Full-page private AI Chat Studio powered by local SLM agents. Run code interpretation, Text-to-SQL, document RAG, and multi-agent workflows offline on CPU.">
-  <link rel="stylesheet" href="chat.css?v=2.1">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <!-- Highlight.js for code rendering -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <!-- Marked.js for markdown formatting -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="chat.css?v=8.0">
+  <!-- Offline Vendored Highlight.js & Marked.js (Zero External CDN Calls) -->
+  <link rel="stylesheet" href="vendor/github-dark.min.css">
+  <script src="vendor/highlight.min.js"></script>
+  <script src="vendor/marked.min.js"></script>
   <!-- OpenGraph / Social Meta Tags -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.slmagents.ai/chat.html">
@@ -157,6 +153,40 @@
         </div>
 
         <div class="top-actions-right">
+          <!-- CPU Profile & Backend Switcher + Live Telemetry HUD -->
+          <div class="harness-profile-bar" title="Switch Pure-CPU RAM Governor Profile &amp; Inference Backend">
+            <select id="harness-profile-select" class="harness-select" onchange="handleHarnessProfileChange()" aria-label="CPU Profile">
+              <option value="lite">CPU: Lite (2.6GB)</option>
+              <option value="balanced" selected>CPU: Balanced (4.7GB)</option>
+              <option value="power">CPU: Power (8.2GB)</option>
+            </select>
+            <select id="harness-backend-select" class="harness-select" onchange="handleHarnessProfileChange()" aria-label="CPU Backend">
+              <option value="auto" selected>Engine: Auto</option>
+              <option value="gguf">GGUF (llama.cpp)</option>
+              <option value="onnx">ONNX (INT4)</option>
+            </select>
+            <span class="harness-telemetry-pill" id="harness-telemetry-pill" title="Last / Live Pure-CPU Inference Throughput">
+              CPU Ready
+            </span>
+          </div>
+
+          <button type="button" class="btn-harness-top" onclick="rewindCurrentSession()" title="Rewind last turn &amp; undo workspace edits (/rewind)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+            <span>Rewind</span>
+          </button>
+          <button type="button" class="btn-harness-top" onclick="forkCurrentSession()" title="Fork conversation branch (/fork)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 15V9a2 2 0 0 0-2-2H9"></path><line x1="6" y1="9" x2="6" y2="15"></line></svg>
+            <span>Fork</span>
+          </button>
+          <button type="button" class="btn-harness-top" onclick="openSkillsRepoModal()" id="btn-top-skills-repo" title="Open Local Skill Repository (.slm/skills/) &amp; AI Skill Creator">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            <span>Skills Repo</span>
+          </button>
+          <button type="button" class="btn-harness-top" onclick="toggleHarnessInspector()" id="btn-toggle-inspector" title="Open Artifact, Citation &amp; Waterfall Trace Inspector">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            <span>Inspector</span>
+          </button>
+
           <button type="button" class="btn-top-mobile-new" onclick="createNewChatSession()" title="Start New Conversation">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span class="btn-text">New Chat</span>
@@ -260,43 +290,234 @@
           <button type="button" class="btn-voice-done" onclick="stopVoiceRecording()">Done</button>
         </div>
 
-        <!-- Sleek Floating Input Box -->
-        <form class="chat-command-form" id="chat-input-form" onsubmit="handleChatSubmit(event)">
-          
-          <!-- Attach File Button -->
+        <!-- External Composer Action Pills (Outside Input Box) -->
+        <div class="dock-external-toolbar" aria-label="Composer Tools">
+          <!-- Attach File Pill -->
           <input type="file" id="chat-file-input" style="display: none;" onchange="handleFileSelected(event)" multiple>
-          <button type="button" class="btn-dock-icon" title="Attach Document, Image, or Code (In-Memory Only)" onclick="document.getElementById('chat-file-input').click()">
-            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <button type="button" class="btn-dock-pill" title="Attach Document, Dataset, Image, or Code" onclick="document.getElementById('chat-file-input').click()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
             </svg>
+            <span>Attach</span>
           </button>
 
-          <!-- Voice Dictation Button -->
-          <button type="button" class="btn-dock-icon" id="chat-mic-btn" onclick="toggleVoiceRecording()" title="Speak Voice Command">
-            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <!-- Live Web Search Toggle Pill -->
+          <button type="button" class="btn-dock-websearch active" id="chat-websearch-btn" onclick="toggleWebSearchMode()" title="Live Web Search Enabled (Click to toggle)">
+            <span class="websearch-status-dot"></span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span>Web Search</span>
+          </button>
+
+          <!-- Document & Presentation Design Tone Selector Pill -->
+          <select id="chat-tone-select" class="dock-tone-select" title="Select Presentation &amp; Document Visual Theme / Tone">
+            <option value="" selected>Tone: Auto</option>
+            <option value="executive">Tone: Executive</option>
+            <option value="friendly">Tone: Friendly</option>
+            <option value="creative">Tone: Creative</option>
+            <option value="casual">Tone: Casual</option>
+            <option value="minimal">Tone: Minimal</option>
+            <option value="tech">Tone: High-Tech</option>
+          </select>
+
+          <!-- Declarative Skill Repository & AI Skill Creator Pill -->
+          <button type="button" class="btn-dock-pill btn-dock-skills" id="chat-skills-btn" onclick="openSkillsRepoModal()" title="Browse, Pin, or Create Skills in Local Skill Repo (.slm/skills/)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            <span id="chat-skills-btn-label">Skills</span>
+            <span class="dock-skill-count-badge" id="chat-skills-count-badge">8</span>
+          </button>
+        </div>
+
+        <!-- Pinned Active Skills Chips Tray -->
+        <div class="chat-active-skills-tray" id="chat-active-skills-tray" style="display: none;"></div>
+
+        <!-- Slash Command & Skill Repository Autocomplete Palette -->
+        <div class="chat-slash-palette" id="chat-slash-palette" style="display: none;"></div>
+
+        <!-- Sleek Floating Input Box (Only Mic + Textarea + Send/Stop inside) -->
+        <form class="chat-command-form" id="chat-input-form" onsubmit="handleChatSubmit(event)">
+          <!-- Voice Dictation Button (Inside Box) -->
+          <button type="button" class="btn-dock-icon" id="chat-mic-btn" onclick="toggleVoiceRecording()" title="Voice Dictation">
+            <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
             </svg>
           </button>
 
           <!-- Auto-Resizing Textarea -->
-          <textarea id="chat-text-input" class="chat-command-textarea" placeholder="Ask anything, request code, or speak..." rows="1" onkeydown="handleChatKeyDown(event)" oninput="autoResizeChatTextarea(this)"></textarea>
+          <textarea id="chat-text-input" class="chat-command-textarea" placeholder="Ask anything, attach documents, or type /skill to create &amp; run skills..." rows="1" onkeydown="handleChatKeyDown(event)" oninput="autoResizeChatTextarea(this); handleSlashCommandAutocomplete(this)"></textarea>
 
-          <!-- Submit / Send Button -->
-          <button type="submit" class="btn-dock-send" id="chat-send-btn" title="Send Message (Enter)" onclick="handleChatSubmit(event)">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
-          </button>
+          <!-- Unified Action Slot: Swaps cleanly between Send (idle) and Stop (generating) -->
+          <div class="dock-action-slot">
+            <button type="button" class="btn-dock-stop" id="chat-stop-btn" style="display: none;" title="Stop Generation Immediately (<40ms CPU Preemption)" aria-label="Stop Generation" onclick="stopActiveGeneration()">
+              <span class="stop-btn-ring" aria-hidden="true"></span>
+              <svg class="stop-btn-glyph" width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
+                <rect x="1.5" y="1.5" width="9" height="9" rx="2"></rect>
+              </svg>
+            </button>
+
+            <button type="submit" class="btn-dock-send" id="chat-send-btn" title="Send Message (Enter)" aria-label="Send Message" onclick="handleChatSubmit(event)">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5M5 12l7-7 7 7"/>
+              </svg>
+            </button>
+          </div>
         </form>
 
-        <!-- Discreet Privacy Footer -->
-        <div class="chat-dock-footer">
-          <span>⚡ Local ONNX CPU Engine • 🔒 100% Private (Zero Cloud Data) • Free &amp; Offline</span>
+        <!-- Discreet Architectural Footer -->
+        <div class="chat-dock-footer" id="chat-dock-engine-footer">
+          <span class="footer-meta-item">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>
+            <span>10-Plane CPU Runtime (GGUF + ONNX INT4)</span>
+          </span>
+          <span class="footer-meta-sep">&middot;</span>
+          <span class="footer-meta-item">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Local &amp; Private</span>
+          </span>
+          <span class="footer-meta-sep">&middot;</span>
+          <span class="footer-meta-item">OpenAI /v1 &amp; MCP Ready</span>
         </div>
       </div>
 
 
     </main>
+
+    <!-- Right-Hand Collapsible Artifact, Citation & Waterfall Trace Inspector Drawer -->
+    <aside class="harness-inspector-drawer" id="harness-inspector-drawer" style="display: none;">
+      <div class="inspector-header">
+        <div>
+          <strong>Harness Inspector</strong>
+          <div class="inspector-sub" id="inspector-subtitle">Artifacts • Citations • Span Waterfall</div>
+        </div>
+        <button type="button" class="btn-close-modal" onclick="toggleHarnessInspector(false)" title="Close Inspector">&times;</button>
+      </div>
+      <div class="inspector-tabs">
+        <button type="button" class="inspector-tab active" data-tab="trace" onclick="switchInspectorTab('trace')">Waterfall Trace</button>
+        <button type="button" class="inspector-tab" data-tab="citations" onclick="switchInspectorTab('citations')">Citations</button>
+        <button type="button" class="inspector-tab" data-tab="artifacts" onclick="switchInspectorTab('artifacts')">Artifacts</button>
+        <button type="button" class="inspector-tab" data-tab="skills" onclick="switchInspectorTab('skills')">Skills Repo</button>
+      </div>
+      <div class="inspector-body" id="inspector-body">
+        <div class="inspector-empty">Run a query or select a message's <strong>Waterfall Trace</strong> / <strong>Citations</strong> badge to inspect execution spans and grounded sources.</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Local Skill Repository (.slm/skills/) & Autonomous AI Skill Creator Modal -->
+  <div class="chat-modal-backdrop" id="skills-repo-modal" style="display: none;" onclick="closeSkillsRepoModal(event)">
+    <div class="chat-issue-modal-card skills-repo-modal-card" onclick="event.stopPropagation()">
+      <div class="issue-modal-header">
+        <div class="issue-modal-title">
+          <div class="issue-github-icon skill-repo-header-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+          </div>
+          <div>
+            <h3>Local Skill Repository &amp; Autonomous Skill Studio</h3>
+            <span class="issue-modal-sub">Declarative <code>SKILL.md</code> Repository: <code id="skills-repo-dir-label">.slm/skills/</code></span>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal" onclick="closeSkillsRepoModal()" title="Close">&times;</button>
+      </div>
+
+      <div class="issue-modal-body skills-repo-modal-body">
+        <!-- AI Skill Generator & Quick Actions Bar -->
+        <div class="skill-ai-generator-box">
+          <div class="skill-ai-generator-top">
+            <strong>Autonomous Skill Creator</strong>
+            <span>Describe any workflow or domain rule — the app generates a structured <code>SKILL.md</code> and saves it in <code>.slm/skills/</code></span>
+          </div>
+          <div class="skill-ai-generator-controls">
+            <input type="text" id="skill-ai-prompt-input" class="issue-input" placeholder="e.g. Kubernetes Postmortem Architect, LinkedIn Viral Tech Post Writer, FinOps Cost Auditor..." onkeydown="if(event.key==='Enter'){event.preventDefault(); generateSkillWithAI();}">
+            <button type="button" class="btn-issue-primary" id="btn-generate-skill-ai" onclick="generateSkillWithAI()">
+              <span>Create &amp; Save to Repo</span>
+            </button>
+            <button type="button" class="btn-issue-secondary" onclick="learnSkillFromCurrentSession()" title="Extract reusable skill from current conversation &amp; save to .slm/skills/">
+              <span>Learn from Chat</span>
+            </button>
+            <button type="button" class="btn-issue-secondary" onclick="openSkillEditorForm(null)" title="Author a custom SKILL.md manually">
+              <span>+ Manual Skill</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Inline Create/Edit Skill Form (Hidden by default) -->
+        <div class="skill-editor-panel" id="skill-editor-panel" style="display: none;">
+          <div class="skill-editor-header">
+            <strong id="skill-editor-title">Create / Edit Declarative Skill (SKILL.md)</strong>
+            <button type="button" class="btn-skill-mini" onclick="closeSkillEditorForm()">Cancel</button>
+          </div>
+          <div class="issue-form-row">
+            <div class="issue-form-group half">
+              <label for="skill-edit-title">Skill Title</label>
+              <input type="text" id="skill-edit-title" class="issue-input" placeholder="e.g. Executive Resume Architect">
+            </div>
+            <div class="issue-form-group half">
+              <label for="skill-edit-name">Repository Slug (<code>.slm/skills/&lt;slug&gt;/SKILL.md</code>)</label>
+              <input type="text" id="skill-edit-name" class="issue-input" placeholder="e.g. executive-resume-architect">
+            </div>
+          </div>
+          <div class="issue-form-group">
+            <label for="skill-edit-desc">Short Description</label>
+            <input type="text" id="skill-edit-desc" class="issue-input" placeholder="What this skill does and when it should activate...">
+          </div>
+          <div class="issue-form-row">
+            <div class="issue-form-group half">
+              <label for="skill-edit-triggers">Auto-Activation Triggers (comma-separated)</label>
+              <input type="text" id="skill-edit-triggers" class="issue-input" placeholder="resume, cv, ats, career profile">
+            </div>
+            <div class="issue-form-group half">
+              <label for="skill-edit-tone">Preferred Visual Tone &amp; Export Formats</label>
+              <div style="display:flex; gap:8px;">
+                <select id="skill-edit-tone" class="issue-select" style="flex:1;">
+                  <option value="">Tone: Auto</option>
+                  <option value="executive">Executive</option>
+                  <option value="friendly">Friendly</option>
+                  <option value="creative">Creative</option>
+                  <option value="casual">Casual</option>
+                  <option value="minimal">Minimal</option>
+                  <option value="tech">High-Tech</option>
+                </select>
+                <input type="text" id="skill-edit-formats" class="issue-input" style="flex:1;" placeholder="pptx, pdf, docx">
+              </div>
+            </div>
+          </div>
+          <div class="issue-form-group">
+            <label for="skill-edit-instructions">Skill Playbook &amp; Domain Instructions (Markdown)</label>
+            <textarea id="skill-edit-instructions" class="issue-textarea" rows="6" placeholder="# Skill Title&#10;&#10;## Purpose&#10;...&#10;&#10;## Execution Workflow&#10;1. ..."></textarea>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+            <button type="button" class="btn-issue-secondary" onclick="closeSkillEditorForm()">Cancel</button>
+            <button type="button" class="btn-issue-primary" onclick="saveSkillFromEditorForm()">Save SKILL.md to Repo</button>
+          </div>
+        </div>
+
+        <!-- Filter & Status Row -->
+        <div class="skill-repo-toolbar">
+          <input type="text" id="skill-search-input" class="issue-input skill-search-input" placeholder="Search skills in .slm/skills/ by name, trigger, or tag..." oninput="renderSkillsRepoList()">
+          <span class="skill-repo-stats" id="skill-repo-stats-label">Loading skills...</span>
+        </div>
+
+        <!-- Skill Cards Grid -->
+        <div class="skills-repo-grid" id="skills-repo-list">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+
+      <div class="issue-modal-footer">
+        <span style="font-size:0.78rem; color:#64748b; margin-right:auto;">
+          Tip: Type <code>/skill &lt;topic&gt;</code> in chat anytime and the app will create &amp; save a new skill to <code>.slm/skills/</code> automatically.
+        </span>
+        <button type="button" class="btn-issue-secondary" onclick="clearPinnedSkills()">Reset to Auto-Match</button>
+        <button type="button" class="btn-issue-primary" onclick="closeSkillsRepoModal()">Done</button>
+      </div>
+    </div>
   </div>
 
   <!-- GitHub Issue Reporter Modal -->
@@ -358,6 +579,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=80.0"></script>
+  <script src="app.js?v=96.0"></script>
 </body>
 </html>

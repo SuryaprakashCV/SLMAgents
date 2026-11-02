@@ -80,6 +80,11 @@ class SLMDocumentParser:
 
         if og is not None:
             try:
+                from slm_harness.runtime.legacy_bridge import install_smart_og_dispatch
+                install_smart_og_dispatch()
+            except Exception:
+                pass
+            try:
                 resolved_path = self._resolve_model_path(model_path, cache_dir)
                 if resolved_path and os.path.exists(resolved_path):
                     self.model_path = resolved_path

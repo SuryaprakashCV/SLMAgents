@@ -70,6 +70,11 @@ class SLMTextToSQL:
         if _shared_sql_model is None:
             with _shared_sql_lock:
                 if _shared_sql_model is None:
+                    try:
+                        from slm_harness.runtime.legacy_bridge import install_smart_og_dispatch
+                        install_smart_og_dispatch()
+                    except Exception:
+                        pass
                     print(f"[SLMTextToSQL] Loading shared ONNX model from: {self.model_path} (threads={n_threads})...")
                     _shared_sql_model = og.Model(self.model_path)
                     _shared_sql_tokenizer = og.Tokenizer(_shared_sql_model)
