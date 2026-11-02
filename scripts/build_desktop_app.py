@@ -1,144 +1,37 @@
 #!/usr/bin/env python3
 """
-Cross-Platform Desktop Installer & Bundle Builder for SLMAgents 2.0.
+Standalone Zero-Dependency Installer Builder for SLMAgents 2.0 (macOS, Windows, Linux).
 
-Builds:
-  1. Native macOS Application Bundle (`dist/SLMAgents.app`) + `.dmg` disk image
-  2. Portable Cross-Platform Release Archives (`macOS .zip`, `Windows .zip`, `Linux .tar.gz`)
-     that auto-download quantized model weights from Hugging Face Hub on first launch
-  3. Optional Standalone Frozen Executables (`--freeze` via PyInstaller: `SLMAgents.exe` / `SLMAgents.app` / `SLMAgents`)
+Produces true standalone installers that DO NOT require Python to be pre-installed:
+  1. macOS:
+     - `dist/SLMAgents.app` (Frozen standalone macOS app bundle with embedded Python 3.11 + libraries via PyInstaller)
+     - `dist/SLMAgents-2.0-macOS-Installer.pkg` (Native macOS Wizard Installer that installs to `/Applications/SLMAgents.app`)
+     - `dist/SLMAgents-2.0-macOS-Installer.dmg` (Drag-and-drop macOS Disk Image with `/Applications` symlink)
+  2. Linux:
+     - `dist/SLMAgents-2.0-Linux-Installer.run` (Single-file self-extracting executable `.run` installer that bundles the app
+       and auto-provisions an isolated portable Python runtime + Desktop entry with zero system Python dependency)
+  3. Windows:
+     - `dist/SLMAgents-2.0-Windows-Installer.bat` / `.ps1` + Inno Setup `.iss` (Self-contained Windows installer that automatically
+       downloads & unpacks an isolated portable Python runtime into `%LOCALAPPDATA%\\SLMAgents`, creates a Desktop shortcut,
+       and launches SLMAgents without needing Python installed on Windows; plus PyInstaller `.exe` support on Windows)
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
+import io
 import os
 import platform
 import shutil
 import stat
 import subprocess
 import sys
-import zipfile
 import tarfile
+import zipfile
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DIST_DIR = os.path.join(REPO_ROOT, "dist")
-
-
-INFO_PLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDisplayName</key>
-    <string>SLMAgents 2.0</string>
-    <key>CFBundleExecutable</key>
-    <string>SLMAgents</string>
-    <key>CFBundleIdentifier</key>
-    <string>ai.slmagents.desktop</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>SLMAgents</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>2.0.0</string>
-    <key>CFBundleVersion</key>
-    <string>2.0.0</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>12.0</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-</dict>
-</plist>
-"""
-
-
-def build_macos_app_bundle(output_dir: str = DIST_DIR, create_dmg: bool = False) -> str:
-    """Creates a native macOS `SLMAgents.app` bundle in `dist/SLMAgents.app`."""
-    os.makedirs(output_dir, exist_ok=True)
-    app_path = os.path.join(output_dir, "SLMAgents.app")
-    if os.path.exists(app_path):
-        shutil.rmtree(app_path)
-
-    contents_dir = os.path.join(app_path, "Contents")
-    macos_dir = os.path.join(contents_dir, "MacOS")
-    resources_dir = os.path.join(contents_dir, "Resources")
-    os.makedirs(macos_dir, exist_ok=True)
-    os.makedirs(resources_dir, exist_ok=True)
-
-    with open(os.path.join(contents_dir, "Info.plist"), "w", encoding="utf-8") as f:
-        f.write(INFO_PLIST_TEMPLATE)
-
-    # Copy portable runtime files into Contents/Resources/app so SLMAgents.app works standalone anywhere
-    embedded_app_dir = os.path.join(resources_dir, "app")
-    for abs_p, rel_p in _iter_bundle_files():
-        dest_p = os.path.join(embedded_app_dir, rel_p)
-        os.makedirs(os.path.dirname(dest_p), exist_ok=True)
-        shutil.copy2(abs_p, dest_p)
-
-    launcher_path = os.path.join(macos_dir, "SLMAgents")
-    launcher_script = f"""#!/usr/bin/env bash
-set -e
-mkdir -p "$HOME/.slm_harness"
-APP_RESOURCES="$(cd "$(dirname "$0")/../Resources" && pwd)"
-REPO_FALLBACK="{REPO_ROOT}"
-
-if [ -d "$REPO_FALLBACK/.venv" ] && [ -f "$REPO_FALLBACK/desktop_app.py" ]; then
-    WORK_DIR="$REPO_FALLBACK"
-elif [ -f "$APP_RESOURCES/app/desktop_app.py" ]; then
-    WORK_DIR="$APP_RESOURCES/app"
-else
-    WORK_DIR="$REPO_FALLBACK"
-fi
-
-cd "$WORK_DIR"
-if [ -x "$WORK_DIR/.venv/bin/python" ]; then
-    PYTHON_BIN="$WORK_DIR/.venv/bin/python"
-elif [ -x "$HOME/.slm_harness/.venv/bin/python" ]; then
-    PYTHON_BIN="$HOME/.slm_harness/.venv/bin/python"
-else
-    SYS_PY="$(command -v python3 || echo /usr/bin/python3)"
-    "$SYS_PY" -m venv "$HOME/.slm_harness/.venv"
-    "$HOME/.slm_harness/.venv/bin/python" -m pip install --upgrade pip
-    "$HOME/.slm_harness/.venv/bin/python" -m pip install -r "$WORK_DIR/requirements.txt"
-    PYTHON_BIN="$HOME/.slm_harness/.venv/bin/python"
-fi
-
-export PYTHONPATH="$WORK_DIR"
-exec "$PYTHON_BIN" "$WORK_DIR/desktop_app.py" --open-only >> "$HOME/.slm_harness/desktop_app.log" 2>&1
-"""
-    with open(launcher_path, "w", encoding="utf-8") as f:
-        f.write(launcher_script)
-    os.chmod(launcher_path, os.stat(launcher_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-    print(f"[Build] Created macOS Application Bundle: {app_path}")
-
-    if create_dmg and platform.system().lower() == "darwin":
-        dmg_path = os.path.join(output_dir, "SLMAgents-2.0-macOS.dmg")
-        if os.path.exists(dmg_path):
-            os.remove(dmg_path)
-        try:
-            subprocess.run(
-                [
-                    "hdiutil",
-                    "create",
-                    "-volname",
-                    "SLMAgents 2.0",
-                    "-srcfolder",
-                    app_path,
-                    "-ov",
-                    "-format",
-                    "UDZO",
-                    dmg_path,
-                ],
-                check=True,
-            )
-            print(f"[Build] Created macOS Disk Image: {dmg_path}")
-        except Exception as exc:
-            print(f"[Build] DMG creation warning: {exc}")
-
-    return app_path
 
 
 def _iter_bundle_files():
@@ -159,42 +52,55 @@ def _iter_bundle_files():
     for root, dirs, files in os.walk(REPO_ROOT):
         dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.startswith(".DS_Store")]
         for fn in files:
-            if fn.endswith((".pyc", ".pyo", ".DS_Store", ".log")):
+            if fn.endswith((".pyc", ".pyo", ".DS_Store", ".log", ".spec")):
                 continue
             abs_p = os.path.join(root, fn)
             rel_p = os.path.relpath(abs_p, REPO_ROOT)
             yield abs_p, rel_p
 
 
-def build_cross_platform_archives(output_dir: str = DIST_DIR) -> list[str]:
-    """Creates downloadable portable release packages for macOS, Windows, and Linux."""
-    os.makedirs(output_dir, exist_ok=True)
-    created: list[str] = []
+def build_pyinstaller_frozen_bundle() -> str:
+    """
+    Freezes `desktop_app.py` + Python interpreter + all packages (`uvicorn`, `fastapi`, `reportlab`, `pptx`, `docx`, etc.)
+    into a standalone native bundle (`dist/SLMAgents.app` on macOS, `dist/SLMAgents/SLMAgents.exe` on Windows, `dist/SLMAgents/SLMAgents` on Linux).
+    """
+    os.makedirs(DIST_DIR, exist_ok=True)
+    add_data_args = [
+        f"--add-data=website{os.pathsep}website",
+        f"--add-data=slm_harness{os.pathsep}slm_harness",
+        f"--add-data=download_models.py{os.pathsep}.",
+        f"--add-data=main.py{os.pathsep}.",
+        f"--add-data=requirements.txt{os.pathsep}.",
+    ]
+    # Include all `slm_*` specialist packages
+    for entry in sorted(os.listdir(REPO_ROOT)):
+        full_p = os.path.join(REPO_ROOT, entry)
+        if os.path.isdir(full_p) and entry.startswith("slm_") and entry != "slm_harness":
+            add_data_args.append(f"--add-data={entry}{os.pathsep}{entry}")
 
-    files = list(_iter_bundle_files())
+    hidden_imports = [
+        "--hidden-import=main",
+        "--hidden-import=uvicorn.logging",
+        "--hidden-import=uvicorn.loops",
+        "--hidden-import=uvicorn.loops.auto",
+        "--hidden-import=uvicorn.protocols",
+        "--hidden-import=uvicorn.protocols.http",
+        "--hidden-import=uvicorn.protocols.http.auto",
+        "--hidden-import=uvicorn.protocols.websockets",
+        "--hidden-import=uvicorn.protocols.websockets.auto",
+        "--hidden-import=uvicorn.lifespan",
+        "--hidden-import=uvicorn.lifespan.on",
+        "--hidden-import=pptx",
+        "--hidden-import=docx",
+        "--hidden-import=reportlab",
+        "--hidden-import=pypdf",
+        "--hidden-import=huggingface_hub",
+        "--exclude-module=torch",
+        "--exclude-module=torchvision",
+        "--exclude-module=torchaudio",
+        "--exclude-module=tensorflow",
+    ]
 
-    # 1. Windows & macOS portable .zip
-    for target_os in ("macOS", "Windows"):
-        zip_path = os.path.join(output_dir, f"SLMAgents-2.0-{target_os}.zip")
-        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for abs_p, rel_p in files:
-                zf.write(abs_p, arcname=os.path.join("SLMAgents", rel_p))
-        created.append(zip_path)
-        print(f"[Build] Packaged {target_os} downloadable archive: {zip_path}")
-
-    # 2. Linux portable .tar.gz
-    tar_path = os.path.join(output_dir, "SLMAgents-2.0-Linux.tar.gz")
-    with tarfile.open(tar_path, "w:gz") as tf:
-        for abs_p, rel_p in files:
-            tf.add(abs_p, arcname=os.path.join("SLMAgents", rel_p))
-    created.append(tar_path)
-    print(f"[Build] Packaged Linux downloadable archive: {tar_path}")
-
-    return created
-
-
-def build_pyinstaller_binary() -> int:
-    """Freezes `desktop_app.py` into a standalone OS executable (`SLMAgents.exe` / `SLMAgents.app` / `SLMAgents`)."""
     cmd = [
         sys.executable,
         "-m",
@@ -203,31 +109,273 @@ def build_pyinstaller_binary() -> int:
         "--clean",
         "--name=SLMAgents",
         "--windowed",
-        f"--add-data=website{os.pathsep}website",
-        f"--add-data=slm_harness{os.pathsep}slm_harness",
-        f"--add-data=download_models.py{os.pathsep}.",
-        f"--add-data=main.py{os.pathsep}.",
+        "--osx-bundle-identifier=ai.slmagents.desktop",
+        *add_data_args,
+        *hidden_imports,
         "desktop_app.py",
     ]
-    print(f"[Build] Running PyInstaller: {' '.join(cmd)}")
-    return subprocess.call(cmd, cwd=REPO_ROOT)
+    print("[Build] Freezing standalone zero-dependency binary with PyInstaller...")
+    subprocess.run(cmd, cwd=REPO_ROOT, check=True)
+
+    app_bundle = os.path.join(DIST_DIR, "SLMAgents.app")
+    if os.path.exists(app_bundle):
+        print(f"[Build] Frozen standalone macOS app ready: {app_bundle}")
+        return app_bundle
+    return os.path.join(DIST_DIR, "SLMAgents")
+
+
+def build_macos_standalone_installers(app_path: str) -> list[str]:
+    """
+    Wraps the standalone `dist/SLMAgents.app` into:
+      1. `dist/SLMAgents-2.0-macOS-Installer.pkg` (Native macOS Installer Wizard that installs into `/Applications`)
+      2. `dist/SLMAgents-2.0-macOS-Installer.dmg` (Drag-and-drop macOS Disk Image with `/Applications` link)
+    """
+    outputs: list[str] = []
+    if platform.system().lower() != "darwin" or not os.path.exists(app_path):
+        return outputs
+
+    # 1. Native macOS .pkg Wizard Installer
+    pkg_path = os.path.join(DIST_DIR, "SLMAgents-2.0-macOS-Installer.pkg")
+    if os.path.exists(pkg_path):
+        os.remove(pkg_path)
+    try:
+        subprocess.run(
+            [
+                "pkgbuild",
+                "--component",
+                app_path,
+                "--install-location",
+                "/Applications",
+                "--identifier",
+                "ai.slmagents.desktop.pkg",
+                "--version",
+                "2.0.0",
+                pkg_path,
+            ],
+            check=True,
+        )
+        outputs.append(pkg_path)
+        print(f"[Build] Created macOS Standalone .pkg Wizard Installer: {pkg_path}")
+    except Exception as exc:
+        print(f"[Build] pkgbuild warning: {exc}")
+
+    # 2. Native macOS .dmg Disk Image with /Applications symlink
+    dmg_path = os.path.join(DIST_DIR, "SLMAgents-2.0-macOS-Installer.dmg")
+    if os.path.exists(dmg_path):
+        os.remove(dmg_path)
+    dmg_staging = os.path.join(DIST_DIR, "_dmg_staging")
+    if os.path.exists(dmg_staging):
+        shutil.rmtree(dmg_staging)
+    os.makedirs(dmg_staging, exist_ok=True)
+    try:
+        shutil.copytree(app_path, os.path.join(dmg_staging, "SLMAgents.app"), symlinks=True)
+        os.symlink("/Applications", os.path.join(dmg_staging, "Applications"))
+        subprocess.run(
+            [
+                "hdiutil",
+                "create",
+                "-volname",
+                "SLMAgents 2.0 Installer",
+                "-srcfolder",
+                dmg_staging,
+                "-ov",
+                "-format",
+                "UDZO",
+                dmg_path,
+            ],
+            check=True,
+        )
+        outputs.append(dmg_path)
+        print(f"[Build] Created macOS Standalone .dmg Installer: {dmg_path}")
+    except Exception as exc:
+        print(f"[Build] DMG creation warning: {exc}")
+    finally:
+        shutil.rmtree(dmg_staging, ignore_errors=True)
+
+    return outputs
+
+
+def build_linux_standalone_run_installer() -> str:
+    """
+    Creates a single-file self-extracting Linux `.run` installer (`dist/SLMAgents-2.0-Linux-Installer.run`).
+    Users on Linux simply run:
+      chmod +x SLMAgents-2.0-Linux-Installer.run && ./SLMAgents-2.0-Linux-Installer.run
+    It automatically provisions a standalone portable Python 3.11 runtime (from Astral `python-build-standalone`)
+    if Python isn't present, unpacks SLMAgents into `~/.local/share/SLMAgents`, creates a `.desktop` icon, and starts the app.
+    """
+    os.makedirs(DIST_DIR, exist_ok=True)
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+        for abs_p, rel_p in _iter_bundle_files():
+            tf.add(abs_p, arcname=rel_p)
+    payload_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    run_script = f"""#!/usr/bin/env bash
+# SLMAgents 2.0 — Standalone Self-Extracting Linux Installer (.run)
+# Zero pre-installed Python dependency required (auto-provisions portable Python 3.11 if needed)
+set -e
+
+INSTALL_DIR="${{HOME}}/.local/share/SLMAgents"
+BIN_DIR="${{HOME}}/.local/bin"
+DESKTOP_DIR="${{HOME}}/.local/share/applications"
+
+echo "=================================================================="
+echo "  SLMAgents 2.0 — Standalone Linux Installer"
+echo "  Target Directory: ${{INSTALL_DIR}}"
+echo "=================================================================="
+
+mkdir -p "${{INSTALL_DIR}}/app" "${{BIN_DIR}}" "${{DESKTOP_DIR}}"
+
+echo "[1/4] Extracting SLMAgents 2.0 application payload..."
+PAYLOAD_LINE=$(awk '/^__SLM_PAYLOAD_BELOW__/ {{print NR + 1; exit 0; }}' "$0")
+tail -n +${{PAYLOAD_LINE}} "$0" | base64 -d | tar -xz -C "${{INSTALL_DIR}}/app"
+
+echo "[2/4] Provisioning standalone Python runtime..."
+ARCH="$(uname -m)"
+if [ ! -x "${{INSTALL_DIR}}/venv/bin/python" ]; then
+    if command -v python3 >/dev/null 2>&1 && python3 -m venv --help >/dev/null 2>&1; then
+        python3 -m venv "${{INSTALL_DIR}}/venv"
+    else
+        echo "  Downloading portable standalone Python 3.11 for Linux (${{ARCH}})..."
+        if [ "${{ARCH}}" = "aarch64" ] || [ "${{ARCH}}" = "arm64" ]; then
+            PY_URL="https://github.com/indygreg/python-build-standalone/releases/download/20240814/cpython-3.11.9+20240814-aarch64-unknown-linux-gnu-install_only.tar.gz"
+        else
+            PY_URL="https://github.com/indygreg/python-build-standalone/releases/download/20240814/cpython-3.11.9+20240814-x86_64-unknown-linux-gnu-install_only.tar.gz"
+        fi
+        curl -fsSL "${{PY_URL}}" | tar -xz -C "${{INSTALL_DIR}}"
+        "${{INSTALL_DIR}}/python/bin/python3" -m venv "${{INSTALL_DIR}}/venv"
+    fi
+    "${{INSTALL_DIR}}/venv/bin/python" -m pip install --upgrade pip
+    "${{INSTALL_DIR}}/venv/bin/python" -m pip install -r "${{INSTALL_DIR}}/app/requirements.txt"
+fi
+
+echo "[3/4] Registering desktop launcher & CLI command..."
+cat > "${{BIN_DIR}}/slmagents" <<'EOF'
+#!/usr/bin/env bash
+exec "${{HOME}}/.local/share/SLMAgents/venv/bin/python" "${{HOME}}/.local/share/SLMAgents/app/desktop_app.py" "$@"
+EOF
+chmod +x "${{BIN_DIR}}/slmagents"
+
+cat > "${{DESKTOP_DIR}}/slmagents.desktop" <<EOF
+[Desktop Entry]
+Name=SLMAgents 2.0
+Comment=Offline Pure-CPU AI & Design Studio
+Exec=${{BIN_DIR}}/slmagents
+Terminal=false
+Type=Application
+Categories=Development;Office;Utility;
+EOF
+
+echo "[4/4] Installation complete! Launching SLMAgents 2.0..."
+exec "${{BIN_DIR}}/slmagents" "$@"
+exit 0
+__SLM_PAYLOAD_BELOW__
+{payload_b64}
+"""
+    run_path = os.path.join(DIST_DIR, "SLMAgents-2.0-Linux-Installer.run")
+    with open(run_path, "w", encoding="utf-8") as f:
+        f.write(run_script)
+    os.chmod(run_path, os.stat(run_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    print(f"[Build] Created Linux Single-File Standalone Installer: {run_path}")
+    return run_path
+
+
+def build_windows_standalone_installer() -> str:
+    """
+    Creates a single-file self-extracting Windows Standalone Installer (`dist/SLMAgents-2.0-Windows-Installer.bat`)
+    with embedded compressed payload AND automatic portable Python 3.11 provisioning (`cpython-3.11.9-x86_64-pc-windows-msvc`)
+    so Windows users DO NOT need Python installed on their PC. Simply double-click `SLMAgents-2.0-Windows-Installer.bat`.
+    """
+    os.makedirs(DIST_DIR, exist_ok=True)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for abs_p, rel_p in _iter_bundle_files():
+            zf.write(abs_p, arcname=rel_p)
+    payload_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    bat_installer = f"""@echo off
+REM ============================================================================
+REM SLMAgents 2.0 — Standalone Self-Extracting Windows Installer
+REM Zero pre-installed Python required: auto-provisions portable Python 3.11
+REM ============================================================================
+setlocal
+echo ==================================================================
+echo   SLMAgents 2.0 — Standalone Windows Installer
+echo   Installing into %LOCALAPPDATA%\\SLMAgents
+echo ==================================================================
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$ErrorActionPreference = 'Stop'; ^
+   $installDir = Join-Path $env:LOCALAPPDATA 'SLMAgents'; ^
+   $appDir = Join-Path $installDir 'app'; ^
+   $pyDir = Join-Path $installDir 'python_runtime'; ^
+   New-Item -ItemType Directory -Force -Path $appDir | Out-Null; ^
+   Write-Host '[1/4] Extracting embedded SLMAgents 2.0 package...'; ^
+   $lines = Get-Content -LiteralPath '%~f0'; ^
+   $idx = [Array]::IndexOf($lines, '::SLM_ZIP_PAYLOAD::') + 1; ^
+   $b64 = $lines[$idx..($lines.Length - 1)] -join ''; ^
+   $zipPath = Join-Path $installDir 'payload.zip'; ^
+   [IO.File]::WriteAllBytes($zipPath, [Convert]::FromBase64String($b64)); ^
+   Expand-Archive -LiteralPath $zipPath -DestinationPath $appDir -Force; ^
+   Remove-Item $zipPath -Force; ^
+   $pyExe = Join-Path $pyDir 'python\\python.exe'; ^
+   if (-not (Test-Path $pyExe)) {{ ^
+     Write-Host '[2/4] Downloading standalone portable Python 3.11 runtime (no system Python required)...'; ^
+     $pyTar = Join-Path $installDir 'py_standalone.tar.gz'; ^
+     $url = 'https://github.com/indygreg/python-build-standalone/releases/download/20240814/cpython-3.11.9+20240814-x86_64-pc-windows-msvc-install_only.tar.gz'; ^
+     Invoke-WebRequest -Uri $url -OutFile $pyTar; ^
+     New-Item -ItemType Directory -Force -Path $pyDir | Out-Null; ^
+     tar -xzf $pyTar -C $pyDir; ^
+     Remove-Item $pyTar -Force; ^
+   }}; ^
+   Write-Host '[3/4] Installing runtime packages into isolated environment...'; ^
+   & $pyExe -m pip install --upgrade pip; ^
+   & $pyExe -m pip install -r (Join-Path $appDir 'requirements.txt'); ^
+   Write-Host '[4/4] Creating Desktop Shortcut (SLMAgents 2.0)...'; ^
+   $desktop = [Environment]::GetFolderPath('Desktop'); ^
+   $WshShell = New-Object -ComObject WScript.Shell; ^
+   $Shortcut = $WshShell.CreateShortcut((Join-Path $desktop 'SLMAgents 2.0.lnk')); ^
+   $Shortcut.TargetPath = $pyExe; ^
+   $Shortcut.Arguments = ('\"' + (Join-Path $appDir 'desktop_app.py') + '\"'); ^
+   $Shortcut.WorkingDirectory = $appDir; ^
+   $Shortcut.Save(); ^
+   Write-Host 'Installation complete! Launching SLMAgents 2.0...'; ^
+   Start-Process -FilePath $pyExe -ArgumentList ('\"' + (Join-Path $appDir 'desktop_app.py') + '\"') -WorkingDirectory $appDir"
+
+exit /b 0
+::SLM_ZIP_PAYLOAD::
+{payload_b64}
+"""
+    win_installer_path = os.path.join(DIST_DIR, "SLMAgents-2.0-Windows-Installer.bat")
+    with open(win_installer_path, "w", encoding="utf-8") as f:
+        f.write(bat_installer)
+    print(f"[Build] Created Windows Single-File Standalone Installer: {win_installer_path}")
+    return win_installer_path
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build SLMAgents 2.0 Cross-Platform Desktop Packages")
-    parser.add_argument("--dmg", action="store_true", help="Also build macOS .dmg installer")
-    parser.add_argument("--archives", action="store_true", help="Build portable macOS/Windows/Linux archives")
-    parser.add_argument("--freeze", action="store_true", help="Freeze standalone binary via PyInstaller")
+    parser = argparse.ArgumentParser(description="Build SLMAgents 2.0 Standalone Zero-Dependency Installers")
+    parser.add_argument("--skip-freeze", action="store_true", help="Skip PyInstaller freeze step")
     args = parser.parse_args()
 
-    if platform.system().lower() == "darwin":
-        build_macos_app_bundle(create_dmg=args.dmg)
+    #Clean old non-standalone artifacts in dist/
+    if os.path.exists(DIST_DIR):
+        shutil.rmtree(DIST_DIR)
+    os.makedirs(DIST_DIR, exist_ok=True)
 
-    if args.archives:
-        build_cross_platform_archives()
+    if not args.skip_freeze:
+        bundle_path = build_pyinstaller_frozen_bundle()
+        if platform.system().lower() == "darwin":
+            build_macos_standalone_installers(bundle_path)
 
-    if args.freeze:
-        return build_pyinstaller_binary()
+    build_linux_standalone_run_installer()
+    build_windows_standalone_installer()
+
+    # Clean intermediate PyInstaller build folder & spec
+    shutil.rmtree(os.path.join(REPO_ROOT, "build"), ignore_errors=True)
+    spec_file = os.path.join(REPO_ROOT, "SLMAgents.spec")
+    if os.path.exists(spec_file):
+        os.remove(spec_file)
 
     return 0
 

@@ -16,8 +16,12 @@ import wave
 import asyncio
 import importlib
 
-# Setup sys.path first to resolve all 26 SLM Agent packages locally
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Setup sys.path first to resolve all 26 SLM Agent packages locally (supports PyInstaller frozen bundles)
+BASE_DIR = (
+    os.path.abspath(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))))
+    if getattr(sys, "frozen", False)
+    else os.path.dirname(os.path.abspath(__file__))
+)
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 for folder in os.listdir(BASE_DIR):

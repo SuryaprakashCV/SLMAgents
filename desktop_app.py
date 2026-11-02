@@ -260,10 +260,11 @@ def run_desktop_app(
     server_thread: Optional[threading.Thread] = None
     if not reuse_server:
         import uvicorn
+        import main as slm_main
 
         def _serve() -> None:
             os.chdir(REPO_ROOT)
-            uvicorn.run("main:app", host=host, port=selected_port, log_level="warning")
+            uvicorn.run(slm_main.app, host=host, port=selected_port, log_level="warning")
 
         server_thread = threading.Thread(target=_serve, daemon=True, name="slm-desktop-uvicorn")
         server_thread.start()
