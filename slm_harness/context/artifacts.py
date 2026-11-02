@@ -41,8 +41,21 @@ def extract_openxml_text(abspath: str, ext: str) -> str:
                     parts.append(p.text.strip())
             for t in doc.tables:
                 for row in t.rows:
-                    cells = [c.text.strip().replace("\n", " ") for c in row.cells if c.text and c.text.strip()]
-                    if cells:
+                    cell_para_lists = [
+                        [p.text.strip() for p in c.paragraphs if p.text and p.text.strip()]
+                        for c in row.cells
+                    ]
+                    non_empty_cells = [cp for cp in cell_para_lists if cp]
+                    if not non_empty_cells:
+                        continue
+                    # If any cell is a multi-paragraph column (e.g. a 2-column Resume/CV layout table),
+                    # preserve every paragraph on its own line rather than flattening with " | "
+                    if any(len(cp) > 2 for cp in non_empty_cells):
+                        for cp in non_empty_cells:
+                            for para_line in cp:
+                                parts.append(para_line)
+                    else:
+                        cells = [" ".join(cp) for cp in non_empty_cells]
                         parts.append(" | ".join(cells))
         except Exception:
             pass
@@ -89,10 +102,19 @@ def extract_openxml_text(abspath: str, ext: str) -> str:
             pass
 
     # Deduplicate consecutive identical table/textbox lines while preserving order
+    import re as _re
+
     deduped: List[str] = []
     for p in parts:
-        if not deduped or deduped[-1] != p:
-            deduped.append(p)
+        # Split trailing uppercase section labels like "... Principal Architect CONTACT" or "... CORE SKILLS"
+        m_sec = _re.match(r"^(.+?)\s+(CONTACT|CORE SKILLS|EDUCATION|PATENT|PROFILE|EXPERIENCE)$", p.strip())
+        if m_sec:
+            sub_lines = [m_sec.group(1).strip(), m_sec.group(2).strip()]
+        else:
+            sub_lines = [p.strip()]
+        for sl in sub_lines:
+            if sl and (not deduped or deduped[-1] != sl):
+                deduped.append(sl)
     return "\n".join(deduped).strip()
 
 
@@ -198,8 +220,13 @@ class ArtifactStore:
         with self._lock:
             if aid in self._index:
                 cached = self._index[aid]
-                # Re-extract if an older cached .docx/.pptx/.pdf stored raw binary ZIP headers
-                if not cached.descriptor or "PK\x03\x04" in cached.descriptor or "\ufffd" in cached.descriptor:
+                # Re-extract if an older cached .docx/.pptx/.pdf stored raw binary ZIP headers or flattened 1-line table
+                if (
+                    not cached.descriptor
+                    or "PK\x03\x04" in cached.descriptor
+                    or "\ufffd" in cached.descriptor
+                    or (cached.line_count <= 2 and cached.byte_size > 1500 and cached.name.lower().endswith((".docx", ".doc", ".pptx", ".ppt")))
+                ):
                     self._index.pop(aid, None)
                 else:
                     return cached
@@ -247,8 +274,13 @@ class ArtifactStore:
         with self._lock:
             if aid in self._index:
                 cached = self._index[aid]
-                # Re-extract if an older cached .docx/.pptx/.pdf stored raw binary ZIP headers
-                if not cached.descriptor or "PK\x03\x04" in cached.descriptor or "\ufffd" in cached.descriptor:
+                # Re-extract if an older cached .docx/.pptx/.pdf stored raw binary ZIP headers or flattened 1-line table
+                if (
+                    not cached.descriptor
+                    or "PK\x03\x04" in cached.descriptor
+                    or "\ufffd" in cached.descriptor
+                    or (cached.line_count <= 2 and cached.byte_size > 1500 and cached.name.lower().endswith((".docx", ".doc", ".pptx", ".ppt")))
+                ):
                     self._index.pop(aid, None)
                 else:
                     return cached

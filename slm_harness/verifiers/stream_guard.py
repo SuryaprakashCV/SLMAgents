@@ -33,7 +33,12 @@ class StreamDegenerationGuard:
         # 2. Exact suffix phrase repeated `max_repeats` times consecutively or densely
         if len(tail) >= self.phrase_len * self.max_repeats:
             suffix = tail[-self.phrase_len :]
-            if len(suffix.strip()) >= 14 and tail.count(suffix) >= self.max_repeats:
+            if (
+                len(suffix.strip()) >= 14
+                and "/api/harness/download/" not in suffix
+                and "Download " not in suffix
+                and tail.count(suffix) >= self.max_repeats
+            ):
                 self.triggered = True
                 return True
 

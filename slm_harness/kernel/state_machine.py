@@ -326,8 +326,14 @@ class TurnStateMachine:
                 (_sreg_pre.is_skill_creation_intent(user_query) or _sreg_pre.is_skill_improvement_intent(user_query))
                 and not _sreg_pre.has_companion_task(user_query, has_attachments=bool(artifacts))
             )
+            _is_fast_export_turn = is_direct_download_followup(user_query) and bool(
+                artifacts
+                or bb.get(session_id, "last_substantial_content")
+                or bb.get(session_id, "last_attached_doc_text")
+            )
             run_web = (
                 not _is_skill_only
+                and not _is_fast_export_turn
                 and (
                     should_run_web_search(
                         user_query,
@@ -518,10 +524,19 @@ class TurnStateMachine:
 
             has_audio_art = any(a.kind == "audio" for a in artifacts)
             has_image_art = any(a.kind == "image" for a in artifacts)
+            fallback_doc = str(bb.get(session_id, "last_attached_doc_text") or last_session_content or "")
+            for art in artifacts:
+                if art.stored_text_path and os.path.isfile(art.stored_text_path):
+                    try:
+                        with open(art.stored_text_path, "r", encoding="utf-8", errors="ignore") as af:
+                            fallback_doc = af.read(12000)
+                        break
+                    except Exception:
+                        pass
+
             is_fast_download_request = (
                 json_schema is None
-                and not artifacts
-                and bool(last_session_content)
+                and bool(last_session_content or fallback_doc)
                 and is_direct_download_followup(user_query)
             )
             is_pure_skill_mutation_turn = (
@@ -540,20 +555,22 @@ class TurnStateMachine:
                 self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent="slm_skill_architect")
 
             elif is_fast_download_request:
+                route_dec.primary_agent = "slm_design_studio"
                 self.bus.emit(
                     EventType.STEP_STARTED,
                     rid,
                     session_id,
                     agent="slm_design_studio",
-                    message="Retrieving active presentation and document content from current session for multi-format compilation...",
+                    message="Design Review Agent: Auditing source document structure, career history, and metrics for presentation & file compilation...",
                 )
                 if any(w in user_query.lower() for w in ("ppt", "pptx", "powerpoint", "presentation", "slide", "deck")):
                     final_text = build_presentation_outline_markdown(
-                        last_session_content,
+                        last_session_content or fallback_doc,
                         title="Executive Presentation Deck",
+                        fallback_document_text=fallback_doc,
                     )
                 else:
-                    final_text = clean_export_content(last_session_content)
+                    final_text = clean_export_content(last_session_content or fallback_doc)
                 model_id_used = "slm-design-studio"
                 backend_used = "cpu-compiler"
                 ttft_ms = 12.0
@@ -708,15 +725,6 @@ class TurnStateMachine:
                     final_text = f"{skill_banner}{final_text}"
                 if len(final_text) >= 250:
                     bb.put(session_id, "last_substantial_content", clean_export_content(final_text))
-                fallback_doc = last_session_content
-                for art in artifacts:
-                    if art.stored_text_path and os.path.isfile(art.stored_text_path):
-                        try:
-                            with open(art.stored_text_path, "r", encoding="utf-8", errors="ignore") as af:
-                                fallback_doc = af.read(8000)
-                            break
-                        except Exception:
-                            pass
                 pref_tone = str(bb.get(session_id, "preferred_design_tone") or "")
                 new_text, exported_files, design_review = rewrite_and_materialize_downloads(
                     user_query=user_query,
@@ -725,7 +733,7 @@ class TurnStateMachine:
                     preferred_tone=pref_tone,
                 )
                 if design_review is not None:
-                    for d_step in design_review.to_thought_steps()[:4]:
+                    for d_step in design_review.to_thought_steps()[:5]:
                         self.bus.emit(
                             EventType.STEP_STARTED,
                             rid,

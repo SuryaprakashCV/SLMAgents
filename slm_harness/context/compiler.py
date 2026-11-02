@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from ..config import HarnessConfig, get_config
 from ..kernel.checkpoints import TurnNode
 from ..runtime import get_runtime
+from ..tools.file_exporter import clean_export_content
 from .artifacts import ArtifactEntry
 
 
@@ -148,10 +149,10 @@ class ContextCompiler:
         for t_idx, node in enumerate(reversed(list(lineage))):
             if node.role not in ("user", "assistant"):
                 continue
-            txt = node.content.strip()
+            txt = clean_export_content(node.content) if node.role == "assistant" else node.content.strip()
             if not txt:
                 continue
-            char_limit = 3800 if t_idx < 2 else 1400
+            char_limit = 2600 if t_idx < 2 else 1100
             if len(txt) > char_limit:
                 txt = txt[: char_limit - 50] + " ...[truncated]"
             ntoks = rt.count_tokens(txt) + 6
