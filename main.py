@@ -3427,6 +3427,99 @@ async def get_robots_txt():
 async def root():
     return FileResponse(os.path.join(website_path, "chat.html"))
 
+
+def _resolve_installer_catalog():
+    dist_dir = os.path.join(BASE_DIR, "dist")
+    items = [
+        {
+            "id": "macos-dmg",
+            "os": "macOS",
+            "title": "macOS Standalone Disk Image (.dmg)",
+            "subtitle": "Apple Silicon & Intel · Drag to Applications · Zero Python needed",
+            "filename": "SLMAgents-2.0-macOS-Installer.dmg",
+            "version": "2.0.0",
+            "media_type": "application/x-apple-diskimage",
+        },
+        {
+            "id": "macos-pkg",
+            "os": "macOS",
+            "title": "macOS Wizard Installer (.pkg)",
+            "subtitle": "Installs directly to /Applications/SLMAgents.app · Bundled Runtime",
+            "filename": "SLMAgents-2.0-macOS-Installer.pkg",
+            "version": "2.0.0",
+            "media_type": "application/octet-stream",
+        },
+        {
+            "id": "windows",
+            "os": "Windows",
+            "title": "Windows Standalone Installer (.bat)",
+            "subtitle": "Windows 10 / 11 (64-bit) · Auto-provisions Portable Python 3.11 + Shortcut",
+            "filename": "SLMAgents-2.0-Windows-Installer.bat",
+            "version": "2.0.0",
+            "media_type": "application/octet-stream",
+        },
+        {
+            "id": "linux",
+            "os": "Linux",
+            "title": "Linux Self-Extracting Installer (.run)",
+            "subtitle": "Ubuntu / Debian / Fedora (x86_64 & ARM64) · Single-file standalone .run",
+            "filename": "SLMAgents-2.0-Linux-Installer.run",
+            "version": "2.0.0",
+            "media_type": "application/x-sh",
+        },
+    ]
+    result = []
+    for item in items:
+        full_p = os.path.join(dist_dir, item["filename"])
+        exists = os.path.isfile(full_p)
+        size_mb = round(os.path.getsize(full_p) / (1024 * 1024), 1) if exists else None
+        result.append(
+            {
+                **item,
+                "available": exists,
+                "size_mb": size_mb,
+                "download_url": f"/api/installers/download/{item['id']}",
+            }
+        )
+    return result
+
+
+@app.get("/api/installers")
+async def list_desktop_installers():
+    return {"version": "2.0.0", "installers": _resolve_installer_catalog()}
+
+
+@app.get("/api/installers/download/{target_id}")
+async def download_desktop_installer(target_id: str):
+    dist_dir = os.path.join(BASE_DIR, "dist")
+    os.makedirs(dist_dir, exist_ok=True)
+    catalog = {entry["id"]: entry for entry in _resolve_installer_catalog()}
+    entry = catalog.get(target_id)
+    if not entry:
+        return Response(content="Unknown installer target", status_code=404)
+
+    file_path = os.path.join(dist_dir, entry["filename"])
+    if not os.path.isfile(file_path):
+        try:
+            from scripts import build_desktop_app
+
+            if target_id == "windows":
+                build_desktop_app.build_windows_standalone_installer()
+            elif target_id == "linux":
+                build_desktop_app.build_linux_standalone_run_installer()
+        except Exception as exc:
+            print(f"[Installer Builder] On-demand build error: {exc}")
+
+    if not os.path.isfile(file_path):
+        return Response(content=f"Installer {entry['filename']} not found in dist/.", status_code=404)
+
+    return FileResponse(
+        file_path,
+        media_type=entry["media_type"],
+        filename=entry["filename"],
+        headers={"Content-Disposition": f'attachment; filename="{entry["filename"]}"'},
+    )
+
 if app is not None:
     try:
         from slm_harness.surfaces.api_server import mount_harness_routes
