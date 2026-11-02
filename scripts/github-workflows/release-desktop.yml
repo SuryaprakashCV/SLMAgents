@@ -1,0 +1,44 @@
+name: Build Cross-Platform Desktop Installers (macOS / Windows / Linux)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform_name: macOS
+            artifact_glob: "dist/*"
+          - os: windows-latest
+            platform_name: Windows
+            artifact_glob: "dist/*"
+          - os: ubuntu-latest
+            platform_name: Linux
+            artifact_glob: "dist/*"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout SLMAgents 2.0
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build Cross-Platform Desktop Bundles
+        run: |
+          python scripts/build_desktop_app.py --dmg --archives
+
+      - name: Upload Desktop Installer Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SLMAgents-2.0-${{ matrix.platform_name }}
+          path: ${{ matrix.artifact_glob }}

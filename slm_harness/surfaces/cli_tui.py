@@ -785,6 +785,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=7860)
 
+    # app
+    p_app = sub.add_parser("app", help="Launch Native Cross-Platform Desktop App Window (macOS / Windows / Linux)")
+    p_app.add_argument("--host", default="127.0.0.1")
+    p_app.add_argument("--port", type=int, default=None)
+    p_app.add_argument("--skip-download", action="store_true")
+
     # doctor
     p_doc = sub.add_parser("doctor", help="Inspect CPU topology, SIMD, dependencies & quantized models")
     p_doc.add_argument("--json", action="store_true")
@@ -854,6 +860,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"Launching SLMAgents Pure-CPU AI Studio & OpenAI /v1 API at http://{parsed.host}:{parsed.port}/chat.html")
         uvicorn.run("main:app", host=parsed.host, port=parsed.port, log_level="info")
         return 0
+    if cmd == "app":
+        from desktop_app import run_desktop_app
+
+        return run_desktop_app(
+            host=parsed.host,
+            port=parsed.port,
+            profile=parsed.profile,
+            skip_download=parsed.skip_download,
+        )
 
     return 0
 

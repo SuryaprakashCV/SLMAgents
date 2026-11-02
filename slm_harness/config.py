@@ -22,8 +22,17 @@ except ImportError:
     yaml = None
 
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DEFAULT_MODELS_DIR = os.path.join(REPO_ROOT, "models")
+import sys
+
+REPO_ROOT = (
+    os.path.abspath(getattr(sys, "_MEIPASS", os.path.join(os.path.dirname(__file__), "..")))
+    if getattr(sys, "frozen", False)
+    else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+)
+USER_DATA_DIR = os.path.expanduser("~/.slm_harness")
+USER_MODELS_DIR = os.path.join(USER_DATA_DIR, "models")
+REPO_MODELS_DIR = os.path.join(REPO_ROOT, "models")
+DEFAULT_MODELS_DIR = REPO_MODELS_DIR if os.path.isdir(REPO_MODELS_DIR) else USER_MODELS_DIR
 
 
 class CPUProfile(str, Enum):
@@ -303,6 +312,9 @@ class HarnessConfig:
         while spec and spec.model_id not in visited:
             visited.add(spec.model_id)
             if os.path.exists(spec.abs_path(self.models_dir)):
+                return spec
+            if os.path.exists(spec.abs_path(USER_MODELS_DIR)):
+                self.models_dir = USER_MODELS_DIR
                 return spec
             if spec.fallback_model_id and spec.fallback_model_id in MODEL_CATALOG:
                 spec = MODEL_CATALOG[spec.fallback_model_id]
