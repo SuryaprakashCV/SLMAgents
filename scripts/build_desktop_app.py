@@ -2,16 +2,9 @@
 """
 Standalone Zero-Dependency Installer Builder for SLMAgents 2.0 (macOS, Windows, Linux).
 
-Produces true standalone installers that DO NOT require Python to be pre-installed:
-  1. macOS:
-     - `assets/SLMAgents.icns` (Custom high-res macOS App Icon)
-     - `dist/SLMAgents.app` (Frozen standalone macOS app bundle with native Cocoa WKWebView + Python 3.11 + libraries)
-     - `dist/SLMAgents-2.0-macOS-Installer.pkg` (Native macOS Wizard Installer with postinstall quarantine removal)
-     - `dist/SLMAgents-2.0-macOS-Installer.dmg` (Drag-and-drop macOS Disk Image with `/Applications` link + 1-click installer)
-  2. Linux:
-     - `dist/SLMAgents-2.0-Linux-Installer.run` (Single-file self-extracting executable `.run` installer)
-  3. Windows:
-     - `dist/SLMAgents-2.0-Windows-Installer.bat` (Single-file self-extracting Windows standalone installer)
+Produces true standalone installers that DO NOT require Python to be pre-installed,
+with a bespoke Silicon-Neural-Agent custom icon (`SLMAgents.icns` / `.ico` / `.png`)
+and a pure Chat-only UI payload (excluding `index.html`, `blogs.html`, `playground.html`).
 """
 
 from __future__ import annotations
@@ -19,6 +12,7 @@ from __future__ import annotations
 import argparse
 import base64
 import io
+import math
 import os
 import platform
 import shutil
@@ -28,6 +22,7 @@ import sys
 import tempfile
 import tarfile
 import zipfile
+from typing import Optional
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DIST_DIR = os.path.join(REPO_ROOT, "dist")
@@ -35,77 +30,219 @@ ASSETS_DIR = os.path.join(REPO_ROOT, "assets")
 
 
 def generate_macos_icns() -> Optional[str]:
-    """Generates a crisp custom macOS `.icns` icon (`assets/SLMAgents.icns`) using Pillow + `iconutil`."""
-    if platform.system().lower() != "darwin":
-        return None
+    """
+    Renders a bespoke, supersampled 2048x2048 -> 1024x1024 SLMAgents 2.0 Installer & App Icon:
+      - Deep Obsidian-Indigo macOS squircle with neon cyan/violet rim
+      - 32 glowing gold/cyan CPU microprocessor pins around a dark-titanium silicon die
+      - 3D Isometric Neural Agent Prism (Cyan, Violet, Emerald) with glowing synaptic nodes at the center
+    """
     os.makedirs(ASSETS_DIR, exist_ok=True)
-    icns_path = os.path.join(ASSETS_DIR, "SLMAgents.icns")
-    try:
-        from PIL import Image, ImageDraw
+    web_assets = os.path.join(REPO_ROOT, "website", "assets")
+    os.makedirs(web_assets, exist_ok=True)
 
-        size = 1024
-        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    icns_path = os.path.join(ASSETS_DIR, "SLMAgents.icns")
+    png_path = os.path.join(ASSETS_DIR, "SLMAgents.png")
+    ico_path = os.path.join(ASSETS_DIR, "SLMAgents.ico")
+    web_png_path = os.path.join(web_assets, "slm-installer-icon.png")
+
+    try:
+        from PIL import Image, ImageDraw, ImageFilter
+
+        ss = 2048  # 2x supersampling for crisp anti-aliased edges
+        img = Image.new("RGBA", (ss, ss), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        # Rounded squircle background with rich indigo/violet tone
-        margin = 64
+        # 1. Outer Squircle Shadow & Base
+        margin = 120
         draw.rounded_rectangle(
-            [margin, margin, size - margin, size - margin],
-            radius=210,
-            fill=(79, 70, 229, 255),
+            [margin, margin, ss - margin, ss - margin],
+            radius=410,
+            fill=(11, 15, 30, 255),
+            outline=(99, 102, 241, 255),
+            width=24,
+        )
+
+        # Inner glowing frame
+        inner_frame = 168
+        draw.rounded_rectangle(
+            [inner_frame, inner_frame, ss - inner_frame, ss - inner_frame],
+            radius=365,
+            fill=(22, 27, 58, 255),
+            outline=(56, 189, 248, 190),
+            width=10,
+        )
+
+        # Subtle circuit grid lines across background
+        for offset in range(380, ss - 380, 160):
+            draw.line([(offset, 220), (offset, ss - 220)], fill=(56, 189, 248, 28), width=4)
+            draw.line([(220, offset), (ss - 220, offset)], fill=(167, 139, 250, 28), width=4)
+
+        # 2. Silicon CPU Microprocessor Pins (Top, Bottom, Left, Right)
+        chip_margin = 430
+        pin_len = 115
+        pin_w = 34
+        pin_positions = [560, 720, 880, 1024, 1168, 1328, 1488]
+        for pos in pin_positions:
+            # Top pins
+            draw.rounded_rectangle(
+                [pos - pin_w // 2, chip_margin - pin_len, pos + pin_w // 2, chip_margin + 20],
+                radius=12,
+                fill=(56, 189, 248, 255),
+            )
+            draw.ellipse([pos - 18, chip_margin - pin_len - 18, pos + 18, chip_margin - pin_len + 18], fill=(167, 139, 250, 255))
+            # Bottom pins
+            draw.rounded_rectangle(
+                [pos - pin_w // 2, ss - chip_margin - 20, pos + pin_w // 2, ss - chip_margin + pin_len],
+                radius=12,
+                fill=(52, 211, 153, 255),
+            )
+            draw.ellipse([pos - 18, ss - chip_margin + pin_len - 18, pos + 18, ss - chip_margin + pin_len + 18], fill=(56, 189, 248, 255))
+            # Left pins
+            draw.rounded_rectangle(
+                [chip_margin - pin_len, pos - pin_w // 2, chip_margin + 20, pos + pin_w // 2],
+                radius=12,
+                fill=(167, 139, 250, 255),
+            )
+            draw.ellipse([chip_margin - pin_len - 18, pos - 18, chip_margin - pin_len + 18, pos + 18], fill=(56, 189, 248, 255))
+            # Right pins
+            draw.rounded_rectangle(
+                [ss - chip_margin - 20, pos - pin_w // 2, ss - chip_margin + pin_len, pos + pin_w // 2],
+                radius=12,
+                fill=(56, 189, 248, 255),
+            )
+            draw.ellipse([ss - chip_margin + pin_len - 18, pos - 18, ss - chip_margin + pin_len + 18, pos + 18], fill=(52, 211, 153, 255))
+
+        # 3. Central Silicon Processor Die Body
+        draw.rounded_rectangle(
+            [chip_margin, chip_margin, ss - chip_margin, ss - chip_margin],
+            radius=170,
+            fill=(15, 23, 42, 255),
             outline=(129, 140, 248, 255),
-            width=14,
+            width=18,
         )
-
-        # Inner highlight card
-        inner = 130
+        die_inner = chip_margin + 54
         draw.rounded_rectangle(
-            [inner, inner, size - inner, size - inner],
-            radius=160,
-            fill=(49, 46, 129, 255),
+            [die_inner, die_inner, ss - die_inner, ss - die_inner],
+            radius=130,
+            fill=(30, 27, 75, 255),
+            outline=(56, 189, 248, 120),
+            width=6,
         )
 
-        # Draw 3 stacked isometric agent layers (matching SLMAgents logo)
-        cx = size // 2
-        layer_offsets = [(380, (56, 189, 248, 255)), (520, (167, 139, 250, 255)), (660, (52, 211, 153, 255))]
-        for cy, color in reversed(layer_offsets):
-            pts = [
-                (cx, cy - 125),
-                (cx + 250, cy),
-                (cx, cy + 125),
-                (cx - 250, cy),
+        # 4. 3D Isometric Stacked Neural Agent Prism inside the CPU Core
+        cx = ss // 2
+        layers = [
+            (1220, (16, 185, 129, 245), (167, 243, 208, 255)),   # Bottom Emerald Layer (Tools/Verifiers)
+            (1015, (124, 58, 237, 245), (221, 214, 254, 255)),   # Middle Violet Layer (Multi-Agent Kernel)
+            (810, (14, 165, 233, 250), (224, 242, 254, 255)),    # Top Cyan Layer (Pure-CPU Reasoning)
+        ]
+        rx, ry, thickness = 340, 165, 58
+        for cy, fill_col, rim_col in layers:
+            # 3D side extrusions
+            left_side = [
+                (cx - rx, cy),
+                (cx, cy + ry),
+                (cx, cy + ry + thickness),
+                (cx - rx, cy + thickness),
             ]
-            draw.polygon(pts, fill=color, outline=(255, 255, 255, 235))
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            iconset_dir = os.path.join(tmpdir, "SLMAgents.iconset")
-            os.makedirs(iconset_dir, exist_ok=True)
-            icon_specs = [
-                (16, "icon_16x16.png"),
-                (32, "icon_16x16@2x.png"),
-                (32, "icon_32x32.png"),
-                (64, "icon_32x32@2x.png"),
-                (128, "icon_128x128.png"),
-                (256, "icon_128x128@2x.png"),
-                (256, "icon_256x256.png"),
-                (512, "icon_256x256@2x.png"),
-                (512, "icon_512x512.png"),
-                (1024, "icon_512x512@2x.png"),
+            right_side = [
+                (cx + rx, cy),
+                (cx, cy + ry),
+                (cx, cy + ry + thickness),
+                (cx + rx, cy + thickness),
             ]
-            for px, filename in icon_specs:
-                resized = img.resize((px, px), Image.Resampling.LANCZOS)
-                resized.save(os.path.join(iconset_dir, filename), "PNG")
+            darker = (max(0, fill_col[0] - 45), max(0, fill_col[1] - 45), max(0, fill_col[2] - 45), 255)
+            deep = (max(0, fill_col[0] - 75), max(0, fill_col[1] - 75), max(0, fill_col[2] - 75), 255)
+            draw.polygon(left_side, fill=darker)
+            draw.polygon(right_side, fill=deep)
 
-            subprocess.run(["iconutil", "-c", "icns", iconset_dir, "-o", icns_path], check=True)
-        print(f"[Build] Generated custom macOS icon: {icns_path}")
+            # Top diamond face
+            top_face = [
+                (cx, cy - ry),
+                (cx + rx, cy),
+                (cx, cy + ry),
+                (cx - rx, cy),
+            ]
+            draw.polygon(top_face, fill=fill_col, outline=rim_col)
+            draw.line([top_face[0], top_face[1], top_face[2], top_face[3], top_face[0]], fill=rim_col, width=10)
+
+        # Central glowing neural core node on top diamond
+        node_r = 46
+        draw.ellipse([cx - node_r, 810 - node_r, cx + node_r, 810 + node_r], fill=(255, 255, 255, 255), outline=(56, 189, 248, 255), width=10)
+
+        # Downsample to 1024x1024 master icon
+        master = img.resize((1024, 1024), Image.Resampling.LANCZOS)
+        master.save(png_path, "PNG")
+        master.resize((256, 256), Image.Resampling.LANCZOS).save(web_png_path, "PNG")
+        master.save(ico_path, format="ICO", sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])
+
+        if platform.system().lower() == "darwin":
+            with tempfile.TemporaryDirectory() as tmpdir:
+                iconset_dir = os.path.join(tmpdir, "SLMAgents.iconset")
+                os.makedirs(iconset_dir, exist_ok=True)
+                icon_specs = [
+                    (16, "icon_16x16.png"),
+                    (32, "icon_16x16@2x.png"),
+                    (32, "icon_32x32.png"),
+                    (64, "icon_32x32@2x.png"),
+                    (128, "icon_128x128.png"),
+                    (256, "icon_128x128@2x.png"),
+                    (256, "icon_256x256.png"),
+                    (512, "icon_256x256@2x.png"),
+                    (512, "icon_512x512.png"),
+                    (1024, "icon_512x512@2x.png"),
+                ]
+                for px, filename in icon_specs:
+                    resized = master.resize((px, px), Image.Resampling.LANCZOS)
+                    resized.save(os.path.join(iconset_dir, filename), "PNG")
+
+                subprocess.run(["iconutil", "-c", "icns", iconset_dir, "-o", icns_path], check=True)
+        print(f"[Build] Generated bespoke SLMAgents Neural-CPU Icon: {icns_path}")
         return icns_path
     except Exception as exc:
         print(f"[Build] Icon generation warning: {exc}")
         return icns_path if os.path.isfile(icns_path) else None
 
 
+def apply_finder_file_icon(target_path: str) -> None:
+    """Applies `assets/SLMAgents.png` directly onto a `.dmg`, `.pkg`, or `.app` in macOS Finder via `NSWorkspace`."""
+    if platform.system().lower() != "darwin" or not os.path.exists(target_path):
+        return
+    png_path = os.path.join(ASSETS_DIR, "SLMAgents.png")
+    if not os.path.isfile(png_path):
+        return
+    try:
+        from AppKit import NSImage, NSWorkspace  # type: ignore
+
+        ns_img = NSImage.alloc().initWithContentsOfFile_(png_path)
+        if ns_img is not None:
+            NSWorkspace.sharedWorkspace().setIcon_forFile_options_(ns_img, os.path.abspath(target_path), 0)
+    except Exception as exc:
+        print(f"[Build] NSWorkspace icon stamp note for {target_path}: {exc}")
+
+
+# Marketing/web-only pages excluded from the downloaded Desktop Chat App
+DESKTOP_EXCLUDED_WEB_FILES = {
+    "index.html",
+    "blogs.html",
+    "playground.html",
+    "sitemap.xml",
+    "robots.txt",
+}
+
+
+def _is_excluded_desktop_web_file(rel_path: str) -> bool:
+    norm = rel_path.replace("\\", "/")
+    if not norm.startswith("website/"):
+        return False
+    base = os.path.basename(norm)
+    if base in DESKTOP_EXCLUDED_WEB_FILES or base.startswith("blog-"):
+        return True
+    return False
+
+
 def _iter_bundle_files():
-    """Yields `(abs_path, rel_path)` for all source/runtime files (excluding `.venv`, `.git`, `models`, `dist`)."""
+    """Yields `(abs_path, rel_path)` for all desktop runtime files (excluding web marketing pages, `.venv`, `models`, `dist`)."""
     exclude_dirs = {
         ".git",
         ".venv",
@@ -126,78 +263,99 @@ def _iter_bundle_files():
                 continue
             abs_p = os.path.join(root, fn)
             rel_p = os.path.relpath(abs_p, REPO_ROOT)
+            if _is_excluded_desktop_web_file(rel_p):
+                continue
             yield abs_p, rel_p
 
 
 def build_pyinstaller_frozen_bundle() -> str:
     """
-    Freezes `desktop_app.py` + `pywebview` native Cocoa window + Python interpreter + all libraries
+    Freezes `desktop_app.py` + `pywebview` native Cocoa window + Python interpreter + chat-only `website/`
     into a standalone native bundle (`dist/SLMAgents.app` on macOS).
     """
     os.makedirs(DIST_DIR, exist_ok=True)
     icns_path = generate_macos_icns()
 
-    add_data_args = [
-        f"--add-data=website{os.pathsep}website",
-        f"--add-data=slm_harness{os.pathsep}slm_harness",
-        f"--add-data=download_models.py{os.pathsep}.",
-        f"--add-data=main.py{os.pathsep}.",
-        f"--add-data=requirements.txt{os.pathsep}.",
-    ]
-    for entry in sorted(os.listdir(REPO_ROOT)):
-        full_p = os.path.join(REPO_ROOT, entry)
-        if os.path.isdir(full_p) and entry.startswith("slm_") and entry != "slm_harness":
-            add_data_args.append(f"--add-data={entry}{os.pathsep}{entry}")
+    with tempfile.TemporaryDirectory() as staging_dir:
+        # Stage a pure Chat-only `website/` directory (no index.html, blogs.html, playground.html)
+        staged_website = os.path.join(staging_dir, "website")
+        os.makedirs(staged_website, exist_ok=True)
+        src_website = os.path.join(REPO_ROOT, "website")
+        for root, _, files in os.walk(src_website):
+            for fn in files:
+                abs_p = os.path.join(root, fn)
+                rel_w = os.path.relpath(abs_p, REPO_ROOT)
+                if _is_excluded_desktop_web_file(rel_w):
+                    continue
+                dest_p = os.path.join(staging_dir, rel_w)
+                os.makedirs(os.path.dirname(dest_p), exist_ok=True)
+                shutil.copy2(abs_p, dest_p)
 
-    hidden_imports = [
-        "--hidden-import=main",
-        "--hidden-import=webview",
-        "--hidden-import=webview.platforms.cocoa",
-        "--hidden-import=uvicorn.logging",
-        "--hidden-import=uvicorn.loops",
-        "--hidden-import=uvicorn.loops.auto",
-        "--hidden-import=uvicorn.protocols",
-        "--hidden-import=uvicorn.protocols.http",
-        "--hidden-import=uvicorn.protocols.http.auto",
-        "--hidden-import=uvicorn.protocols.websockets",
-        "--hidden-import=uvicorn.protocols.websockets.auto",
-        "--hidden-import=uvicorn.lifespan",
-        "--hidden-import=uvicorn.lifespan.on",
-        "--hidden-import=pptx",
-        "--hidden-import=docx",
-        "--hidden-import=reportlab",
-        "--hidden-import=pypdf",
-        "--hidden-import=huggingface_hub",
-        "--exclude-module=torch",
-        "--exclude-module=torchvision",
-        "--exclude-module=torchaudio",
-        "--exclude-module=tensorflow",
-    ]
+        add_data_args = [
+            f"--add-data={staged_website}{os.pathsep}website",
+            f"--add-data=assets{os.pathsep}assets",
+            f"--add-data=slm_harness{os.pathsep}slm_harness",
+            f"--add-data=download_models.py{os.pathsep}.",
+            f"--add-data=main.py{os.pathsep}.",
+            f"--add-data=requirements.txt{os.pathsep}.",
+        ]
+        for entry in sorted(os.listdir(REPO_ROOT)):
+            full_p = os.path.join(REPO_ROOT, entry)
+            if os.path.isdir(full_p) and entry.startswith("slm_") and entry != "slm_harness":
+                add_data_args.append(f"--add-data={entry}{os.pathsep}{entry}")
 
-    icon_args = [f"--icon={icns_path}"] if icns_path and os.path.isfile(icns_path) else []
+        hidden_imports = [
+            "--hidden-import=main",
+            "--hidden-import=webview",
+            "--hidden-import=webview.platforms.cocoa",
+            "--hidden-import=uvicorn.logging",
+            "--hidden-import=uvicorn.loops",
+            "--hidden-import=uvicorn.loops.auto",
+            "--hidden-import=uvicorn.protocols",
+            "--hidden-import=uvicorn.protocols.http",
+            "--hidden-import=uvicorn.protocols.http.auto",
+            "--hidden-import=uvicorn.protocols.websockets",
+            "--hidden-import=uvicorn.protocols.websockets.auto",
+            "--hidden-import=uvicorn.lifespan",
+            "--hidden-import=uvicorn.lifespan.on",
+            "--hidden-import=pptx",
+            "--hidden-import=docx",
+            "--hidden-import=reportlab",
+            "--hidden-import=pypdf",
+            "--hidden-import=huggingface_hub",
+            "--exclude-module=torch",
+            "--exclude-module=torchvision",
+            "--exclude-module=torchaudio",
+            "--exclude-module=tensorflow",
+        ]
 
-    cmd = [
-        sys.executable,
-        "-m",
-        "PyInstaller",
-        "--noconfirm",
-        "--clean",
-        "--name=SLMAgents",
-        "--windowed",
-        "--osx-bundle-identifier=ai.slmagents.desktop",
-        *icon_args,
-        *add_data_args,
-        *hidden_imports,
-        "desktop_app.py",
-    ]
-    print("[Build] Freezing standalone zero-dependency binary with PyInstaller...")
-    subprocess.run(cmd, cwd=REPO_ROOT, check=True)
+        icon_args = [f"--icon={icns_path}"] if icns_path and os.path.isfile(icns_path) else []
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "PyInstaller",
+            "--noconfirm",
+            "--clean",
+            "--name=SLMAgents",
+            "--windowed",
+            "--osx-bundle-identifier=ai.slmagents.desktop",
+            *icon_args,
+            *add_data_args,
+            *hidden_imports,
+            "desktop_app.py",
+        ]
+        print("[Build] Freezing standalone zero-dependency Chat App with PyInstaller...")
+        subprocess.run(cmd, cwd=REPO_ROOT, check=True)
 
     app_bundle = os.path.join(DIST_DIR, "SLMAgents.app")
     if os.path.exists(app_bundle):
         if platform.system().lower() == "darwin":
+            if icns_path and os.path.isfile(icns_path):
+                shutil.copy2(icns_path, os.path.join(app_bundle, "Contents", "Resources", "SLMAgents.icns"))
             subprocess.run(["xattr", "-cr", app_bundle], check=False)
             subprocess.run(["codesign", "--force", "--deep", "--sign", "-", app_bundle], check=False)
+            apply_finder_file_icon(app_bundle)
         print(f"[Build] Frozen standalone macOS app ready: {app_bundle}")
         return app_bundle
     return os.path.join(DIST_DIR, "SLMAgents")
@@ -206,15 +364,14 @@ def build_pyinstaller_frozen_bundle() -> str:
 def build_macos_standalone_installers(app_path: str) -> list[str]:
     """
     Wraps the standalone `dist/SLMAgents.app` into:
-      1. `dist/SLMAgents-2.0-macOS-Installer.pkg` (with postinstall script that strips Gatekeeper quarantine)
-      2. `dist/SLMAgents-2.0-macOS-Installer.dmg` (with `SLMAgents.app`, `Applications` symlink, and `Install & Open SLMAgents.command`)
-      3. Also installs directly to `/Applications/SLMAgents.app` on the local Mac so Dock launch works immediately!
+      1. `dist/SLMAgents-2.0-macOS-Installer.pkg` (with custom icon + postinstall quarantine removal)
+      2. `dist/SLMAgents-2.0-macOS-Installer.dmg` (with custom icon + `SLMAgents.app` + `Applications` symlink)
+      3. Installs directly to `/Applications/SLMAgents.app` and refreshes macOS LaunchServices icon cache
     """
     outputs: list[str] = []
     if platform.system().lower() != "darwin" or not os.path.exists(app_path):
         return outputs
 
-    # Install directly into /Applications/SLMAgents.app on this Mac so Dock/Applications icon works immediately
     try:
         target_app = "/Applications/SLMAgents.app"
         if os.path.exists(target_app):
@@ -222,11 +379,16 @@ def build_macos_standalone_installers(app_path: str) -> list[str]:
         shutil.copytree(app_path, target_app, symlinks=True)
         subprocess.run(["xattr", "-cr", target_app], check=False)
         subprocess.run(["codesign", "--force", "--deep", "--sign", "-", target_app], check=False)
-        print(f"[Build] Installed directly to {target_app}")
+        apply_finder_file_icon(target_app)
+        lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+        if os.path.exists(lsregister):
+            subprocess.run([lsregister, "-f", target_app], check=False)
+        subprocess.run(["touch", target_app], check=False)
+        print(f"[Build] Installed directly to {target_app} with custom icon")
     except Exception as exc:
         print(f"[Build] Direct /Applications install note: {exc}")
 
-    # 1. Native macOS .pkg Wizard Installer with postinstall quarantine removal
+    # 1. Native macOS .pkg Wizard Installer
     pkg_path = os.path.join(DIST_DIR, "SLMAgents-2.0-macOS-Installer.pkg")
     if os.path.exists(pkg_path):
         os.remove(pkg_path)
@@ -238,6 +400,7 @@ def build_macos_standalone_installers(app_path: str) -> list[str]:
                     "#!/bin/bash\n"
                     "xattr -cr /Applications/SLMAgents.app 2>/dev/null || true\n"
                     "codesign --force --deep --sign - /Applications/SLMAgents.app 2>/dev/null || true\n"
+                    "touch /Applications/SLMAgents.app 2>/dev/null || true\n"
                     "open /Applications/SLMAgents.app 2>/dev/null || true\n"
                     "exit 0\n"
                 )
@@ -260,12 +423,13 @@ def build_macos_standalone_installers(app_path: str) -> list[str]:
                 check=True,
             )
             subprocess.run(["xattr", "-cr", pkg_path], check=False)
+            apply_finder_file_icon(pkg_path)
             outputs.append(pkg_path)
             print(f"[Build] Created macOS Standalone .pkg Wizard Installer: {pkg_path}")
     except Exception as exc:
         print(f"[Build] pkgbuild warning: {exc}")
 
-    # 2. Native macOS .dmg Disk Image with /Applications symlink + 1-click Gatekeeper-free launcher
+    # 2. Native macOS .dmg Disk Image
     dmg_path = os.path.join(DIST_DIR, "SLMAgents-2.0-macOS-Installer.dmg")
     if os.path.exists(dmg_path):
         os.remove(dmg_path)
@@ -278,6 +442,7 @@ def build_macos_standalone_installers(app_path: str) -> list[str]:
         shutil.copytree(app_path, staged_app, symlinks=True)
         subprocess.run(["xattr", "-cr", staged_app], check=False)
         subprocess.run(["codesign", "--force", "--deep", "--sign", "-", staged_app], check=False)
+        apply_finder_file_icon(staged_app)
         os.symlink("/Applications", os.path.join(dmg_staging, "Applications"))
 
         helper_cmd = os.path.join(dmg_staging, "Install & Open SLMAgents.command")
@@ -294,6 +459,7 @@ def build_macos_standalone_installers(app_path: str) -> list[str]:
                 "open /Applications/SLMAgents.app\n"
             )
         os.chmod(helper_cmd, 0o755)
+        apply_finder_file_icon(helper_cmd)
 
         subprocess.run(
             [
@@ -311,6 +477,7 @@ def build_macos_standalone_installers(app_path: str) -> list[str]:
             check=True,
         )
         subprocess.run(["xattr", "-cr", dmg_path], check=False)
+        apply_finder_file_icon(dmg_path)
         outputs.append(dmg_path)
         print(f"[Build] Created macOS Standalone .dmg Installer: {dmg_path}")
     except Exception as exc:
@@ -345,7 +512,7 @@ echo "=================================================================="
 
 mkdir -p "${{INSTALL_DIR}}/app" "${{BIN_DIR}}" "${{DESKTOP_DIR}}"
 
-echo "[1/4] Extracting SLMAgents 2.0 application payload..."
+echo "[1/4] Extracting SLMAgents 2.0 Chat Studio payload..."
 PAYLOAD_LINE=$(awk '/^__SLM_PAYLOAD_BELOW__/ {{print NR + 1; exit 0; }}' "$0")
 tail -n +${{PAYLOAD_LINE}} "$0" | base64 -d | tar -xz -C "${{INSTALL_DIR}}/app"
 
@@ -368,7 +535,7 @@ if [ ! -x "${{INSTALL_DIR}}/venv/bin/python" ]; then
     "${{INSTALL_DIR}}/venv/bin/python" -m pip install -r "${{INSTALL_DIR}}/app/requirements.txt"
 fi
 
-echo "[3/4] Registering desktop launcher & CLI command..."
+echo "[3/4] Registering desktop launcher & custom icon..."
 cat > "${{BIN_DIR}}/slmagents" <<'EOF'
 #!/usr/bin/env bash
 exec "${{HOME}}/.local/share/SLMAgents/venv/bin/python" "${{HOME}}/.local/share/SLMAgents/app/desktop_app.py" "$@"
@@ -380,6 +547,7 @@ cat > "${{DESKTOP_DIR}}/slmagents.desktop" <<EOF
 Name=SLMAgents 2.0
 Comment=Offline Pure-CPU AI & Design Studio
 Exec=${{BIN_DIR}}/slmagents
+Icon=${{INSTALL_DIR}}/app/assets/SLMAgents.png
 Terminal=false
 Type=Application
 Categories=Development;Office;Utility;
@@ -425,7 +593,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
    $appDir = Join-Path $installDir 'app'; ^
    $pyDir = Join-Path $installDir 'python_runtime'; ^
    New-Item -ItemType Directory -Force -Path $appDir | Out-Null; ^
-   Write-Host '[1/4] Extracting embedded SLMAgents 2.0 package...'; ^
+   Write-Host '[1/4] Extracting embedded SLMAgents 2.0 Chat Studio...'; ^
    $lines = Get-Content -LiteralPath '%~f0'; ^
    $idx = [Array]::IndexOf($lines, '::SLM_ZIP_PAYLOAD::') + 1; ^
    $b64 = $lines[$idx..($lines.Length - 1)] -join ''; ^
@@ -446,13 +614,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
    Write-Host '[3/4] Installing runtime packages into isolated environment...'; ^
    & $pyExe -m pip install --upgrade pip; ^
    & $pyExe -m pip install -r (Join-Path $appDir 'requirements.txt'); ^
-   Write-Host '[4/4] Creating Desktop Shortcut (SLMAgents 2.0)...'; ^
+   Write-Host '[4/4] Creating Desktop Shortcut with SLMAgents Icon...'; ^
    $desktop = [Environment]::GetFolderPath('Desktop'); ^
    $WshShell = New-Object -ComObject WScript.Shell; ^
    $Shortcut = $WshShell.CreateShortcut((Join-Path $desktop 'SLMAgents 2.0.lnk')); ^
    $Shortcut.TargetPath = $pyExe; ^
    $Shortcut.Arguments = ('\"' + (Join-Path $appDir 'desktop_app.py') + '\"'); ^
    $Shortcut.WorkingDirectory = $appDir; ^
+   $icoFile = Join-Path $appDir 'assets\\SLMAgents.ico'; ^
+   if (Test-Path $icoFile) {{ $Shortcut.IconLocation = $icoFile }}; ^
    $Shortcut.Save(); ^
    Write-Host 'Installation complete! Launching SLMAgents 2.0...'; ^
    Start-Process -FilePath $pyExe -ArgumentList ('\"' + (Join-Path $appDir 'desktop_app.py') + '\"') -WorkingDirectory $appDir"
@@ -476,6 +646,8 @@ def main() -> int:
     if os.path.exists(DIST_DIR):
         shutil.rmtree(DIST_DIR)
     os.makedirs(DIST_DIR, exist_ok=True)
+
+    generate_macos_icns()
 
     if not args.skip_freeze:
         bundle_path = build_pyinstaller_frozen_bundle()

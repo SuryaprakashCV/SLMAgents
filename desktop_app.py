@@ -234,6 +234,28 @@ def start_or_attach_server(host: str, port: Optional[int]) -> tuple[int, bool]:
     return selected_port, False
 
 
+def _apply_macos_dock_icon() -> None:
+    """Forces macOS Dock to display the custom SLMAgents icon at runtime via AppKit."""
+    if platform.system().lower() != "darwin":
+        return
+    try:
+        from AppKit import NSApplication, NSImage  # type: ignore
+
+        icon_candidates = [
+            os.path.join(REPO_ROOT, "assets", "SLMAgents.icns"),
+            os.path.join(REPO_ROOT, "assets", "SLMAgents.png"),
+            os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", "Resources", "SLMAgents.icns")),
+        ]
+        for icon_p in icon_candidates:
+            if os.path.isfile(icon_p):
+                ns_img = NSImage.alloc().initWithContentsOfFile_(icon_p)
+                if ns_img is not None:
+                    NSApplication.sharedApplication().setApplicationIconImage_(ns_img)
+                    break
+    except Exception:
+        pass
+
+
 def run_desktop_app(
     host: str = "127.0.0.1",
     port: Optional[int] = None,
@@ -241,6 +263,7 @@ def run_desktop_app(
     skip_download: bool = False,
     headless_open_only: bool = False,
 ) -> int:
+    _apply_macos_dock_icon()
     ram_gb = detect_total_ram_gb()
     active_profile = profile or os.environ.get("SLM_PROFILE") or recommend_cpu_profile(ram_gb)
     models_dir = resolve_models_directory()
