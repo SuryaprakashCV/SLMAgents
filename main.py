@@ -16,11 +16,16 @@ import wave
 import asyncio
 import importlib
 
-# Setup sys.path first to resolve all 26 SLM Agent packages locally (supports PyInstaller frozen bundles)
+# Setup sys.path first to resolve all 26 SLM Agent packages locally (supports PyInstaller frozen bundles & OTA central_sync)
+_CENTRAL_SYNC_DIR = os.path.expanduser("~/.slm_harness/central_sync")
 BASE_DIR = (
-    os.path.abspath(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))))
-    if getattr(sys, "frozen", False)
-    else os.path.dirname(os.path.abspath(__file__))
+    _CENTRAL_SYNC_DIR
+    if getattr(sys, "frozen", False) and os.path.isdir(os.path.join(_CENTRAL_SYNC_DIR, "website"))
+    else (
+        os.path.abspath(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))))
+        if getattr(sys, "frozen", False)
+        else os.path.dirname(os.path.abspath(__file__))
+    )
 )
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
@@ -78,11 +83,13 @@ def prewarm_all_models():
         from slm_harness.runtime.legacy_bridge import install_smart_og_dispatch
         from slm_harness.memory import WorkspaceIndexWatcher
         from slm_harness.config import get_config
+        from slm_harness.updater import start_background_auto_updater
 
         rt = get_runtime()
         install_smart_og_dispatch()
         cfg = get_config()
         WorkspaceIndexWatcher().start_background_sync(cfg.workspace_dir)
+        start_background_auto_updater(repo_dir=BASE_DIR, interval_sec=45.0)
         print(
             f"[System] ✅ SLMAgents 10-Plane Pure-CPU Harness ready "
             f"(CPU={rt.topology.brand}, threads={rt.topology.recommended_inference_threads}, "

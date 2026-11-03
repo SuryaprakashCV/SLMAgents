@@ -669,18 +669,45 @@
           brand.onclick = function(e) { e.preventDefault(); if (typeof createNewChatSession === 'function') createNewChatSession(); };
         }
       }
-      // Check Central Repo OTA Update Status on startup
-      fetch('/api/system/update/status').then(function(r) { return r.json(); }).then(function(info) {
-        var btn = document.getElementById('btn-sync-central-repo');
-        var lbl = document.getElementById('btn-sync-central-label');
-        if (btn && lbl && info && info.update_available) {
-          btn.style.borderColor = '#10b981';
-          btn.style.color = '#059669';
-          btn.style.background = '#ecfdf5';
-          lbl.textContent = 'Update Ready (' + (info.remote_sha || 'new') + ')';
-          btn.title = 'New update on Central Repo: ' + (info.latest_commit_message || '');
-        }
-      }).catch(function() {});
+      // Automatic Central Repo OTA Watcher: checks on startup and every 45s, auto-pulling when a new commit is uploaded to Git
+      var _lastKnownRemoteSha = null;
+      function pollAndAutoApplyGitUpdates() {
+        fetch('/api/system/update/status').then(function(r) { return r.json(); }).then(function(info) {
+          var btn = document.getElementById('btn-sync-central-repo');
+          var lbl = document.getElementById('btn-sync-central-label');
+          if (!btn || !lbl || !info || info.status !== 'ok') return;
+          if (info.update_available) {
+            lbl.textContent = 'Auto-Updating (' + (info.remote_sha || 'new') + ')...';
+            fetch('/api/system/update/pull', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ force: false })
+            }).then(function(r2) { return r2.json(); }).then(function(pulled) {
+              if (pulled && pulled.status === 'ok') {
+                _lastKnownRemoteSha = pulled.remote_sha;
+                btn.style.borderColor = '#10b981';
+                btn.style.color = '#059669';
+                btn.style.background = '#ecfdf5';
+                lbl.textContent = '✓ Git Synced (' + (pulled.remote_sha || 'latest') + ')';
+                btn.title = 'Auto-updated from Git: ' + (pulled.latest_commit_message || '');
+                if (typeof loadSkillsFromRepo === 'function') loadSkillsFromRepo();
+              }
+            }).catch(function() {});
+          } else if (info.remote_sha && _lastKnownRemoteSha && _lastKnownRemoteSha !== info.remote_sha) {
+            _lastKnownRemoteSha = info.remote_sha;
+            btn.style.borderColor = '#10b981';
+            btn.style.color = '#059669';
+            btn.style.background = '#ecfdf5';
+            lbl.textContent = '✓ Git Synced (' + info.remote_sha + ')';
+            btn.title = 'Auto-updated from Git: ' + (info.latest_commit_message || '');
+            if (typeof loadSkillsFromRepo === 'function') loadSkillsFromRepo();
+          } else if (info.remote_sha && !_lastKnownRemoteSha) {
+            _lastKnownRemoteSha = info.remote_sha;
+          }
+        }).catch(function() {});
+      }
+      pollAndAutoApplyGitUpdates();
+      setInterval(pollAndAutoApplyGitUpdates, 45000);
     })();
 
     async function syncCentralRepoUpdate(btn) {
