@@ -63,7 +63,7 @@ except ImportError:
 try:
     from fastapi import FastAPI, HTTPException, Request
     from fastapi.staticfiles import StaticFiles
-    from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, RedirectResponse
+    from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, RedirectResponse, Response
     from pydantic import BaseModel
     from fastapi.middleware.cors import CORSMiddleware
 except ImportError:
@@ -88,15 +88,18 @@ def prewarm_all_models():
         rt = get_runtime()
         install_smart_og_dispatch()
         cfg = get_config()
-        WorkspaceIndexWatcher().start_background_sync(cfg.workspace_dir)
-        start_background_auto_updater(repo_dir=BASE_DIR, interval_sec=45.0)
+        is_hosted_space = bool(os.environ.get("SPACE_ID") or os.environ.get("SLM_PROFILE") == "lite")
+        if not is_hosted_space:
+            WorkspaceIndexWatcher().start_background_sync(cfg.workspace_dir)
+        if os.environ.get("SLM_ENABLE_OTA_UPDATER", "0") == "1" and not is_hosted_space:
+            start_background_auto_updater(repo_dir=BASE_DIR, interval_sec=45.0)
         print(
             f"[System] ✅ SLMAgents 10-Plane Pure-CPU Harness ready "
             f"(CPU={rt.topology.brand}, threads={rt.topology.recommended_inference_threads}, "
             f"profile={cfg.profile.value}, RAM cap={cfg.ram_hard_limit_mb} MB)."
         )
         if os.environ.get("SLM_EAGER_PREWARM", "0") == "1":
-            get_shared_onnx_genai()
+            threading.Thread(target=lambda: rt.get_llm("primary"), daemon=True, name="slm-prewarm-llm").start()
     except Exception as e:
         print(f"[System] Harness startup note: {e}")
 
@@ -124,12 +127,12 @@ MODEL_PATH = os.path.join(BASE_DIR, "models", "qwen2.5-coder-3b-onnx")
 
 # Global instances for ONNX runtime model sharing
 shared_model = None
-# Hardware thread allocation: dynamically scale up to 8 threads for maximum CPU throughput
-_detected_threads = str(min(8, max(4, os.cpu_count() or 4)))
+# Hardware thread allocation: respect container SLM_N_THREADS and use PASSIVE wait policy
+_detected_threads = os.environ.get("SLM_N_THREADS") or str(min(4, max(2, os.cpu_count() or 2)))
 os.environ.setdefault("SLM_N_THREADS", _detected_threads)
 os.environ["OMP_NUM_THREADS"] = os.environ.get("SLM_N_THREADS", _detected_threads)
 os.environ["MKL_NUM_THREADS"] = os.environ.get("SLM_N_THREADS", _detected_threads)
-os.environ["OMP_WAIT_POLICY"] = "ACTIVE"
+os.environ["OMP_WAIT_POLICY"] = "PASSIVE"
 os.environ["KMP_BLOCKTIME"] = "1"
 os.environ["ORT_ENABLE_AVX2"] = "1"
 
@@ -198,6 +201,11 @@ class Qwen35ONNXModel:
 
         self.dec_output_names = [o.name for o in self.dec_sess.get_outputs()]
         self.dec_input_names = set(i.name for i in self.dec_sess.get_inputs())
+        self.position_ids_rank = 0
+        for inp in self.dec_sess.get_inputs():
+            if inp.name == "position_ids":
+                self.position_ids_rank = len(inp.shape)
+                break
         
         # Pre-compute KV cache tensor mappings once to eliminate string overhead per token
         self.kv_mappings = []
@@ -282,16 +290,18 @@ class Qwen35ONNXGenerator:
                     "input_ids": input_ids,
                     "attention_mask": np.ones((1, seq_len), dtype=np.int64)
                 }
-        pos_ids = np.repeat(np.arange(seq_len, dtype=np.int64).reshape(1, 1, seq_len), 3, axis=0)
         if "position_ids" in self.model.dec_input_names:
-            self.dec_inputs["position_ids"] = pos_ids
+            if getattr(self.model, "position_ids_rank", 2) == 3:
+                self.dec_inputs["position_ids"] = np.repeat(np.arange(seq_len, dtype=np.int64).reshape(1, 1, seq_len), 3, axis=0)
+            else:
+                self.dec_inputs["position_ids"] = np.arange(seq_len, dtype=np.int64).reshape(1, seq_len)
         
         for inp in self.model.dec_sess.get_inputs():
             if inp.name not in self.dec_inputs:
                 if inp.name == "num_logits_to_keep":
                     self.dec_inputs[inp.name] = np.array(1, dtype=np.int64)
                 else:
-                    shape = [d if isinstance(d, int) else (0 if "sequence" in str(d) else 1) for d in inp.shape]
+                    shape = [d if isinstance(d, int) else (0 if "sequence" in str(d).lower() or "past" in str(d).lower() else 1) for d in inp.shape]
                     dtype = np.int64 if "int64" in str(inp.type) else (np.float16 if "float16" in str(inp.type) else np.float32)
                     self.dec_inputs[inp.name] = np.zeros(shape, dtype=dtype)
 
@@ -322,7 +332,10 @@ class Qwen35ONNXGenerator:
                 
             self.dec_inputs["attention_mask"] = np.ones((1, cur_pos + 1), dtype=np.int64)
             if "position_ids" in self.model.dec_input_names:
-                self.dec_inputs["position_ids"] = np.repeat(np.array([[[cur_pos]]], dtype=np.int64), 3, axis=0)
+                if getattr(self.model, "position_ids_rank", 2) == 3:
+                    self.dec_inputs["position_ids"] = np.repeat(np.array([[[cur_pos]]], dtype=np.int64), 3, axis=0)
+                else:
+                    self.dec_inputs["position_ids"] = np.array([[cur_pos]], dtype=np.int64)
             
             # Fast zero-overhead KV cache pointer update using pre-computed kv_mappings
             last_outputs = self.last_outputs
@@ -419,6 +432,8 @@ class ChatRequest(BaseModel):
     forced_mode: str = ""
     json_schema: Optional[dict] = None
     max_tokens: int = 2400
+    reasoning_effort: str = "medium"
+    clarification_choice: Optional[str] = None
 
 from slm_memory import SLMMemoryManager
 memory_mgr = SLMMemoryManager()
@@ -2857,6 +2872,8 @@ def chat_endpoint(req: ChatRequest):
             design_tone=req.design_tone,
             active_skills=req.active_skills,
             max_tokens=req.max_tokens,
+            reasoning_effort=getattr(req, "reasoning_effort", "medium") or "medium",
+            clarification_choice=getattr(req, "clarification_choice", None),
         )
 
     thought_queue = queue.Queue()
@@ -3308,6 +3325,18 @@ async def get_system_stats():
         loaded_models = arena_st.get("loaded_models", [])
         prim = cfg.resolve_model_spec("primary")
         active_model_label = f"{prim.model_id} ({prim.backend.upper()} {prim.quantization})"
+        # In containerized deployments (e.g. HF Spaces / 2T Xeon where /proc/meminfo reflects the 128 GB shared host),
+        # report container / process RSS against container RAM ceiling so the UI never shows host-tenant 89% noise
+        if (
+            os.environ.get("SPACE_ID")
+            or rt.topology.recommended_inference_threads <= 2
+            or rt.topology.physical_cores <= 2
+            or (total_gb and total_gb > 32.0 and "xeon" in rt.topology.brand.lower())
+        ):
+            cap_gb = round(min(16.0, rt.topology.total_ram_mb / 1024.0), 1) if rt.topology.total_ram_mb > 0 else 16.0
+            total_gb = cap_gb
+            used_gb = round(max(0.2, mem_mb / 1024.0), 2)
+            ram_pct = round(min(99.0, (used_gb / max(1.0, total_gb)) * 100.0), 1)
     except Exception:
         pass
 
@@ -3327,14 +3356,21 @@ async def get_system_stats():
 @app.post("/api/system/clear-cache")
 async def clear_system_cache():
     try:
-        evicted = []
+        evicted = 0
         try:
-            from slm_harness.runtime import get_runtime
-            evicted = get_runtime().arena.evict_all()
+            from slm_harness.runtime import get_cancellation_registry, get_runtime
+            get_cancellation_registry().cancel_all(reason="RAM Cache Purged by user")
+            rt = get_runtime()
+            evicted = rt.arena.purge_unpinned()
         except Exception:
             pass
         import gc
         gc.collect()
+        try:
+            import ctypes
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass
         return {"status": "success", "evicted_models": evicted, "message": "RAM cache pruned and garbage collected successfully"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -3434,6 +3470,9 @@ async def get_robots_txt():
 
 @app.get("/")
 async def root():
+    index_file = os.path.join(website_path, "index.html")
+    if os.path.isfile(index_file):
+        return FileResponse(index_file)
     return FileResponse(os.path.join(website_path, "chat.html"))
 
 
@@ -3752,6 +3791,14 @@ async def download_desktop_installer(target_id: str, agent: str = ""):
             print(f"[Installer Builder] On-demand build error: {exc}")
 
     if not os.path.isfile(file_path):
+        if target_id == "macos-dmg":
+            fb_path, fb_name, fb_mt = _build_individual_agent_harness_installer("all", "agent-macos")
+            return FileResponse(
+                fb_path,
+                media_type=fb_mt,
+                filename=fb_name,
+                headers={"Content-Disposition": f'attachment; filename="{fb_name}"'},
+            )
         return Response(content=f"Installer {entry['filename']} not found in dist/.", status_code=404)
 
     def _auto_clear_downloads_quarantine() -> None:

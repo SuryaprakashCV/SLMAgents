@@ -158,11 +158,29 @@ def sample_next_token(
     rng: Optional[np.random.Generator] = None,
 ) -> int:
     """Fast vectorized CPU token sampler supporting repetition penalty, top-k, top-p, and greedy."""
+    # Fast greedy / near-greedy path (avoids copying 152k float32 array and running full argpartition on every token)
+    if temperature <= 0.16:
+        arr = logits_1d
+        if repetition_penalty and abs(repetition_penalty - 1.0) > 1e-4 and recent_token_ids:
+            arr = np.asarray(logits_1d, dtype=np.float32).copy()
+            unique_ids = np.fromiter(
+                {int(t) for t in recent_token_ids[-64:] if 0 <= int(t) < arr.shape[0]},
+                dtype=np.int64,
+            )
+            if unique_ids.size > 0:
+                selected = arr[unique_ids]
+                arr[unique_ids] = np.where(
+                    selected < 0,
+                    selected * repetition_penalty,
+                    selected / repetition_penalty,
+                )
+        return int(np.argmax(arr))
+
     scores = np.asarray(logits_1d, dtype=np.float32).copy()
 
     if repetition_penalty and abs(repetition_penalty - 1.0) > 1e-4 and recent_token_ids:
         unique_ids = np.fromiter(
-            {int(t) for t in recent_token_ids[-128:] if 0 <= int(t) < scores.shape[0]},
+            {int(t) for t in recent_token_ids[-96:] if 0 <= int(t) < scores.shape[0]},
             dtype=np.int64,
         )
         if unique_ids.size > 0:
@@ -172,9 +190,6 @@ def sample_next_token(
                 selected * repetition_penalty,
                 selected / repetition_penalty,
             )
-
-    if temperature <= 1e-4:
-        return int(np.argmax(scores))
 
     scores = scores / float(temperature)
 
@@ -417,13 +432,13 @@ class ONNXCPUBackend:
             return os.path.getsize(path) > 5 * 1024 * 1024
 
         dec_candidates = [
+            os.path.join(model_dir, "onnx", "model_quantized.onnx"),
+            os.path.join(model_dir, "onnx", "model_int8.onnx"),
+            os.path.join(model_dir, "decoder_model_merged_quantized.onnx"),
+            os.path.join(model_dir, "onnx", "decoder_model_merged_quantized.onnx"),
             os.path.join(model_dir, "onnx", "model_q4.onnx"),
             os.path.join(model_dir, "onnx", "decoder_model_merged_q4.onnx"),
             os.path.join(model_dir, "onnx", "decoder_model_merged_int4.onnx"),
-            os.path.join(model_dir, "onnx", "decoder_model_merged_quantized.onnx"),
-            os.path.join(model_dir, "onnx", "model_int8.onnx"),
-            os.path.join(model_dir, "onnx", "model_quantized.onnx"),
-            os.path.join(model_dir, "decoder_model_merged_quantized.onnx"),
             os.path.join(model_dir, "onnx", "model.onnx"),
             os.path.join(model_dir, "model.onnx"),
         ]
@@ -466,6 +481,17 @@ class ONNXCPUBackend:
         past_len: int,
         state: Dict[str, np.ndarray],
     ) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
+        # Optimum's exported decoder_model_merged ONNX graph (/model/attn_mask_reformat/input_ids_subgraph/Expand)
+        # requires either past_len == 0 (full prompt prefill) OR len(token_slice) == 1 (autoregressive step).
+        # If past_len > 0 and len(token_slice) > 1 on an input_ids model, step token-by-token safely.
+        if past_len > 0 and len(token_slice) > 1 and not self.uses_inputs_embeds:
+            logits: Optional[np.ndarray] = None
+            cur_state = state
+            for idx, tok in enumerate(token_slice):
+                logits, cur_state = self._run_forward_slice([tok], past_len + idx, cur_state)
+            assert logits is not None
+            return logits, cur_state
+
         arr_ids = np.asarray([token_slice], dtype=np.int64)
         slice_len = int(arr_ids.shape[1])
         total_len = past_len + slice_len
@@ -525,7 +551,7 @@ class ONNXCPUBackend:
             prompt_len = 1
 
         max_new = max(1, min(req.max_tokens, max_ctx - prompt_len + 64))
-        chunk_sz = max(64, int(self.config.prefill_chunk_size))
+        chunk_sz = max(512, int(self.config.prefill_chunk_size))
 
         enum_masker: Optional[ONNXPrefixEnumMasker] = None
         if req.grammar and req.grammar.mode == "enum" and req.grammar.allowed_values:
@@ -543,46 +569,39 @@ class ONNXCPUBackend:
         ttft_ms = 0.0
 
         with self._lock:
-            # Check prefix KV cache match (leave at least 1 token to compute fresh logits)
-            matched_len = 0
-            state: Dict[str, np.ndarray]
-            if (
-                self._cached_prefix_ids
-                and self._cached_prefix_state is not None
-                and prompt_len > len(self._cached_prefix_ids)
-                and tuple(input_ids[: len(self._cached_prefix_ids)]) == self._cached_prefix_ids
-            ):
-                matched_len = len(self._cached_prefix_ids)
-                state = {k: v for k, v in self._cached_prefix_state.items()}
-            else:
-                state = self._init_empty_state()
+            state = self._init_empty_state()
 
-            # Chunked CPU prefill with cooperative cancellation & progress events
-            cur = matched_len
-            logits: Optional[np.ndarray] = None
-            cache_saved_this_turn = matched_len > 0
-
-            while cur < prompt_len:
+            # Optimum's merged decoder ONNX subgraph (/model/attn_mask_reformat/input_ids_subgraph/Expand)
+            # requires full-prompt prefill from past_len == 0 in a single vectorized GEMM pass.
+            if not self.uses_inputs_embeds:
                 if req.cancel_token:
                     req.cancel_token.check()
-                end = min(prompt_len, cur + chunk_sz)
-                logits, state = self._run_forward_slice(input_ids[cur:end], cur, state)
-                cur = end
-
-                # Snapshot prefix cache around ~50-75% of prompt (typically static system + tools)
-                if not cache_saved_this_turn and 64 <= cur <= min(1024, prompt_len - 8):
-                    self._cached_prefix_ids = tuple(input_ids[:cur])
-                    self._cached_prefix_state = {k: v.copy() for k, v in state.items()}
-                    cache_saved_this_turn = True
-
+                logits, state = self._run_forward_slice(input_ids, 0, state)
                 yield GenerationChunk(
                     kind="prefill",
-                    prefill_done=cur,
+                    prefill_done=prompt_len,
                     prefill_total=prompt_len,
                     prompt_tokens=prompt_len,
                     model_id=self.spec.model_id,
                     backend="onnx",
                 )
+            else:
+                cur = 0
+                logits = None
+                while cur < prompt_len:
+                    if req.cancel_token:
+                        req.cancel_token.check()
+                    end = min(prompt_len, cur + chunk_sz)
+                    logits, state = self._run_forward_slice(input_ids[cur:end], cur, state)
+                    cur = end
+                    yield GenerationChunk(
+                        kind="prefill",
+                        prefill_done=cur,
+                        prefill_total=prompt_len,
+                        prompt_tokens=prompt_len,
+                        model_id=self.spec.model_id,
+                        backend="onnx",
+                    )
 
             if logits is None:
                 logits, state = self._run_forward_slice(input_ids[-1:], prompt_len - 1, state)
@@ -602,7 +621,7 @@ class ONNXCPUBackend:
 
                 next_tok = sample_next_token(
                     last_logits,
-                    input_ids[-64:] + generated_ids,
+                    input_ids[-32:] + generated_ids[-64:],
                     temperature=0.0 if enum_masker is not None else req.temperature,
                     top_k=req.top_k,
                     top_p=req.top_p,
@@ -618,10 +637,21 @@ class ONNXCPUBackend:
                     break
 
                 generated_ids.append(next_tok)
-                # Full-sequence incremental BPE decode avoids broken multi-byte UTF-8 glyphs
-                cur_decoded = self.tokenizer.decode(generated_ids)
-                delta = cur_decoded[len(prev_decoded) :]
-                prev_decoded = cur_decoded
+                # O(1) sliding window BPE decode (avoids O(N^2) full-sequence decode overhead)
+                if len(generated_ids) <= 8:
+                    cur_decoded = self.tokenizer.decode(generated_ids)
+                    delta = cur_decoded[len(prev_decoded) :]
+                    prev_decoded = cur_decoded
+                else:
+                    win_prev = self.tokenizer.decode(generated_ids[-6:-1])
+                    win_curr = self.tokenizer.decode(generated_ids[-6:])
+                    if win_curr.startswith(win_prev) and "\ufffd" not in win_curr:
+                        delta = win_curr[len(win_prev) :]
+                        prev_decoded += delta
+                    else:
+                        cur_decoded = self.tokenizer.decode(generated_ids)
+                        delta = cur_decoded[len(prev_decoded) :]
+                        prev_decoded = cur_decoded
 
                 elapsed_dec = max(1e-4, time.perf_counter() - t_decode_start)
                 tps = len(generated_ids) / elapsed_dec
@@ -639,6 +669,9 @@ class ONNXCPUBackend:
                     )
                     if req.cancel_token:
                         req.cancel_token.check()
+
+                # Cooperative yield so Uvicorn's asyncio event loop flushes SSE frames immediately on 2-vCPU containers
+                time.sleep(0.001)
 
                 if req.cancel_token:
                     req.cancel_token.check()
