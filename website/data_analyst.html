@@ -7,7 +7,7 @@
   
   <link rel="canonical" href="https://www.slmagents.ai/data_analyst.html">
   <title>SLM Data Analyst: Statistical Question Answering & Chart Generation | SLMAgents</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=55.0">
   
   <!-- OpenGraph / Social Meta Tags -->
   <meta property="og:type" content="article">
@@ -45,94 +45,45 @@
   </script>
 </head>
 <body>
-        <!-- Navigation Header -->
-  <header>
+              <!-- Top Engineering Header -->
+  <header class="site-top-header web-only-nav">
     <div class="container nav-container">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <button class="sidebar-toggle" onclick="toggleSidebar()">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
         </button>
         <a href="index.html" class="logo">
           <div class="logo-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
           </div>
-          <span>SLM Agents</span>
+          <span>SLMAgents</span>
         </a>
       </div>
+
       <nav>
         <ul class="nav-links">
-          <li><a href="index.html">Home</a></li>
-          <li class="dropdown">
-            <a class="dropdown-trigger" style="color:var(--primary)">
-              Docs
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-            </a>
-            <div class="dropdown-content">
-              <div>
-                <div class="mega-col-title">Productivity</div>
-                <div class="mega-col-list">
-                  <a href="rag.html">📚 SLM RAG</a>
-                  <a href="summarizer.html">📝 Summarizer</a>
-                  <a href="cli.html">💻 CLI Agent</a>
-                  <a href="email_assistant.html">📧 Email Assistant</a>
-                  <a href="meeting_summarizer.html">🎙️ Meeting Summarizer</a>
-                  <a href="memory_manager.html">🧠 Memory Manager</a>
-                  <a href="task_planner.html">📋 Task Planner</a>
-                  <a href="pdf_chat.html">📑 PDF Chat</a>
-                  <a href="pkb_agent.html">🔗 PKB Agent</a>
-                  <a href="voice_agent.html">🗣️ Voice Agent</a>
-                </div>
-              </div>
-              <div>
-                <div class="mega-col-title">Developer Tools</div>
-                <div class="mega-col-list">
-                  <a href="orchestrator.html">🎯 Orchestrator</a>
-                  <a href="sql.html">📊 Text-to-SQL</a>
-                  <a href="code_interpreter.html">⚡ Code Interpreter</a>
-                  <a href="git_repo_manager.html">🐙 Git Repo Manager</a>
-                  <a href="database_migrator.html">🗄️ Database Migrator</a>
-                </div>
-              </div>
-              <div>
-                <div class="mega-col-title">Web &amp; Scraping</div>
-                <div class="mega-col-list">
-                  <a href="web_agent.html">🌐 Web Agent</a>
-                  <a href="web_scraper.html">🕷️ Web Scraper</a>
-                  <a href="search_orchestrator.html">🔎 Search Orchestrator</a>
-                </div>
-              </div>
-              <div>
-                <div class="mega-col-title">Data &amp; Utilities</div>
-                <div class="mega-col-list">
-                  <a href="json_cleaner.html">🧹 JSON Cleaner</a>
-                  <a href="document_parser.html">📄 Document Parser</a>
-                  <a href="vision_parser.html">👁️ Vision Parser</a>
-                  <a href="data_analyst.html">📈 Data Analyst</a>
-                  <a href="translation_hub.html">🌐 Translation Hub</a>
-                  <a href="math_agent.html">🧮 Math Agent</a>
-                  <a href="security_audit.html">🛡️ Security Audit</a>
-                  <a href="embeddings_server.html">🔢 Embeddings Server</a>
-                </div>
-              </div>
-            </div>
-          </li>
-          <li><a href="chat.html">Chat Studio</a></li>
-          <li><a href="playground.html">Playground</a></li>
-          <li><a href="blogs.html">Blogs</a></li>
+          <li><a href="index.html" id="topnav-home">Home</a></li>
+          <li><a href="chat.html" id="topnav-chat">Chat Studio</a></li>
+          <li><a href="playground.html" id="topnav-playground">Playground</a></li>
+          <li><a href="blogs.html" id="topnav-blogs">Blogs</a></li>
           <li>
-            <button onclick="openDownloadModal()" style="background: linear-gradient(135deg, #4f46e5, #0284c7); color: #ffffff; border: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(79,70,229,0.25);">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <button type="button" onclick="openDownloadModal()" class="btn-nav-download">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Download App
             </button>
           </li>
-          <li><a href="https://github.com/t00114218-stack/SLMAgents" class="btn-github-nav" target="_blank">
-            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/></svg>
-            GitHub
-          </a></li>
+          <li>
+            <a href="https://github.com/t00114218-stack/SLMAgents" target="_blank" class="btn-github-nav">
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/>
+              </svg>
+              GitHub
+            </a>
+          </li>
         </ul>
       </nav>
     </div>
@@ -149,22 +100,22 @@
     <main class="main-content">
       <div class="doc-content-wrapper">
         <section class="doc-section" style="margin-top: 0;">
-          <div class="breadcrumb" style="font-size: 0.85rem; color: #475569; margin-bottom: 1rem; font-weight: 600;"><a href="index.html" style="color: #4f46e5; text-decoration: none;">Home</a> <span style="margin: 0 6px;">›</span> <span style="color: #0f172a;">SLM Data Analyst</span></div>
-          <div class="badge-pill">📊 CSV Stats Calculator</div>
+          <div class="breadcrumb" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;"><a href="index.html" style="color: var(--text-secondary); text-decoration: none;">Overview</a> <span style="margin: 0 6px;">/</span> <span>slm_data</span> <span style="margin: 0 6px;">/</span> <span style="color: var(--text-primary); font-weight: 600;">SLM Data Analyst</span></div>
+          <div class="badge-pill">slm_data · Data & Utilities · 10-Plane Pure-CPU Agent</div>
           <h1 style="font-size: 2.25rem; color: #0f172a; font-weight: 800; margin-bottom: 0.75rem;">SLM Data Analyst</h1>
           <p style="font-size: 1.05rem; color: #334155; line-height: 1.65; font-weight: 500; margin: 0;">Loads local CSV, Parquet, or Excel files. Answers statistical questions, performs calculations, and auto-generates data visualization code.</p>
         </section>
 
-                                <nav class="doc-nav">
-          <a href="#overview">Overview</a>
-          <a href="#install">OS Installers &amp; Installation</a>
-          <a href="#harness">10-Plane Harness</a>
-          <a href="#git">Git Checkout</a>
-          <a href="#config">Configuration API</a>
+                                                        <nav class="doc-nav">
+          <a href="#overview">01 / Overview</a>
+          <a href="#install">02 / OS Installers &amp; CLI</a>
+          <a href="#harness">03 / 10-Plane Harness</a>
+          <a href="#git">04 / Git Checkout</a>
+          <a href="#config">05 / API Reference</a>
         </nav>
 
         <section class="doc-section" id="overview">
-          <h2>🚀 Overview &amp; Capabilities</h2>
+          <h2>01 / Overview &amp; Capabilities</h2>
           <p>Loads local CSV, Parquet, or Excel files. Answers statistical questions, performs calculations, and auto-generates data visualization code.</p>
           
           <h3 style="margin-top: 1.5rem; font-size: 1.15rem; color: #0f172a; font-weight: 700;">Key Features</h3>
@@ -176,58 +127,67 @@
           </ul>
         </section>
 
-                                <!-- INSTALLATION & STANDALONE OS HARNESS INSTALLERS -->
+                                                        <!-- INSTALLATION & STANDALONE OS HARNESS INSTALLERS -->
         <section class="doc-section" id="install">
-          <h2>💻 Standalone OS Harness Installers, CLI &amp; Python Installation</h2>
-          <p>In <strong>SLMAgents 2.0</strong>, <strong>SLM Data Analyst</strong> runs inside the <strong>10-Plane Pure-CPU Agent Harness (<code>slm_harness</code>)</strong>. You can download a self-extracting <strong>Individual Agent + Harness OS Installer</strong> for macOS, Windows, or Linux (bundling <code>slm_data</code> + <code>slm_harness</code> + the <code>./slm</code> CLI), install the full 26-agent desktop suite, or install via Python <code>pip</code>:</p>
+          <h2>02 / Standalone OS Harness Installers, CLI &amp; Python SDK</h2>
+          <p>In <strong>SLMAgents 2.0</strong>, <strong>SLM Data Analyst</strong> executes inside the <strong>10-Plane Pure-CPU Agent Harness (<code>slm_harness</code>)</strong>. Download a self-extracting <strong>Individual Agent + Harness OS Installer</strong> for macOS, Windows, or Linux (bundling <code>slm_data</code> + <code>slm_harness</code> + the <code>./slm</code> CLI), install the full 26-agent desktop suite, or install via Python <code>pip</code>:</p>
 
-          <h3 style="font-size: 1.08rem; color: #0f172a; font-weight: 800; margin-top: 1.25rem; margin-bottom: 0.65rem;">1. Individual SLM Data Analyst + 10-Plane Harness Installers (All OSes)</h3>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 1.25rem;">
-            <a href="/api/installers/download/agent-macos?agent=data_analyst" style="text-decoration: none; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 12px; padding: 14px 16px; display: block;">
-              <div style="font-weight: 800; color: #3730a3; font-size: 0.92rem;">🍎 macOS Harness Installer (.command)</div>
-              <div style="font-size: 0.78rem; color: #4338ca; margin-top: 4px;">Self-extracting macOS bundle with <code>slm_data</code> + <code>slm_harness</code> + <code>./slm</code> CLI</div>
+          <h3>1. Individual SLM Data Analyst + 10-Plane Harness Installers (All OSes)</h3>
+          <div class="subpage-installer-grid">
+            <a href="/api/installers/download/agent-macos?agent=data_analyst" class="subpage-installer-card">
+              <div class="subpage-installer-title">
+                <span>macOS Installer</span>
+                <span class="subpage-installer-ext">.command</span>
+              </div>
+              <div class="subpage-installer-desc">Self-extracting macOS bundle with <code>slm_data</code> + <code>slm_harness</code> + <code>./slm</code> CLI</div>
             </a>
-            <a href="/api/installers/download/agent-windows?agent=data_analyst" style="text-decoration: none; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 14px 16px; display: block;">
-              <div style="font-weight: 800; color: #0369a1; font-size: 0.92rem;">🪟 Windows Harness Installer (.bat)</div>
-              <div style="font-size: 0.78rem; color: #0284c7; margin-top: 4px;">Self-extracting Windows installer + auto portable Python 3.11 + <code>slm_data</code></div>
+            <a href="/api/installers/download/agent-windows?agent=data_analyst" class="subpage-installer-card">
+              <div class="subpage-installer-title">
+                <span>Windows Installer</span>
+                <span class="subpage-installer-ext">.bat</span>
+              </div>
+              <div class="subpage-installer-desc">Self-extracting Windows payload + portable Python 3.11 + <code>slm_data</code></div>
             </a>
-            <a href="/api/installers/download/agent-linux?agent=data_analyst" style="text-decoration: none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 14px 16px; display: block;">
-              <div style="font-weight: 800; color: #047857; font-size: 0.92rem;">🐧 Linux Harness Installer (.run)</div>
-              <div style="font-size: 0.78rem; color: #059669; margin-top: 4px;">Self-extracting Linux bundle with <code>slm_data</code> + <code>slm_harness</code> + <code>./slm</code> CLI</div>
+            <a href="/api/installers/download/agent-linux?agent=data_analyst" class="subpage-installer-card">
+              <div class="subpage-installer-title">
+                <span>Linux Installer</span>
+                <span class="subpage-installer-ext">.run</span>
+              </div>
+              <div class="subpage-installer-desc">Self-extracting Linux archive with <code>slm_data</code> + <code>slm_harness</code> + <code>./slm</code> CLI</div>
             </a>
           </div>
 
-          <h3 style="font-size: 1.08rem; color: #0f172a; font-weight: 800; margin-top: 1.25rem; margin-bottom: 0.65rem;">2. Full 26-Agent Studio &amp; Desktop OS Installers</h3>
-          <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 1.5rem;">
-            <a href="/api/installers/download/macos-dmg" style="padding: 8px 14px; border-radius: 8px; background: #f8fafc; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 700; font-size: 0.82rem; text-decoration: none;">🍎 macOS .dmg (281 MB)</a>
-            <a href="/api/installers/download/macos-pkg" style="padding: 8px 14px; border-radius: 8px; background: #f8fafc; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 700; font-size: 0.82rem; text-decoration: none;">📦 macOS .pkg (236 MB)</a>
-            <a href="/api/installers/download/windows" style="padding: 8px 14px; border-radius: 8px; background: #f8fafc; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 700; font-size: 0.82rem; text-decoration: none;">🪟 Windows .bat (3.7 MB)</a>
-            <a href="/api/installers/download/linux" style="padding: 8px 14px; border-radius: 8px; background: #f8fafc; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 700; font-size: 0.82rem; text-decoration: none;">🐧 Linux .run (3.4 MB)</a>
-            <button onclick="openDownloadModal()" style="padding: 8px 14px; border-radius: 8px; background: #4f46e5; color: #ffffff; border: none; font-weight: 700; font-size: 0.82rem; cursor: pointer;">⚡ All OS Installers Modal</button>
+          <h3>2. Full 26-Agent Studio &amp; Desktop OS Installers</h3>
+          <div class="subpage-suite-links">
+            <a href="/api/installers/download/macos-dmg" class="subpage-suite-link">macOS .dmg (281 MB)</a>
+            <a href="/api/installers/download/macos-pkg" class="subpage-suite-link">macOS .pkg (236 MB)</a>
+            <a href="/api/installers/download/windows" class="subpage-suite-link">Windows .bat (3.7 MB)</a>
+            <a href="/api/installers/download/linux" class="subpage-suite-link">Linux .run (3.4 MB)</a>
+            <button onclick="openDownloadModal()" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.76rem;">All OS Installers Modal</button>
           </div>
 
-          <h3 style="font-size: 1.08rem; color: #0f172a; font-weight: 800; margin-top: 1.25rem; margin-bottom: 0.65rem;">3. 10-Plane Harness CLI (<code>./slm</code>) &amp; Python <code>pip</code> Installation</h3>
-          <div class="code-panel" style="max-width:100%; background: #0f172a; border: 1px solid #1e293b; border-radius: 14px; overflow: hidden; margin: 1rem 0; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);">
-            <div class="code-header" style="background: #1e293b; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155;">
+          <h3>3. 10-Plane Harness CLI (<code>./slm</code>) &amp; Python <code>pip</code> Installation</h3>
+          <div class="code-panel" style="margin: 0.75rem 0;">
+            <div class="code-header">
               <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
-              <div class="code-title" style="color: #94a3b8; font-weight: 700; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;">Terminal — 10-Plane Harness CLI &amp; Pip</div>
+              <div class="code-title">Terminal — 10-Plane Harness CLI &amp; Pip</div>
             </div>
-            <div class="code-content" style="display:block; padding: 1.25rem 1.5rem; background: #0f172a;">
-              <pre style="margin:0; background:#0f172a; color:#f8fafc; font-family:'JetBrains Mono',monospace; font-size:0.88rem; border:none; box-shadow:none; padding:0; line-height: 1.7;"><span style="color:#64748b;"># Option A: Install via PyPI or editable source with the 10-Plane Harness</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">pip install</span> <span style="color:#38bdf8;">slm-data</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">pip install</span> <span style="color:#94a3b8;">-e</span> <span style="color:#38bdf8;">./slm_harness</span> <span style="color:#94a3b8;">-e</span> <span style="color:#38bdf8;">./slm_data</span>
+            <div class="code-content" style="display:block;">
+              <pre><span style="color:#64748b;"># Option A: Install via PyPI or editable source with the 10-Plane Harness</span>
+<span style="color:#34d399;">$</span> pip install slm-data
+<span style="color:#34d399;">$</span> pip install -e ./slm_harness -e ./slm_data
 
 <span style="color:#64748b;"># Option B: Run directly through the Unified 10-Plane Pure-CPU Harness CLI (./slm)</span>
-<span style="color:#34d399;">$</span> <span style="color:#38bdf8;">./slm ask "Analyze @sales.csv, summarize revenue by region, and generate a bar chart"</span>
-<span style="color:#34d399;">$</span> <span style="color:#38bdf8;">./slm chat</span>   <span style="color:#64748b;"># Interactive Rich TUI with 18 slash commands (/trace, /models, /arena, /undo)</span>
-<span style="color:#34d399;">$</span> <span style="color:#38bdf8;">./slm serve</span>  <span style="color:#64748b;"># 100% Offline Web AI Studio + OpenAI /v1 API at http://127.0.0.1:7860</span></pre>
+<span style="color:#34d399;">$</span> ./slm ask "Analyze @sales.csv, summarize revenue by region, and generate a bar chart"
+<span style="color:#34d399;">$</span> ./slm chat   <span style="color:#64748b;"># Interactive Rich TUI with 18 slash commands (/trace, /models, /arena, /undo)</span>
+<span style="color:#34d399;">$</span> ./slm serve  <span style="color:#64748b;"># 100% Offline Web AI Studio + OpenAI /v1 API at http://127.0.0.1:7860</span></pre>
             </div>
           </div>
         </section>
 
         <!-- 10-PLANE PURE-CPU HARNESS ARCHITECTURE -->
         <section class="doc-section" id="harness">
-          <h2>🧭 10-Plane Pure-CPU Harness Integration (<code>slm_harness</code>)</h2>
+          <h2>03 / 10-Plane Pure-CPU Harness Integration (<code>slm_harness</code>)</h2>
           <p>Rather than executing as an isolated prompt wrapper, <strong>SLM Data Analyst</strong> is natively orchestrated by the <strong>SLMAgents 2.0 10-Plane Pure-CPU Harness</strong> (via <code>slm_harness.runtime.legacy_bridge</code> and <code>CascadeRouter</code>). Every call benefits from hybrid <code>llama.cpp</code> GGUF (<code>Q4_K_M</code>) + Quantized INT4/INT8 CPU execution, watermarked LRU memory governance, grammar-constrained decoding, and deterministic verification at <strong>$0 API cost</strong>:</p>
           <table class="param-table">
             <thead>
@@ -260,49 +220,61 @@
 
         <!-- GIT CHECKOUT -->
         <section class="doc-section" id="git">
-          <h2>🐙 Checkout from GitHub (Agent + 10-Plane Harness)</h2>
+          <h2>04 / Source Checkout (Git Sparse-Checkout)</h2>
           <p>Clone this agent alongside the <strong>10-Plane Pure-CPU Harness (<code>slm_harness</code>)</strong> from the monorepo using Git sparse-checkout — no need to download all 26 agents:</p>
 
-          <h3 style="font-size: 1.05rem; color: #0f172a; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.75rem;">Option 1 — Sparse Checkout with 10-Plane Harness (Recommended)</h3>
-          <div class="code-panel" style="max-width:100%; background: #0f172a; border: 1px solid #1e293b; border-radius: 14px; overflow: hidden; margin: 1rem 0; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);">
-            <div class="code-header" style="background: #1e293b; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155;">
+          <h3>Option 1 — Sparse Checkout with 10-Plane Harness (Recommended)</h3>
+          <div class="code-panel" style="margin: 0.75rem 0;">
+            <div class="code-header">
               <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
-              <div class="code-title" style="color: #94a3b8; font-weight: 700; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;">Terminal — Git Sparse Checkout</div>
+              <div class="code-title">Terminal — Git Sparse Checkout</div>
             </div>
-            <div class="code-content" style="display:block; padding: 1.25rem 1.5rem; background: #0f172a;">
-              <pre style="margin:0; background:#0f172a; color:#f8fafc; font-family:'JetBrains Mono',monospace; font-size:0.88rem; border:none; box-shadow:none; padding:0; line-height: 1.75;"><span style="color:#64748b;"># 1. Create and enter a new directory</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">mkdir</span> <span style="color:#38bdf8;">slm_data_workspace</span> <span style="color:#94a3b8;">&amp;&amp;</span> <span style="color:#c084fc; font-weight:700;">cd</span> <span style="color:#38bdf8;">slm_data_workspace</span>
+            <div class="code-content" style="display:block;">
+              <pre><span style="color:#64748b;"># 1. Create and enter a new directory</span>
+<span style="color:#34d399;">$</span> mkdir slm_data_workspace &amp;&amp; cd slm_data_workspace
 
 <span style="color:#64748b;"># 2. Initialise empty git repo and add remote</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">git init</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">git remote add origin</span> <span style="color:#38bdf8;">https://github.com/t00114218-stack/SLMAgents.git</span>
+<span style="color:#34d399;">$</span> git init
+<span style="color:#34d399;">$</span> git remote add origin https://github.com/t00114218-stack/SLMAgents.git
 
 <span style="color:#64748b;"># 3. Enable sparse-checkout for both slm_harness and slm_data</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">git sparse-checkout init</span> <span style="color:#94a3b8;">--cone</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">git sparse-checkout set</span> <span style="color:#38bdf8;">slm_harness slm_data</span>
+<span style="color:#34d399;">$</span> git sparse-checkout init --cone
+<span style="color:#34d399;">$</span> git sparse-checkout set slm_harness slm_data
 
 <span style="color:#64748b;"># 4. Pull the 10-Plane Harness and agent source</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">git pull origin</span> <span style="color:#38bdf8;">main</span></pre>
+<span style="color:#34d399;">$</span> git pull origin main</pre>
             </div>
           </div>
 
-          <h3 style="font-size: 1.05rem; color: #0f172a; font-weight: 700; margin-top: 2rem; margin-bottom: 0.75rem;">Option 2 — Full Repository Clone</h3>
-          <div class="code-panel" style="max-width:100%; background: #0f172a; border: 1px solid #1e293b; border-radius: 14px; overflow: hidden; margin: 1rem 0;">
-            <div class="code-header" style="background: #1e293b; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155;">
+          <h3>Option 2 — Full Repository Clone</h3>
+          <div class="code-panel" style="margin: 0.75rem 0;">
+            <div class="code-header">
               <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
-              <div class="code-title" style="color: #94a3b8; font-weight: 700; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;">Terminal — Full Clone</div>
+              <div class="code-title">Terminal — Full Clone</div>
             </div>
-            <div class="code-content" style="display:block; padding: 1.25rem 1.5rem; background: #0f172a;">
-              <pre style="margin:0; background:#0f172a; color:#f8fafc; font-family:'JetBrains Mono',monospace; font-size:0.88rem; border:none; box-shadow:none; padding:0; line-height: 1.75;"><span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">git clone</span> <span style="color:#38bdf8;">https://github.com/t00114218-stack/SLMAgents.git</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">cd</span> <span style="color:#38bdf8;">SLMAgents</span>
-<span style="color:#34d399;">$</span> <span style="color:#c084fc; font-weight:700;">./slm doctor</span></pre>
+            <div class="code-content" style="display:block;">
+              <pre><span style="color:#34d399;">$</span> git clone https://github.com/t00114218-stack/SLMAgents.git
+<span style="color:#34d399;">$</span> cd SLMAgents
+<span style="color:#34d399;">$</span> ./slm doctor</pre>
             </div>
           </div>
 
-          <p style="margin-top: 1.25rem; font-size: 0.9rem; color: #475569; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 1rem 1.25rem;">
-            💡 <strong>Tip:</strong> After checkout, install the harness and agent in editable mode with <code style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; padding: 2px 8px; border-radius: 5px; font-weight: 700;">pip install -e ./slm_harness -e ./slm_data</code> or download the pre-packaged OS Harness Installer above.
+          <p style="margin-top: 1rem; font-size: 0.84rem; color: var(--text-secondary); background: #fafafa; border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 1rem;">
+            <strong>Note:</strong> After checkout, install the harness and agent in editable mode with <code>pip install -e ./slm_harness -e ./slm_data</code> or download the pre-packaged OS Harness Installer above.
           </p>
         </section>
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
 
         
 
@@ -316,7 +288,7 @@
         
 
         <section class="doc-section" id="config">
-          <h2>⚙️ Configuration API</h2>
+          <h2>05 / Configuration &amp; API Reference</h2>
           
           <h3>Constructor Parameters</h3>
           <p>Instantiate <code>SLMDataAnalyst</code> with performance options:</p>
@@ -405,13 +377,22 @@ print(result)</code></pre>
           </div>
         </section>
 
-        <footer style="margin-top: 3rem; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 2rem; color: #475569; font-size: 0.9rem; font-weight: 500;">
-          <p>© 2026 SLM Agents. Powered by the 10-Plane Pure-CPU Agent Harness (<code>slm_harness</code>) • 100% Offline Local AI under MIT License.</p>
+        <footer>
+          <div class="footer-row">
+            <div><strong style="color: var(--text-primary);">SLMAgents 2.0</strong> · Powered by the 10-Plane Pure-CPU Agent Harness (<code>slm_harness</code>) · MIT License</div>
+            <div class="footer-links">
+              <a href="index.html">Overview</a>
+              <a href="index.html#os-installers">OS Installers</a>
+              <a href="chat.html">Chat Studio</a>
+              <a href="playground.html">API Sandbox</a>
+              <a href="blogs.html">Research</a>
+            </div>
+          </div>
         </footer>
       </div>
     </main>
   </div>
 
-  <script src="app.js?v=54.0"></script>
+  <script src="app.js?v=55.0"></script>
 </body>
 </html>

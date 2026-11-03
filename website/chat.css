@@ -41,16 +41,138 @@ html, body {
 }
 
 /* ==========================================================================
+   0. Shared Constant Top Engineering Header (Web Mode)
+   ========================================================================== */
+header.site-top-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid #e4e4e7;
+  display: flex;
+  align-items: center;
+}
+
+header.site-top-header .nav-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+  height: 56px;
+}
+
+header.site-top-header .logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  font-size: 0.98rem;
+  color: #09090b;
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+
+header.site-top-header .logo-icon {
+  width: 28px;
+  height: 28px;
+  background: #09090b;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+header.site-top-header .nav-links {
+  display: flex;
+  gap: 1.25rem;
+  list-style: none;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+}
+
+header.site-top-header .nav-links a {
+  color: #3f3f46;
+  text-decoration: none;
+  font-size: 0.86rem;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+header.site-top-header .nav-links a:hover,
+header.site-top-header .nav-links a.active {
+  color: #09090b;
+  font-weight: 600;
+}
+
+header.site-top-header .btn-nav-download {
+  background: #09090b;
+  color: #ffffff;
+  border: 1px solid #09090b;
+  padding: 0.38rem 0.8rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+header.site-top-header .btn-github-nav {
+  background: #ffffff;
+  padding: 0.38rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #d4d4d8;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #09090b !important;
+  font-weight: 600 !important;
+  font-size: 0.8rem !important;
+}
+
+header.site-top-header .sidebar-toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid #e4e4e7;
+  color: #09090b;
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 5px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
    1. Application Shell
    ========================================================================== */
 
 .chat-app-container {
   display: flex;
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - 56px);
+  margin-top: 56px;
   overflow: hidden;
   position: relative;
   background: var(--bg-app);
+}
+
+html.desktop-app-mode .chat-app-container {
+  height: 100vh;
+  margin-top: 0;
 }
 
 /* ==========================================================================
@@ -60,7 +182,7 @@ html, body {
 .chat-sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
-  height: 100vh;
+  height: 100%;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-subtle);
   display: flex;
@@ -347,7 +469,7 @@ html, body {
 .chat-main-pane {
   flex: 1;
   min-width: 0;
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   position: relative;

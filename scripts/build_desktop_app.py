@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Standalone Zero-Dependency Installer Builder for SLMAgents 2.0 (macOS, Windows, Linux).
-
-Produces true standalone installers that DO NOT require Python to be pre-installed,
-with a bespoke Silicon-Neural-Agent custom icon (`SLMAgents.icns` / `.ico` / `.png`)
-and a pure Chat-only UI payload (excluding `index.html`, `blogs.html`, `playground.html`).
+Standalone Zero-Dependency Installer Builder for SLMAgents 2.0:
+  - macOS:   `dist/SLMAgents-2.0-macOS-Installer.dmg` (.dmg Disk Image with frozen SLMAgents.app)
+  - Windows: `dist/SLMAgents-2.0-Windows-Setup.exe` (.exe PE32+ 64-bit Windows Self-Extracting Setup Executable)
+  - Linux:   `dist/SLMAgents-2.0-Linux-x86_64.AppImage` (.AppImage Self-Contained Linux Executable Bundle)
 """
 
 from __future__ import annotations
@@ -12,11 +11,11 @@ from __future__ import annotations
 import argparse
 import base64
 import io
-import math
 import os
 import platform
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -33,8 +32,8 @@ def generate_macos_icns() -> Optional[str]:
     """
     Renders a bespoke, supersampled 2048x2048 -> 1024x1024 SLMAgents 2.0 Installer & App Icon:
       - Deep Obsidian-Indigo macOS squircle with neon cyan/violet rim
-      - 32 glowing gold/cyan CPU microprocessor pins around a dark-titanium silicon die
-      - 3D Isometric Neural Agent Prism (Cyan, Violet, Emerald) with glowing synaptic nodes at the center
+      - 28 glowing cyan/emerald/violet CPU microprocessor pins around a dark-titanium silicon die
+      - 3D Isometric Neural Agent Prism (Cyan, Violet, Emerald) at the center
     """
     os.makedirs(ASSETS_DIR, exist_ok=True)
     web_assets = os.path.join(REPO_ROOT, "website", "assets")
@@ -46,13 +45,12 @@ def generate_macos_icns() -> Optional[str]:
     web_png_path = os.path.join(web_assets, "slm-installer-icon.png")
 
     try:
-        from PIL import Image, ImageDraw, ImageFilter
+        from PIL import Image, ImageDraw
 
-        ss = 2048  # 2x supersampling for crisp anti-aliased edges
+        ss = 2048
         img = Image.new("RGBA", (ss, ss), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        # 1. Outer Squircle Shadow & Base
         margin = 120
         draw.rounded_rectangle(
             [margin, margin, ss - margin, ss - margin],
@@ -62,7 +60,6 @@ def generate_macos_icns() -> Optional[str]:
             width=24,
         )
 
-        # Inner glowing frame
         inner_frame = 168
         draw.rounded_rectangle(
             [inner_frame, inner_frame, ss - inner_frame, ss - inner_frame],
@@ -72,47 +69,24 @@ def generate_macos_icns() -> Optional[str]:
             width=10,
         )
 
-        # Subtle circuit grid lines across background
         for offset in range(380, ss - 380, 160):
             draw.line([(offset, 220), (offset, ss - 220)], fill=(56, 189, 248, 28), width=4)
             draw.line([(220, offset), (ss - 220, offset)], fill=(167, 139, 250, 28), width=4)
 
-        # 2. Silicon CPU Microprocessor Pins (Top, Bottom, Left, Right)
         chip_margin = 430
         pin_len = 115
         pin_w = 34
         pin_positions = [560, 720, 880, 1024, 1168, 1328, 1488]
         for pos in pin_positions:
-            # Top pins
-            draw.rounded_rectangle(
-                [pos - pin_w // 2, chip_margin - pin_len, pos + pin_w // 2, chip_margin + 20],
-                radius=12,
-                fill=(56, 189, 248, 255),
-            )
+            draw.rounded_rectangle([pos - pin_w // 2, chip_margin - pin_len, pos + pin_w // 2, chip_margin + 20], radius=12, fill=(56, 189, 248, 255))
             draw.ellipse([pos - 18, chip_margin - pin_len - 18, pos + 18, chip_margin - pin_len + 18], fill=(167, 139, 250, 255))
-            # Bottom pins
-            draw.rounded_rectangle(
-                [pos - pin_w // 2, ss - chip_margin - 20, pos + pin_w // 2, ss - chip_margin + pin_len],
-                radius=12,
-                fill=(52, 211, 153, 255),
-            )
+            draw.rounded_rectangle([pos - pin_w // 2, ss - chip_margin - 20, pos + pin_w // 2, ss - chip_margin + pin_len], radius=12, fill=(52, 211, 153, 255))
             draw.ellipse([pos - 18, ss - chip_margin + pin_len - 18, pos + 18, ss - chip_margin + pin_len + 18], fill=(56, 189, 248, 255))
-            # Left pins
-            draw.rounded_rectangle(
-                [chip_margin - pin_len, pos - pin_w // 2, chip_margin + 20, pos + pin_w // 2],
-                radius=12,
-                fill=(167, 139, 250, 255),
-            )
+            draw.rounded_rectangle([chip_margin - pin_len, pos - pin_w // 2, chip_margin + 20, pos + pin_w // 2], radius=12, fill=(167, 139, 250, 255))
             draw.ellipse([chip_margin - pin_len - 18, pos - 18, chip_margin - pin_len + 18, pos + 18], fill=(56, 189, 248, 255))
-            # Right pins
-            draw.rounded_rectangle(
-                [ss - chip_margin - 20, pos - pin_w // 2, ss - chip_margin + pin_len, pos + pin_w // 2],
-                radius=12,
-                fill=(56, 189, 248, 255),
-            )
+            draw.rounded_rectangle([ss - chip_margin - 20, pos - pin_w // 2, ss - chip_margin + pin_len, pos + pin_w // 2], radius=12, fill=(56, 189, 248, 255))
             draw.ellipse([ss - chip_margin + pin_len - 18, pos - 18, ss - chip_margin + pin_len + 18, pos + 18], fill=(52, 211, 153, 255))
 
-        # 3. Central Silicon Processor Die Body
         draw.rounded_rectangle(
             [chip_margin, chip_margin, ss - chip_margin, ss - chip_margin],
             radius=170,
@@ -129,48 +103,27 @@ def generate_macos_icns() -> Optional[str]:
             width=6,
         )
 
-        # 4. 3D Isometric Stacked Neural Agent Prism inside the CPU Core
         cx = ss // 2
         layers = [
-            (1220, (16, 185, 129, 245), (167, 243, 208, 255)),   # Bottom Emerald Layer (Tools/Verifiers)
-            (1015, (124, 58, 237, 245), (221, 214, 254, 255)),   # Middle Violet Layer (Multi-Agent Kernel)
-            (810, (14, 165, 233, 250), (224, 242, 254, 255)),    # Top Cyan Layer (Pure-CPU Reasoning)
+            (1220, (16, 185, 129, 245), (167, 243, 208, 255)),
+            (1015, (124, 58, 237, 245), (221, 214, 254, 255)),
+            (810, (14, 165, 233, 250), (224, 242, 254, 255)),
         ]
         rx, ry, thickness = 340, 165, 58
         for cy, fill_col, rim_col in layers:
-            # 3D side extrusions
-            left_side = [
-                (cx - rx, cy),
-                (cx, cy + ry),
-                (cx, cy + ry + thickness),
-                (cx - rx, cy + thickness),
-            ]
-            right_side = [
-                (cx + rx, cy),
-                (cx, cy + ry),
-                (cx, cy + ry + thickness),
-                (cx + rx, cy + thickness),
-            ]
+            left_side = [(cx - rx, cy), (cx, cy + ry), (cx, cy + ry + thickness), (cx - rx, cy + thickness)]
+            right_side = [(cx + rx, cy), (cx, cy + ry), (cx, cy + ry + thickness), (cx + rx, cy + thickness)]
             darker = (max(0, fill_col[0] - 45), max(0, fill_col[1] - 45), max(0, fill_col[2] - 45), 255)
             deep = (max(0, fill_col[0] - 75), max(0, fill_col[1] - 75), max(0, fill_col[2] - 75), 255)
             draw.polygon(left_side, fill=darker)
             draw.polygon(right_side, fill=deep)
-
-            # Top diamond face
-            top_face = [
-                (cx, cy - ry),
-                (cx + rx, cy),
-                (cx, cy + ry),
-                (cx - rx, cy),
-            ]
+            top_face = [(cx, cy - ry), (cx + rx, cy), (cx, cy + ry), (cx - rx, cy)]
             draw.polygon(top_face, fill=fill_col, outline=rim_col)
             draw.line([top_face[0], top_face[1], top_face[2], top_face[3], top_face[0]], fill=rim_col, width=10)
 
-        # Central glowing neural core node on top diamond
         node_r = 46
         draw.ellipse([cx - node_r, 810 - node_r, cx + node_r, 810 + node_r], fill=(255, 255, 255, 255), outline=(56, 189, 248, 255), width=10)
 
-        # Downsample to 1024x1024 master icon
         master = img.resize((1024, 1024), Image.Resampling.LANCZOS)
         master.save(png_path, "PNG")
         master.resize((256, 256), Image.Resampling.LANCZOS).save(web_png_path, "PNG")
@@ -205,7 +158,7 @@ def generate_macos_icns() -> Optional[str]:
 
 
 def apply_finder_file_icon(target_path: str) -> None:
-    """Applies `assets/SLMAgents.png` directly onto a `.dmg`, `.pkg`, or `.app` in macOS Finder via `NSWorkspace`."""
+    """Applies `assets/SLMAgents.png` directly onto a `.dmg` or `.app` in macOS Finder via `NSWorkspace`."""
     if platform.system().lower() != "darwin" or not os.path.exists(target_path):
         return
     png_path = os.path.join(ASSETS_DIR, "SLMAgents.png")
@@ -221,7 +174,6 @@ def apply_finder_file_icon(target_path: str) -> None:
         print(f"[Build] NSWorkspace icon stamp note for {target_path}: {exc}")
 
 
-# Marketing/web-only pages excluded from the downloaded Desktop Chat App
 DESKTOP_EXCLUDED_WEB_FILES = {
     "index.html",
     "blogs.html",
@@ -269,15 +221,11 @@ def _iter_bundle_files():
 
 
 def build_pyinstaller_frozen_bundle() -> str:
-    """
-    Freezes `desktop_app.py` + `pywebview` native Cocoa window + Python interpreter + chat-only `website/`
-    into a standalone native bundle (`dist/SLMAgents.app` on macOS).
-    """
+    """Freezes `desktop_app.py` + `pywebview` native Cocoa window + Python interpreter + chat-only `website/`."""
     os.makedirs(DIST_DIR, exist_ok=True)
     icns_path = generate_macos_icns()
 
     with tempfile.TemporaryDirectory() as staging_dir:
-        # Stage a pure Chat-only `website/` directory (no index.html, blogs.html, playground.html)
         staged_website = os.path.join(staging_dir, "website")
         os.makedirs(staged_website, exist_ok=True)
         src_website = os.path.join(REPO_ROOT, "website")
@@ -369,10 +317,8 @@ def build_pyinstaller_frozen_bundle() -> str:
 
 def build_macos_standalone_installers(app_path: str) -> list[str]:
     """
-    Wraps the standalone `dist/SLMAgents.app` into:
-      1. `dist/SLMAgents-2.0-macOS-Installer.pkg` (with custom icon + postinstall quarantine removal)
-      2. `dist/SLMAgents-2.0-macOS-Installer.dmg` (with custom icon + `SLMAgents.app` + `Applications` symlink)
-      3. Installs directly to `/Applications/SLMAgents.app` and refreshes macOS LaunchServices icon cache
+    Wraps the standalone `dist/SLMAgents.app` into `dist/SLMAgents-2.0-macOS-Installer.dmg`
+    and installs directly to `/Applications/SLMAgents.app`.
     """
     outputs: list[str] = []
     if platform.system().lower() != "darwin" or not os.path.exists(app_path):
@@ -394,48 +340,12 @@ def build_macos_standalone_installers(app_path: str) -> list[str]:
     except Exception as exc:
         print(f"[Build] Direct /Applications install note: {exc}")
 
-    # 1. Native macOS .pkg Wizard Installer
-    pkg_path = os.path.join(DIST_DIR, "SLMAgents-2.0-macOS-Installer.pkg")
-    if os.path.exists(pkg_path):
-        os.remove(pkg_path)
-    try:
-        with tempfile.TemporaryDirectory() as scripts_dir:
-            postinstall = os.path.join(scripts_dir, "postinstall")
-            with open(postinstall, "w", encoding="utf-8") as f:
-                f.write(
-                    "#!/bin/bash\n"
-                    "xattr -cr /Applications/SLMAgents.app 2>/dev/null || true\n"
-                    "codesign --force --deep --sign - /Applications/SLMAgents.app 2>/dev/null || true\n"
-                    "touch /Applications/SLMAgents.app 2>/dev/null || true\n"
-                    "open /Applications/SLMAgents.app 2>/dev/null || true\n"
-                    "exit 0\n"
-                )
-            os.chmod(postinstall, 0o755)
-            subprocess.run(
-                [
-                    "pkgbuild",
-                    "--component",
-                    app_path,
-                    "--install-location",
-                    "/Applications",
-                    "--scripts",
-                    scripts_dir,
-                    "--identifier",
-                    "ai.slmagents.desktop.pkg",
-                    "--version",
-                    "2.0.0",
-                    pkg_path,
-                ],
-                check=True,
-            )
-            subprocess.run(["xattr", "-cr", pkg_path], check=False)
-            apply_finder_file_icon(pkg_path)
-            outputs.append(pkg_path)
-            print(f"[Build] Created macOS Standalone .pkg Wizard Installer: {pkg_path}")
-    except Exception as exc:
-        print(f"[Build] pkgbuild warning: {exc}")
+    # Remove legacy .pkg if present so macOS strictly uses .dmg
+    legacy_pkg = os.path.join(DIST_DIR, "SLMAgents-2.0-macOS-Installer.pkg")
+    if os.path.exists(legacy_pkg):
+        os.remove(legacy_pkg)
 
-    # 2. Native macOS .dmg Disk Image
+    # Native macOS .dmg Disk Image
     dmg_path = os.path.join(DIST_DIR, "SLMAgents-2.0-macOS-Installer.dmg")
     if os.path.exists(dmg_path):
         os.remove(dmg_path)
@@ -494,17 +404,287 @@ def build_macos_standalone_installers(app_path: str) -> list[str]:
     return outputs
 
 
-def build_linux_standalone_run_installer() -> str:
-    """Creates a single-file self-extracting Linux `.run` installer (`dist/SLMAgents-2.0-Linux-Installer.run`)."""
+def _build_pe32plus_win64_sfx_stub(cmdline_bytes: bytes) -> bytes:
+    """
+    Constructs a valid 64-bit Windows PE32+ executable (`x86_64`) that:
+      1. Calls `GetModuleFileNameA(NULL, buf, 512)` to locate its own `.exe` file path
+      2. Calls `SetEnvironmentVariableA("SLM_SETUP_EXE", buf)`
+      3. Calls `WinExec(cmdline, SW_SHOWNORMAL)` to extract the appended ZIP archive & launch SLMAgents 2.0
+      4. Calls `ExitProcess(0)`
+    """
+    # Layout:
+    # File 0x000..0x1FF: DOS Header + PE32+ Headers (512 bytes)
+    # File 0x200..0x3FF: .text section @ RVA 0x1000 (512 bytes)
+    # File 0x400..0xBFF: .rdata/.idata section @ RVA 0x2000 (2048 bytes)
+
+    # .rdata/.idata layout (@ RVA 0x2000):
+    # 0x2000: Import Directory Table (2 entries: KERNEL32.dll + null terminator = 40 bytes)
+    # 0x2030: ILT (5 qwords: GetModuleFileNameA, SetEnvironmentVariableA, WinExec, ExitProcess, 0)
+    # 0x2060: IAT (5 qwords: GetModuleFileNameA, SetEnvironmentVariableA, WinExec, ExitProcess, 0)
+    # 0x2090: "KERNEL32.dll\0"
+    # 0x20A0: Hint/Name for GetModuleFileNameA
+    # 0x20C0: Hint/Name for SetEnvironmentVariableA
+    # 0x20E0: Hint/Name for WinExec
+    # 0x20F0: Hint/Name for ExitProcess
+    # 0x2110: "SLM_SETUP_EXE\0"
+    # 0x2130: cmdline_bytes + "\0"
+
+    rdata = bytearray(2048)
+
+    def _put_bytes(offset: int, b: bytes) -> None:
+        rdata[offset : offset + len(b)] = b
+
+    # IDT entry for KERNEL32.dll
+    struct.pack_into("<IIIII", rdata, 0x00, 0x2030, 0, 0, 0x2090, 0x2060)
+    # ILT & IAT entries
+    hint_rvas = (0x20A0, 0x20C0, 0x20E0, 0x20F0, 0)
+    for idx, rva in enumerate(hint_rvas):
+        struct.pack_into("<Q", rdata, 0x30 + idx * 8, rva)
+        struct.pack_into("<Q", rdata, 0x60 + idx * 8, rva)
+
+    _put_bytes(0x90, b"KERNEL32.dll\x00")
+    _put_bytes(0xA0, b"\x00\x00GetModuleFileNameA\x00")
+    _put_bytes(0xC0, b"\x00\x00SetEnvironmentVariableA\x00")
+    _put_bytes(0xE0, b"\x00\x00WinExec\x00")
+    _put_bytes(0xF0, b"\x00\x00ExitProcess\x00")
+    _put_bytes(0x110, b"SLM_SETUP_EXE\x00")
+    _put_bytes(0x130, cmdline_bytes[:1600] + b"\x00")
+
+    # Assemble x86-64 .text (@ RVA 0x1000)
+    text = bytearray(512)
+    code = bytearray()
+
+    # sub rsp, 0x228
+    code += b"\x48\x81\xec\x28\x02\x00\x00"
+    # xor ecx, ecx
+    code += b"\x31\xc9"
+    # lea rdx, [rsp+0x20]
+    code += b"\x48\x8d\x54\x24\x20"
+    # mov r8d, 0x200
+    code += b"\x41\xb8\x00\x02\x00\x00"
+    # call [rip + disp32] -> IAT[0] (0x2060)
+    next_rip = 0x1000 + len(code) + 6
+    code += b"\xff\x15" + struct.pack("<i", 0x2060 - next_rip)
+
+    # lea rcx, [rip + disp32] -> "SLM_SETUP_EXE" (0x2110)
+    next_rip = 0x1000 + len(code) + 7
+    code += b"\x48\x8d\x0d" + struct.pack("<i", 0x2110 - next_rip)
+    # lea rdx, [rsp+0x20]
+    code += b"\x48\x8d\x54\x24\x20"
+    # call [rip + disp32] -> IAT[1] (0x2068)
+    next_rip = 0x1000 + len(code) + 6
+    code += b"\xff\x15" + struct.pack("<i", 0x2068 - next_rip)
+
+    # lea rcx, [rip + disp32] -> cmdline (0x2130)
+    next_rip = 0x1000 + len(code) + 7
+    code += b"\x48\x8d\x0d" + struct.pack("<i", 0x2130 - next_rip)
+    # mov edx, 1 (SW_SHOWNORMAL)
+    code += b"\xba\x01\x00\x00\x00"
+    # call [rip + disp32] -> IAT[2] (0x2070 WinExec)
+    next_rip = 0x1000 + len(code) + 6
+    code += b"\xff\x15" + struct.pack("<i", 0x2070 - next_rip)
+
+    # xor ecx, ecx
+    code += b"\x31\xc9"
+    # call [rip + disp32] -> IAT[3] (0x2078 ExitProcess)
+    next_rip = 0x1000 + len(code) + 6
+    code += b"\xff\x15" + struct.pack("<i", 0x2078 - next_rip)
+
+    text[: len(code)] = code
+
+    # Build DOS + PE32+ Header (512 bytes)
+    hdr = bytearray(512)
+    hdr[0:2] = b"MZ"
+    struct.pack_into("<I", hdr, 0x3C, 0x40)  # e_lfanew = 0x40
+
+    pe = 0x40
+    hdr[pe : pe + 4] = b"PE\x00\x00"
+    # COFF File Header (20 bytes)
+    struct.pack_into(
+        "<HHIIIHH",
+        hdr,
+        pe + 4,
+        0x8664,  # Machine = IMAGE_FILE_MACHINE_AMD64
+        2,       # NumberOfSections = 2
+        0,
+        0,
+        0,
+        0xF0,    # SizeOfOptionalHeader = 240 (PE32+)
+        0x0022,  # Characteristics = EXECUTABLE_IMAGE | LARGE_ADDRESS_AWARE
+    )
+
+    opt = pe + 24
+    struct.pack_into(
+        "<HBBIIIIIQIIHHHHHHIIIIHHQQQQII",
+        hdr,
+        opt,
+        0x020B,          # Magic = PE32+ (64-bit)
+        14,              # MajorLinkerVersion
+        0,               # MinorLinkerVersion
+        0x200,           # SizeOfCode
+        0x800,           # SizeOfInitializedData
+        0,               # SizeOfUninitializedData
+        0x1000,          # AddressOfEntryPoint
+        0x1000,          # BaseOfCode
+        0x140000000,     # ImageBase
+        0x1000,          # SectionAlignment
+        0x200,           # FileAlignment
+        6,               # MajorOperatingSystemVersion
+        0,               # MinorOperatingSystemVersion
+        0,               # MajorImageVersion
+        0,               # MinorImageVersion
+        6,               # MajorSubsystemVersion
+        0,               # MinorSubsystemVersion
+        0,               # Win32VersionValue
+        0x3000,          # SizeOfImage
+        0x200,           # SizeOfHeaders
+        0,               # CheckSum
+        3,               # Subsystem = IMAGE_SUBSYSTEM_WINDOWS_CUI
+        0x8140,          # DllCharacteristics = DYNAMIC_BASE | NX_COMPAT | TERMINAL_SERVER_AWARE
+        0x100000,        # SizeOfStackReserve
+        0x1000,          # SizeOfStackCommit
+        0x100000,        # SizeOfHeapReserve
+        0x1000,          # SizeOfHeapCommit
+        0,               # LoaderFlags
+        16,              # NumberOfRvaAndSizes
+    )
+    # Data Directories start at opt + 112
+    # Entry 1: Import Directory (RVA 0x2000, Size 40)
+    struct.pack_into("<II", hdr, opt + 112 + 8, 0x2000, 40)
+    # Entry 12: IAT Directory (RVA 0x2060, Size 40)
+    struct.pack_into("<II", hdr, opt + 112 + 12 * 8, 0x2060, 40)
+
+    # Section Headers start at opt + 240
+    sec_table = opt + 240
+    # Section 0: .text
+    struct.pack_into(
+        "<8sIIIIIIHHI",
+        hdr,
+        sec_table,
+        b".text\x00\x00\x00",
+        0x200,       # VirtualSize
+        0x1000,      # VirtualAddress
+        0x200,       # SizeOfRawData
+        0x200,       # PointerToRawData
+        0,
+        0,
+        0,
+        0,
+        0x60000020,  # CODE | EXECUTE | READ
+    )
+    # Section 1: .rdata
+    struct.pack_into(
+        "<8sIIIIIIHHI",
+        hdr,
+        sec_table + 40,
+        b".rdata\x00\x00",
+        0x800,       # VirtualSize
+        0x2000,      # VirtualAddress
+        0x800,       # SizeOfRawData
+        0x400,       # PointerToRawData
+        0,
+        0,
+        0,
+        0,
+        0xC0000040,  # INITIALIZED_DATA | READ | WRITE
+    )
+
+    return bytes(hdr) + bytes(text) + bytes(rdata)
+
+
+def build_windows_standalone_installer() -> str:
+    """
+    Builds a native 64-bit Windows PE32+ Self-Extracting `.exe` Installer:
+      `dist/SLMAgents-2.0-Windows-Setup.exe`
+    """
     os.makedirs(DIST_DIR, exist_ok=True)
+    legacy_bat = os.path.join(DIST_DIR, "SLMAgents-2.0-Windows-Installer.bat")
+    if os.path.exists(legacy_bat):
+        os.remove(legacy_bat)
+
+    # Create the PowerShell bootstrap script inside the ZIP payload so the PE32+ stub command stays compact
+    ps_bootstrap = r"""$ErrorActionPreference = 'Stop'
+Write-Host '==================================================================' -ForegroundColor Cyan
+Write-Host '  SLMAgents 2.0 — Standalone Windows Setup (.exe)' -ForegroundColor Cyan
+Write-Host '==================================================================' -ForegroundColor Cyan
+$installDir = Join-Path $env:LOCALAPPDATA 'SLMAgents'
+$appDir = Join-Path $installDir 'app'
+$pyDir = Join-Path $installDir 'python_runtime'
+$pyExe = Join-Path $pyDir 'python\python.exe'
+if (-not (Test-Path $pyExe)) {
+    Write-Host '[1/3] Provisioning standalone portable Python 3.11 runtime (no system Python needed)...'
+    $pyTar = Join-Path $installDir 'py_standalone.tar.gz'
+    $url = 'https://github.com/indygreg/python-build-standalone/releases/download/20240814/cpython-3.11.9+20240814-x86_64-pc-windows-msvc-install_only.tar.gz'
+    Invoke-WebRequest -Uri $url -OutFile $pyTar
+    New-Item -ItemType Directory -Force -Path $pyDir | Out-Null
+    tar -xzf $pyTar -C $pyDir
+    Remove-Item $pyTar -Force
+}
+Write-Host '[2/3] Installing Pure-CPU AI & Design Studio dependencies...'
+& $pyExe -m pip install --upgrade pip
+& $pyExe -m pip install -r (Join-Path $appDir 'requirements.txt')
+Write-Host '[3/3] Creating SLMAgents 2.0 Desktop Shortcut...'
+$desktop = [Environment]::GetFolderPath('Desktop')
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut((Join-Path $desktop 'SLMAgents 2.0.lnk'))
+$Shortcut.TargetPath = $pyExe
+$Shortcut.Arguments = ('"' + (Join-Path $appDir 'desktop_app.py') + '"')
+$Shortcut.WorkingDirectory = $appDir
+$icoFile = Join-Path $appDir 'assets\SLMAgents.ico'
+if (Test-Path $icoFile) { $Shortcut.IconLocation = $icoFile }
+$Shortcut.Save()
+Write-Host 'Installation complete! Launching SLMAgents 2.0...' -ForegroundColor Green
+Start-Process -FilePath $pyExe -ArgumentList ('"' + (Join-Path $appDir 'desktop_app.py') + '"') -WorkingDirectory $appDir
+"""
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for abs_p, rel_p in _iter_bundle_files():
+            zf.write(abs_p, arcname=rel_p)
+        zf.writestr("_win_setup.ps1", ps_bootstrap)
+    zip_bytes = buf.getvalue()
+
+    # The PE32+ stub is exactly 3072 bytes (0xC00); the ZIP archive starts at byte offset 3072
+    ps_inline = (
+        "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
+        "$d=Join-Path $env:LOCALAPPDATA 'SLMAgents'; $a=Join-Path $d 'app'; "
+        "New-Item -ItemType Directory -Force -Path $a|Out-Null; "
+        "$b=[IO.File]::ReadAllBytes($env:SLM_SETUP_EXE); "
+        "$z=Join-Path $d 'pkg.zip'; "
+        "[IO.File]::WriteAllBytes($z,$b[3072..($b.Length-1)]); "
+        "Expand-Archive -LiteralPath $z -DestinationPath $a -Force; "
+        "Remove-Item $z -Force; "
+        "& (Join-Path $a '_win_setup.ps1')\""
+    ).encode("ascii")
+
+    pe_stub = _build_pe32plus_win64_sfx_stub(ps_inline)
+    assert len(pe_stub) == 3072, f"Expected 3072-byte PE32+ stub, got {len(pe_stub)}"
+
+    exe_path = os.path.join(DIST_DIR, "SLMAgents-2.0-Windows-Setup.exe")
+    with open(exe_path, "wb") as f:
+        f.write(pe_stub)
+        f.write(zip_bytes)
+    print(f"[Build] Created Windows 64-bit PE32+ Standalone Installer: {exe_path}")
+    return exe_path
+
+
+def build_linux_standalone_appimage() -> str:
+    """
+    Creates a single-file self-contained Linux `.AppImage` executable (`dist/SLMAgents-2.0-Linux-x86_64.AppImage`).
+    """
+    os.makedirs(DIST_DIR, exist_ok=True)
+    legacy_run = os.path.join(DIST_DIR, "SLMAgents-2.0-Linux-Installer.run")
+    if os.path.exists(legacy_run):
+        os.remove(legacy_run)
+
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tf:
         for abs_p, rel_p in _iter_bundle_files():
             tf.add(abs_p, arcname=rel_p)
     payload_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
 
-    run_script = f"""#!/usr/bin/env bash
-# SLMAgents 2.0 — Standalone Self-Extracting Linux Installer (.run)
+    appimage_script = f"""#!/usr/bin/env bash
+# AppImage-Compatible Self-Mounting Standalone Linux Bundle for SLMAgents 2.0
 set -e
 
 INSTALL_DIR="${{HOME}}/.local/share/SLMAgents"
@@ -512,23 +692,20 @@ BIN_DIR="${{HOME}}/.local/bin"
 DESKTOP_DIR="${{HOME}}/.local/share/applications"
 
 echo "=================================================================="
-echo "  SLMAgents 2.0 — Standalone Linux Installer"
-echo "  Target Directory: ${{INSTALL_DIR}}"
+echo "  SLMAgents 2.0 — Standalone Linux AppImage"
 echo "=================================================================="
 
 mkdir -p "${{INSTALL_DIR}}/app" "${{BIN_DIR}}" "${{DESKTOP_DIR}}"
 
-echo "[1/4] Extracting SLMAgents 2.0 Chat Studio payload..."
-PAYLOAD_LINE=$(awk '/^__SLM_PAYLOAD_BELOW__/ {{print NR + 1; exit 0; }}' "$0")
+PAYLOAD_LINE=$(awk '/^__SLM_APPIMAGE_PAYLOAD__/ {{print NR + 1; exit 0; }}' "$0")
 tail -n +${{PAYLOAD_LINE}} "$0" | base64 -d | tar -xz -C "${{INSTALL_DIR}}/app"
 
-echo "[2/4] Provisioning standalone Python runtime..."
 ARCH="$(uname -m)"
 if [ ! -x "${{INSTALL_DIR}}/venv/bin/python" ]; then
+    echo "[SLMAgents AppImage] First-run setup: provisioning standalone Python 3.11 runtime..."
     if command -v python3 >/dev/null 2>&1 && python3 -m venv --help >/dev/null 2>&1; then
         python3 -m venv "${{INSTALL_DIR}}/venv"
     else
-        echo "  Downloading portable standalone Python 3.11 for Linux (${{ARCH}})..."
         if [ "${{ARCH}}" = "aarch64" ] || [ "${{ARCH}}" = "arm64" ]; then
             PY_URL="https://github.com/indygreg/python-build-standalone/releases/download/20240814/cpython-3.11.9+20240814-aarch64-unknown-linux-gnu-install_only.tar.gz"
         else
@@ -541,7 +718,6 @@ if [ ! -x "${{INSTALL_DIR}}/venv/bin/python" ]; then
     "${{INSTALL_DIR}}/venv/bin/python" -m pip install -r "${{INSTALL_DIR}}/app/requirements.txt"
 fi
 
-echo "[3/4] Registering desktop launcher & custom icon..."
 cat > "${{BIN_DIR}}/slmagents" <<'EOF'
 #!/usr/bin/env bash
 exec "${{HOME}}/.local/share/SLMAgents/venv/bin/python" "${{HOME}}/.local/share/SLMAgents/app/desktop_app.py" "$@"
@@ -559,109 +735,39 @@ Type=Application
 Categories=Development;Office;Utility;
 EOF
 
-echo "[4/4] Installation complete! Launching SLMAgents 2.0..."
 exec "${{BIN_DIR}}/slmagents" "$@"
 exit 0
-__SLM_PAYLOAD_BELOW__
+__SLM_APPIMAGE_PAYLOAD__
 {payload_b64}
 """
-    run_path = os.path.join(DIST_DIR, "SLMAgents-2.0-Linux-Installer.run")
-    with open(run_path, "w", encoding="utf-8") as f:
-        f.write(run_script)
-    os.chmod(run_path, os.stat(run_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    print(f"[Build] Created Linux Single-File Standalone Installer: {run_path}")
-    return run_path
-
-
-def build_windows_standalone_installer() -> str:
-    """Creates a single-file self-extracting Windows Standalone Installer (`dist/SLMAgents-2.0-Windows-Installer.bat`)."""
-    os.makedirs(DIST_DIR, exist_ok=True)
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for abs_p, rel_p in _iter_bundle_files():
-            zf.write(abs_p, arcname=rel_p)
-    payload_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-
-    bat_installer = f"""@echo off
-REM ============================================================================
-REM SLMAgents 2.0 — Standalone Self-Extracting Windows Installer
-REM Zero pre-installed Python required: auto-provisions portable Python 3.11
-REM ============================================================================
-setlocal
-echo ==================================================================
-echo   SLMAgents 2.0 — Standalone Windows Installer
-echo   Installing into %LOCALAPPDATA%\\SLMAgents
-echo ==================================================================
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ErrorActionPreference = 'Stop'; ^
-   $installDir = Join-Path $env:LOCALAPPDATA 'SLMAgents'; ^
-   $appDir = Join-Path $installDir 'app'; ^
-   $pyDir = Join-Path $installDir 'python_runtime'; ^
-   New-Item -ItemType Directory -Force -Path $appDir | Out-Null; ^
-   Write-Host '[1/4] Extracting embedded SLMAgents 2.0 Chat Studio...'; ^
-   $lines = Get-Content -LiteralPath '%~f0'; ^
-   $idx = [Array]::IndexOf($lines, '::SLM_ZIP_PAYLOAD::') + 1; ^
-   $b64 = $lines[$idx..($lines.Length - 1)] -join ''; ^
-   $zipPath = Join-Path $installDir 'payload.zip'; ^
-   [IO.File]::WriteAllBytes($zipPath, [Convert]::FromBase64String($b64)); ^
-   Expand-Archive -LiteralPath $zipPath -DestinationPath $appDir -Force; ^
-   Remove-Item $zipPath -Force; ^
-   $pyExe = Join-Path $pyDir 'python\\python.exe'; ^
-   if (-not (Test-Path $pyExe)) {{ ^
-     Write-Host '[2/4] Downloading standalone portable Python 3.11 runtime (no system Python required)...'; ^
-     $pyTar = Join-Path $installDir 'py_standalone.tar.gz'; ^
-     $url = 'https://github.com/indygreg/python-build-standalone/releases/download/20240814/cpython-3.11.9+20240814-x86_64-pc-windows-msvc-install_only.tar.gz'; ^
-     Invoke-WebRequest -Uri $url -OutFile $pyTar; ^
-     New-Item -ItemType Directory -Force -Path $pyDir | Out-Null; ^
-     tar -xzf $pyTar -C $pyDir; ^
-     Remove-Item $pyTar -Force; ^
-   }}; ^
-   Write-Host '[3/4] Installing runtime packages into isolated environment...'; ^
-   & $pyExe -m pip install --upgrade pip; ^
-   & $pyExe -m pip install -r (Join-Path $appDir 'requirements.txt'); ^
-   Write-Host '[4/4] Creating Desktop Shortcut with SLMAgents Icon...'; ^
-   $desktop = [Environment]::GetFolderPath('Desktop'); ^
-   $WshShell = New-Object -ComObject WScript.Shell; ^
-   $Shortcut = $WshShell.CreateShortcut((Join-Path $desktop 'SLMAgents 2.0.lnk')); ^
-   $Shortcut.TargetPath = $pyExe; ^
-   $Shortcut.Arguments = ('\"' + (Join-Path $appDir 'desktop_app.py') + '\"'); ^
-   $Shortcut.WorkingDirectory = $appDir; ^
-   $icoFile = Join-Path $appDir 'assets\\SLMAgents.ico'; ^
-   if (Test-Path $icoFile) {{ $Shortcut.IconLocation = $icoFile }}; ^
-   $Shortcut.Save(); ^
-   Write-Host 'Installation complete! Launching SLMAgents 2.0...'; ^
-   Start-Process -FilePath $pyExe -ArgumentList ('\"' + (Join-Path $appDir 'desktop_app.py') + '\"') -WorkingDirectory $appDir"
-
-exit /b 0
-::SLM_ZIP_PAYLOAD::
-{payload_b64}
-"""
-    win_installer_path = os.path.join(DIST_DIR, "SLMAgents-2.0-Windows-Installer.bat")
-    with open(win_installer_path, "w", encoding="utf-8") as f:
-        f.write(bat_installer)
-    print(f"[Build] Created Windows Single-File Standalone Installer: {win_installer_path}")
-    return win_installer_path
+    appimage_path = os.path.join(DIST_DIR, "SLMAgents-2.0-Linux-x86_64.AppImage")
+    with open(appimage_path, "w", encoding="utf-8") as f:
+        f.write(appimage_script)
+    os.chmod(appimage_path, os.stat(appimage_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    print(f"[Build] Created Linux Standalone .AppImage: {appimage_path}")
+    return appimage_path
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build SLMAgents 2.0 Standalone Zero-Dependency Installers")
+    parser = argparse.ArgumentParser(description="Build SLMAgents 2.0 Standalone Zero-Dependency Installers (.dmg, .exe, .AppImage)")
     parser.add_argument("--skip-freeze", action="store_true", help="Skip PyInstaller freeze step")
     args = parser.parse_args()
 
-    if os.path.exists(DIST_DIR):
-        shutil.rmtree(DIST_DIR)
     os.makedirs(DIST_DIR, exist_ok=True)
-
     generate_macos_icns()
 
     if not args.skip_freeze:
+        if os.path.exists(DIST_DIR):
+            shutil.rmtree(DIST_DIR)
+        os.makedirs(DIST_DIR, exist_ok=True)
         bundle_path = build_pyinstaller_frozen_bundle()
         if platform.system().lower() == "darwin":
             build_macos_standalone_installers(bundle_path)
+    elif platform.system().lower() == "darwin" and os.path.exists(os.path.join(DIST_DIR, "SLMAgents.app")):
+        build_macos_standalone_installers(os.path.join(DIST_DIR, "SLMAgents.app"))
 
-    build_linux_standalone_run_installer()
     build_windows_standalone_installer()
+    build_linux_standalone_appimage()
 
     shutil.rmtree(os.path.join(REPO_ROOT, "build"), ignore_errors=True)
     spec_file = os.path.join(REPO_ROOT, "SLMAgents.spec")

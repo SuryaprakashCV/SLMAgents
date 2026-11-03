@@ -3,27 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry, Watermark LRU MemoryArena metrics, and standalone OS harness installers.">
-  
+  <meta name="description" content="Interactive API sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry, Watermark LRU MemoryArena metrics, and standalone OS harness installers.">
   <link rel="canonical" href="https://www.slmagents.ai/playground.html">
-  <title>Interactive 10-Plane Agent Harness Studio &amp; Playground | SLMAgents 2.0</title>
-  <link rel="stylesheet" href="style.css?v=54.0">
-  <!-- OpenGraph / Social Meta Tags -->
+  <title>Interactive 10-Plane Agent Harness Sandbox &amp; Unit Test Generator | SLMAgents 2.0</title>
+  <link rel="stylesheet" href="style.css?v=56.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.slmagents.ai/playground.html">
-  <meta property="og:title" content="Interactive 10-Plane Agent Harness Studio &amp; Playground | SLMAgents 2.0">
-  <meta property="og:description" content="Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry and standalone OS harness installers.">
+  <meta property="og:title" content="Interactive 10-Plane Agent Harness Sandbox | SLMAgents 2.0">
+  <meta property="og:description" content="Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness).">
   <meta property="og:site_name" content="SLMAgents">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Interactive 10-Plane Agent Harness Studio &amp; Playground | SLMAgents 2.0">
-  <meta name="twitter:description" content="Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry and standalone OS harness installers.">
-  <!-- Structured Data / Schema Markup -->
+  <meta name="twitter:title" content="Interactive 10-Plane Agent Harness Sandbox | SLMAgents 2.0">
+  <meta name="twitter:description" content="Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness).">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "TechArticle",
-    "headline": "Interactive 10-Plane Agent Harness Studio & Playground | SLMAgents 2.0",
-    "description": "Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry and standalone OS harness installers.",
+    "headline": "Interactive 10-Plane Agent Harness Sandbox | SLMAgents 2.0",
+    "description": "Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness).",
     "url": "https://www.slmagents.ai/playground.html",
     "mainEntityOfPage": "https://www.slmagents.ai/playground.html",
     "articleSection": "Playground",
@@ -43,202 +43,177 @@
   }
   </script>
 </head>
-<body style="overflow-y: auto !important; padding-top: 64px; background: #f8fafc; color: #0f172a; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+<body>
 
-  <!-- Header -->
-  <header style="position: fixed; top: 0; left: 0; right: 0; height: 64px; z-index: 1000; background: #ffffff; border-bottom: 1px solid #cbd5e1; display: flex; align-items: center;">
-    <div class="container nav-container" style="width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center;">
+  <!-- Top Engineering Header -->
+  <header class="site-top-header web-only-nav">
+    <div class="container nav-container">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <a href="index.html" class="logo" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: #0f172a; font-weight: 800; font-size: 1.2rem;">
-          <div class="logo-icon" style="background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%); color: #ffffff; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <a href="index.html" class="logo">
+          <div class="logo-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
           </div>
-          <span>SLM Agents</span>
+          <span>SLMAgents</span>
         </a>
       </div>
+
       <nav>
-        <ul>
-          <li><a href="index.html">Home</a></li>
-          <li class="dropdown">
-            <a class="dropdown-trigger">
-              Docs
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-            </a>
-            <div class="dropdown-content">
-              <div>
-                <div class="mega-col-title">Productivity</div>
-                <div class="mega-col-list">
-                  <a href="rag.html">📚 SLM RAG</a>
-                  <a href="summarizer.html">📝 Summarizer</a>
-                  <a href="cli.html">💻 CLI Agent</a>
-                  <a href="email_assistant.html">📧 Email Assistant</a>
-                  <a href="meeting_summarizer.html">🎙️ Meeting Summarizer</a>
-                  <a href="memory_manager.html">🧠 Memory Manager</a>
-                  <a href="task_planner.html">📋 Task Planner</a>
-                  <a href="pdf_chat.html">📑 PDF Chat</a>
-                  <a href="pkb_agent.html">🔗 PKB Agent</a>
-                  <a href="voice_agent.html">🗣️ Voice Agent</a>
-                </div>
-              </div>
-              <div>
-                <div class="mega-col-title">Developer Tools</div>
-                <div class="mega-col-list">
-                  <a href="orchestrator.html">🎯 Orchestrator</a>
-                  <a href="sql.html">📊 Text-to-SQL</a>
-                  <a href="code_interpreter.html">⚡ Code Interpreter</a>
-                  <a href="git_repo_manager.html">🐙 Git Repo Manager</a>
-                  <a href="database_migrator.html">🗄️ Database Migrator</a>
-                </div>
-              </div>
-              <div>
-                <div class="mega-col-title">Web &amp; Scraping</div>
-                <div class="mega-col-list">
-                  <a href="web_agent.html">🌐 Web Agent</a>
-                  <a href="web_scraper.html">🕷️ Web Scraper</a>
-                  <a href="search_orchestrator.html">🔎 Search Orchestrator</a>
-                </div>
-              </div>
-              <div>
-                <div class="mega-col-title">Data &amp; Utilities</div>
-                <div class="mega-col-list">
-                  <a href="json_cleaner.html">🧹 JSON Cleaner</a>
-                  <a href="document_parser.html">📄 Document Parser</a>
-                  <a href="vision_parser.html">👁️ Vision Parser</a>
-                  <a href="data_analyst.html">📈 Data Analyst</a>
-                  <a href="translation_hub.html">🌐 Translation Hub</a>
-                  <a href="math_agent.html">🧮 Math Agent</a>
-                  <a href="security_audit.html">🛡️ Security Audit</a>
-                  <a href="embeddings_server.html">🔢 Embeddings Server</a>
-                </div>
-              </div>
-            </div>
-          </li>
-          <li><a href="chat.html">Chat Studio</a></li>
-          <li><a href="playground.html" class="active" style="color: #4f46e5; font-weight: 700;">⚡ Playground</a></li>
-          <li><a href="blogs.html">Blogs</a></li>
+        <ul class="nav-links">
+          <li><a href="index.html" id="topnav-home">Home</a></li>
+          <li><a href="chat.html" id="topnav-chat">Chat Studio</a></li>
+          <li><a href="playground.html" id="topnav-playground">Playground</a></li>
+          <li><a href="blogs.html" id="topnav-blogs">Blogs</a></li>
           <li>
-            <button onclick="openDownloadModal()" style="background: linear-gradient(135deg, #4f46e5, #0284c7); color: #ffffff; border: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(79,70,229,0.25);">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <button type="button" onclick="openDownloadModal()" class="btn-nav-download">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Download App
             </button>
           </li>
-          <li><a href="https://github.com/t00114218-stack/SLMAgents" class="btn-github-nav" target="_blank">
-            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/>
-            </svg>
-            <span>GitHub</span>
-          </a></li>
+          <li>
+            <a href="https://github.com/t00114218-stack/SLMAgents" target="_blank" class="btn-github-nav">
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/>
+              </svg>
+              GitHub
+            </a>
+          </li>
         </ul>
       </nav>
     </div>
   </header>
 
-  <!-- Interactive Multi-Agent Playground / Studio -->
-  <section class="studio-section" id="studio" style="border-top: 1px solid rgba(0, 0, 0, 0.05); padding: 60px 0 80px 0; background: #f8fafc;">
-    <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 20px;">
-      <div class="section-header" style="text-align: center; margin-bottom: 2rem;">
-        <div class="badge-pill" style="display: inline-block; margin-bottom: 0.75rem; background: #e0e7ff; color: #4338ca; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; border: 1px solid #c7d2fe;">🎮 Live 10-Plane Pure-CPU Agent Harness Sandbox</div>
-        <h1 class="section-title" style="font-size: 2.25rem; color: #0f172a; font-weight: 800; margin-bottom: 0.5rem;">Interactive Multi-Agent Harness Studio</h1>
-        <p class="section-subtitle" style="font-size: 1.02rem; color: #475569; max-width: 780px; margin: 0 auto;">Execute any of the 26 specialized agents through the <strong>SLMAgents 2.0 10-Plane Pure-CPU Harness (<code>slm_harness</code>)</strong>—powered by hybrid <code>llama.cpp</code> GGUF (<code>Q4_K_M</code>) + Quantized INT4/INT8 CPU models, <code>&lt;35ms</code> Cascade Routing, Watermark LRU <code>MemoryArena</code>, and deterministic self-healing verifiers.</p>
+  <div class="layout-container">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">Documentation</div>
+        <ul class="sidebar-list" id="sidebar-active-list"></ul>
       </div>
+    </aside>
 
-      <!-- Standalone OS Harness Installer Bar -->
-      <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px 20px; margin-bottom: 28px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; box-shadow: 0 4px 14px rgba(15,23,42,0.04);">
-        <div>
-          <div style="font-weight: 800; color: #0f172a; font-size: 0.95rem;">📦 Download Standalone 10-Plane Harness Installers (All OSes)</div>
-          <div style="font-size: 0.82rem; color: #64748b;">Install the full 26-agent studio or download an individual standalone harness installer for the selected agent below.</div>
+    <main class="main-content">
+      <!-- Interactive Multi-Agent Playground / Sandbox -->
+      <section class="studio-section" id="studio" style="max-width: 1120px; margin: 0 auto;">
+        <div style="margin-bottom: 1.5rem;">
+          <div class="eng-eyebrow">
+            <span class="eng-eyebrow-dot"></span>
+            <span>API SANDBOX &amp; UNIT TEST GENERATOR · 26 SPECIALIZED AGENTS</span>
+          </div>
+          <h1 style="font-size: 1.95rem; color: var(--text-primary); font-weight: 800; letter-spacing: -0.025em; margin-bottom: 0.45rem;">Interactive 10-Plane Agent Harness Sandbox</h1>
+          <p style="font-size: 0.94rem; color: var(--text-secondary); max-width: 820px; line-height: 1.6;">
+            Execute any of the 26 specialized agents through the <strong>SLMAgents 2.0 10-Plane Pure-CPU Harness (<code>slm_harness</code>)</strong>—powered by hybrid <code>llama.cpp</code> GGUF (<code>Q4_K_M</code>) + quantized INT4/INT8 CPU models, <code>&lt;35ms</code> Cascade Routing, Watermark LRU <code>MemoryArena</code>, and deterministic self-healing verifiers.
+          </p>
         </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-          <a id="pg-agent-mac-dl" href="/api/installers/download/agent-macos?agent=rag" style="padding: 8px 12px; border-radius: 8px; background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca; font-weight: 700; font-size: 0.8rem; text-decoration: none;">🍎 Selected Agent macOS (.command)</a>
-          <a id="pg-agent-win-dl" href="/api/installers/download/agent-windows?agent=rag" style="padding: 8px 12px; border-radius: 8px; background: #f0f9ff; border: 1px solid #bae6fd; color: #0369a1; font-weight: 700; font-size: 0.8rem; text-decoration: none;">🪟 Selected Agent Windows (.bat)</a>
-          <a id="pg-agent-lin-dl" href="/api/installers/download/agent-linux?agent=rag" style="padding: 8px 12px; border-radius: 8px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; font-weight: 700; font-size: 0.8rem; text-decoration: none;">🐧 Selected Agent Linux (.run)</a>
-          <button onclick="openDownloadModal()" style="padding: 8px 14px; border-radius: 8px; background: #0f172a; color: #ffffff; border: none; font-weight: 700; font-size: 0.8rem; cursor: pointer;">Full Suite OS Installers (.dmg / .pkg / .bat / .run)</button>
-        </div>
-      </div>
 
-      <div class="studio-grid" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 40px; margin-top: 40px; text-align: left;">
-        <!-- Parameters Panel -->
-        <div class="studio-panel" style="background: rgba(15, 23, 42, 0.04); border: 1px solid rgba(15, 23, 42, 0.08); box-shadow: 0 10px 30px rgba(0,0,0,0.03); padding: 30px; border-radius: 16px;">
-          <h3 style="color: #0f172a; font-size: 1.25rem; font-weight: 700; margin-top: 0; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-            Agent Parameters
-          </h3>
-          
-          <div style="margin-bottom: 20px;">
-            <label style="display: block; font-size: 0.85rem; color: #475569; font-weight: 700; margin-bottom: 0.5rem;">Select SLM Agent:</label>
-            <select id="studio-agent-select" onchange="onStudioAgentChange(this.value)" style="width: 100%; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.75rem 1rem; color: #0f172a; font-size: 0.9rem; font-weight: 600; outline: none; cursor: pointer; transition: border-color 0.2s;">
-              <option value="rag" selected>📚 SLM RAG</option>
-              <option value="orchestrator">🎯 SLM Orchestrator</option>
-              <option value="sql">📊 SLM Text-to-SQL</option>
-              <option value="summarizer">📝 SLM Summarizer</option>
-              <option value="web_agent">🌐 SLM Web Agent</option>
-              <option value="cli">💻 SLM CLI Agent</option>
-              <option value="code_interpreter">⚡ SLM Code Interpreter</option>
-              <option value="git_repo_manager">🐙 SLM Git Repo Manager</option>
-              <option value="json_cleaner">🧹 SLM JSON Cleaner</option>
-              <option value="document_parser">📄 SLM Document Parser</option>
-              <option value="vision_parser">👁️ SLM Vision Parser</option>
-              <option value="web_scraper">🕷️ SLM Web Scraper</option>
-              <option value="search_orchestrator">🔎 SLM Search Orchestrator</option>
-              <option value="database_migrator">🗄️ SLM Database Migrator</option>
-              <option value="email_assistant">📧 SLM Email Assistant</option>
-              <option value="meeting_summarizer">🎙️ SLM Meeting Summarizer</option>
-              <option value="memory_manager">🧠 SLM Memory Manager</option>
-              <option value="task_planner">📋 SLM Task Planner</option>
-              <option value="pdf_chat">📑 SLM PDF Chat</option>
-              <option value="pkb_agent">🔗 SLM PKB Agent</option>
-              <option value="data_analyst">📈 SLM Data Analyst</option>
-              <option value="translation_hub">🌐 SLM Translation Hub</option>
-              <option value="math_agent">🧮 SLM Math Agent</option>
-              <option value="security_audit">🛡️ SLM Security Audit</option>
-              <option value="embeddings_server">🔢 SLM Embeddings Server</option>
-              <option value="voice">🗣️ SLM Voice Agent</option>
-            </select>
+        <!-- Standalone OS Harness Installer Bar -->
+        <div class="agent-installer-builder" style="margin-bottom: 1.5rem;">
+          <div>
+            <div style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">Download Standalone 10-Plane Harness Installers (Selected Agent or Full Suite)</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary);">Links below automatically track the agent selected in the sandbox dropdown.</div>
+          </div>
+          <div class="builder-controls">
+            <a id="pg-agent-mac-dl" href="/api/installers/download/agent-macos?agent=rag" class="builder-dl-btn">Selected Agent · macOS (.command)</a>
+            <a id="pg-agent-win-dl" href="/api/installers/download/agent-windows?agent=rag" class="builder-dl-btn">Selected Agent · Windows (.bat)</a>
+            <a id="pg-agent-lin-dl" href="/api/installers/download/agent-linux?agent=rag" class="builder-dl-btn">Selected Agent · Linux (.run)</a>
+            <button onclick="openDownloadModal()" class="btn btn-primary" style="padding: 0.42rem 0.8rem; font-size: 0.76rem;">Full Suite OS Installers</button>
+          </div>
+        </div>
+
+        <div class="studio-grid" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem; align-items: start;">
+          <!-- Parameters Panel -->
+          <div class="studio-panel" style="background: #ffffff; border: 1px solid var(--border); padding: 1.5rem; border-radius: 8px;">
+            <h3 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin-top: 0; margin-bottom: 1.15rem; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+              <span>Agent Configuration &amp; Inputs</span>
+            </h3>
+
+            <div style="margin-bottom: 1rem;">
+              <label for="studio-agent-select" style="display: block; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem;">Target Agent Module</label>
+              <select id="studio-agent-select" onchange="onStudioAgentChange(this.value)" style="width: 100%; background: #fafafa; border: 1px solid var(--border-strong); border-radius: 6px; padding: 0.6rem 0.75rem; color: var(--text-primary); font-size: 0.86rem; font-weight: 600; outline: none; cursor: pointer;">
+                <option value="rag" selected>slm_rag — SLM RAG</option>
+                <option value="orchestrator">slm_orchestrator — SLM Orchestrator</option>
+                <option value="sql">slm_text_to_sql — SLM Text-to-SQL</option>
+                <option value="summarizer">slm_summarizer — SLM Summarizer</option>
+                <option value="web_agent">slm_web — SLM Web Agent</option>
+                <option value="cli">slm_cli — SLM CLI Agent</option>
+                <option value="code_interpreter">slm_code_interpreter — SLM Code Interpreter</option>
+                <option value="git_repo_manager">slm_git_manager — SLM Git Repo Manager</option>
+                <option value="json_cleaner">slm_json_cleaner — SLM JSON Cleaner</option>
+                <option value="document_parser">slm_doc_parser — SLM Document Parser</option>
+                <option value="vision_parser">slm_vision_parser — SLM Vision Parser</option>
+                <option value="web_scraper">slm_scraper — SLM Web Scraper</option>
+                <option value="search_orchestrator">slm_search — SLM Search Orchestrator</option>
+                <option value="database_migrator">slm_db_migration — SLM Database Migrator</option>
+                <option value="email_assistant">slm_email — SLM Email Assistant</option>
+                <option value="meeting_summarizer">slm_meeting — SLM Meeting Summarizer</option>
+                <option value="memory_manager">slm_memory — SLM Memory Manager</option>
+                <option value="task_planner">slm_task_planner — SLM Task Planner</option>
+                <option value="pdf_chat">slm_pdf — SLM PDF Chat</option>
+                <option value="pkb_agent">slm_pkb — SLM PKB Agent</option>
+                <option value="data_analyst">slm_data — SLM Data Analyst</option>
+                <option value="translation_hub">slm_translation — SLM Translation Hub</option>
+                <option value="math_agent">slm_math — SLM Math Agent</option>
+                <option value="security_audit">slm_security — SLM Security Audit</option>
+                <option value="embeddings_server">slm_embeddings — SLM Embeddings Server</option>
+                <option value="voice">slm_voice — SLM Voice Agent</option>
+              </select>
+            </div>
+
+            <!-- Dynamic parameter inputs -->
+            <div id="studio-dynamic-fields" style="display: flex; flex-direction: column; gap: 0.85rem;"></div>
+
+            <button id="studio-run-btn" class="btn btn-primary" onclick="runStudioAgent()" style="width: 100%; margin-top: 1.25rem; padding: 0.7rem 0; font-size: 0.88rem;">
+              Execute Agent in Sandbox
+            </button>
           </div>
 
-          <!-- Dynamic parameter inputs -->
-          <div id="studio-dynamic-fields" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+          <!-- Console Panel -->
+          <div class="studio-panel" style="background: #ffffff; border: 1px solid var(--border); padding: 1.5rem; border-radius: 8px; display: flex; flex-direction: column;">
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.65rem;">
+              <button id="tab-mode-exec" class="code-tab-btn active" onclick="setStudioMode('exec')" style="background: #18181b; color: #ffffff; border-radius: 5px; padding: 0.35rem 0.75rem; border: none; font-family: var(--font-mono); font-size: 0.76rem; font-weight: 600; cursor: pointer;">Execute Sandbox</button>
+              <button id="tab-mode-unittest" class="code-tab-btn" onclick="setStudioMode('unittest')" style="background: #f4f4f5; color: var(--text-secondary); border-radius: 5px; padding: 0.35rem 0.75rem; border: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.76rem; font-weight: 600; cursor: pointer;">Generate Pytest Suite</button>
+            </div>
 
-          <button id="studio-run-btn" class="btn btn-primary" onclick="runStudioAgent()" style="width: 100%; margin-top: 1.5rem; padding: 14px 0; font-size: 0.95rem; font-weight: 700; border-radius: 8px; background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%); color: #ffffff; border: none; cursor: pointer; transition: opacity 0.2s; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);">
-            ⚡ Run Agent Execution
-          </button>
-        </div>
-
-        <!-- Console Panel -->
-        <div class="studio-panel" style="background: rgba(15, 23, 42, 0.04); border: 1px solid rgba(15, 23, 42, 0.08); box-shadow: 0 10px 30px rgba(0,0,0,0.03); padding: 30px; border-radius: 16px; display: flex; flex-direction: column;">
-          <div class="code-tabs" style="display: flex; gap: 10px; margin-bottom: 1.25rem; border-bottom: 1px solid rgba(15,23,42,0.08); padding-bottom: 10px;">
-            <button id="tab-mode-exec" class="code-tab-btn active" onclick="setStudioMode('exec')" style="background: transparent; border: none; color: #475569; font-weight: 700; font-size: 0.85rem; padding: 4px 8px; cursor: pointer; border-bottom: 2px solid #4f46e5;">Execute Sandbox</button>
-            <button id="tab-mode-unittest" class="code-tab-btn" onclick="setStudioMode('unittest')" style="background: transparent; border: none; color: #475569; font-weight: 700; font-size: 0.85rem; padding: 4px 8px; cursor: pointer;">Generate Unit Test</button>
-          </div>
-
-          <div class="code-panel" style="flex: 1; min-height: 380px; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; border: 1px solid #1e293b;">
-            <div class="code-header" style="justify-content: space-between; background: #1e293b; padding: 10px 16px; display: flex; align-items: center; border-bottom: 1px solid #334155;">
-              <div class="code-dots">
-                <div class="code-dot" style="background: #ef4444; width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px;"></div>
-                <div class="code-dot" style="background: #f59e0b; width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px;"></div>
-                <div class="code-dot" style="background: #10b981; width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></div>
+            <div class="code-panel" style="flex: 1; min-height: 410px;">
+              <div class="code-header">
+                <div class="code-dots">
+                  <div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div>
+                </div>
+                <span class="code-title">slm_harness // sandbox_stdout</span>
+                <button class="copy-btn" onclick="copyStudioCode()" style="background: transparent; border: 1px solid #334155; border-radius: 4px; padding: 2px 8px; color: #94a3b8; font-family: var(--font-mono); font-size: 0.72rem; cursor: pointer;">Copy</button>
               </div>
-              <button class="copy-btn" onclick="copyStudioCode()" style="background: transparent; border: none; color: #94a3b8; font-size: 0.8rem; font-weight: 700; cursor: pointer;">Copy</button>
-            </div>
-            <div id="studio-console-parent" style="flex: 1; padding: 1.25rem; background: #0f172a; overflow-y: auto;">
-              <pre style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; color: #38bdf8; white-space: pre-wrap; word-break: break-all; background: #0f172a; border: none; box-shadow: none; padding: 0;"><code id="studio-output-console">Initializing playground...</code></pre>
+              <div id="studio-console-parent" style="flex: 1; padding: 1.15rem; background: #090d16; overflow-y: auto;">
+                <pre style="margin: 0; font-family: var(--font-mono); font-size: 0.8rem; color: #e2e8f0; white-space: pre-wrap; word-break: break-word;"><code id="studio-output-console">Initializing 10-Plane Harness sandbox...</code></pre>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- Footer -->
-  <footer style="background: #0b0f19; border-top: 1px solid #1e293b; padding: 40px 0; color: #94a3b8; text-align: center; font-size: 0.9rem;">
-    <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 20px;">
-      <p style="margin: 0 0 10px 0;">© 2026 SLM Agents. Powered by the 10-Plane Pure-CPU Agent Harness (<code>slm_harness</code> • <code>llama.cpp</code> GGUF + Quantized INT4/INT8 CPU). Open-source under MIT License.</p>
-    </div>
-  </footer>
+        <footer>
+          <div class="footer-row">
+            <div>
+              <strong style="color: var(--text-primary);">SLMAgents 2.0</strong> · 10-Plane Pure-CPU Agent Harness (<code>slm_harness</code>) · MIT License
+            </div>
+            <div class="footer-links">
+              <a href="index.html">Home</a>
+              <a href="chat.html">Chat Studio</a>
+              <a href="playground.html">Playground</a>
+              <a href="blogs.html">Blogs</a>
+              <a href="https://github.com/t00114218-stack/SLMAgents" target="_blank">GitHub</a>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </main>
+  </div>
 
-  <script src="app.js?v=54.0"></script>
+  <script src="app.js?v=56.0"></script>
   <script>
     (function() {
       const sel = document.getElementById('studio-agent-select');

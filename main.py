@@ -3532,67 +3532,46 @@ def _build_individual_agent_harness_installer(agent_slug: str, os_target: str) -
                     yield full_p, rel_p
 
     norm_os = os_target.lower()
-    if norm_os in ("windows", "win", "bat", "agent-windows"):
-        filename = f"SLMAgents-2.0-{agent_label}-Harness-Windows.bat"
+    if norm_os in ("windows", "win", "exe", "bat", "agent-windows"):
+        filename = f"SLMAgents-2.0-{agent_label}-Harness-Setup.exe"
         out_path = os.path.join(cache_dir, filename)
         if not os.path.isfile(out_path):
+            from scripts.build_desktop_app import _build_pe32plus_win64_sfx_stub
+
+            ps_cmd = (
+                "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "
+                '"$ErrorActionPreference=\'Stop\'; '
+                f"$root=Join-Path $env:LOCALAPPDATA 'SLMAgents\\\\harness_{agent_folder}'; "
+                "$app=Join-Path $root 'src'; $pyDir=Join-Path $env:LOCALAPPDATA 'SLMAgents\\\\python_runtime'; "
+                "New-Item -ItemType Directory -Force -Path $app | Out-Null; "
+                f"Write-Host '=== SLMAgents 2.0 Windows Setup ({agent_folder}) ===' -ForegroundColor Cyan; "
+                "$bytes=[IO.File]::ReadAllBytes($env:SLM_SETUP_EXE); "
+                "$zipOff=-1; for($i=2048;$i -lt ($bytes.Length-4);$i++){if($bytes[$i] -eq 0x50 -and $bytes[$i+1] -eq 0x4B -and $bytes[$i+2] -eq 0x03 -and $bytes[$i+3] -eq 0x04){$zipOff=$i;break}}; "
+                "$zipPath=Join-Path $root 'payload.zip'; "
+                "$fs=[IO.File]::Create($zipPath); $fs.Write($bytes,$zipOff,$bytes.Length-$zipOff); $fs.Close(); "
+                "Expand-Archive -LiteralPath $zipPath -DestinationPath $app -Force; Remove-Item $zipPath -Force; "
+                "$pyExe=Join-Path $pyDir 'python\\\\python.exe'; "
+                "if(-not (Test-Path $pyExe)){ "
+                "Write-Host 'Provisioning portable Python 3.11...' -ForegroundColor Cyan; "
+                "$t=Join-Path $root 'py.tar.gz'; "
+                "Invoke-WebRequest -Uri 'https://github.com/indygreg/python-build-standalone/releases/download/20240814/cpython-3.11.9+20240814-x86_64-pc-windows-msvc-install_only.tar.gz' -OutFile $t; "
+                "New-Item -ItemType Directory -Force -Path $pyDir | Out-Null; tar -xzf $t -C $pyDir; Remove-Item $t -Force }; "
+                "$env:PYTHONPATH=$app; & $pyExe -m slm_harness.surfaces.cli_tui doctor"
+                '"'
+            ).encode("ascii")
+            pe_stub = _build_pe32plus_win64_sfx_stub(ps_cmd)
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
                 for abs_p, rel_p in _iter_agent_files():
                     zf.write(abs_p, arcname=rel_p)
-            b64_payload = base64.b64encode(buf.getvalue()).decode("ascii")
-            pkg_install_cmd = f"& $pyExe -m pip install -e (Join-Path $appDir '{agent_folder}'); " if agent_folder != "slm_harness" else ""
-            bat_content = f"""@echo off
-REM ============================================================================
-REM SLMAgents 2.0 — Individual 10-Plane Harness Installer ({agent_folder}) for Windows
-REM Bundles slm_harness + {agent_folder} + portable Python 3.11 runtime
-REM ============================================================================
-setlocal
-echo ==================================================================
-echo   SLMAgents 2.0 — 10-Plane Harness Installer [{agent_folder}]
-echo   Target: %LOCALAPPDATA%\\SLMAgents\\harness_{agent_folder}
-echo ==================================================================
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ErrorActionPreference = 'Stop'; ^
-   $installDir = Join-Path $env:LOCALAPPDATA 'SLMAgents\\harness_{agent_folder}'; ^
-   $appDir = Join-Path $installDir 'src'; ^
-   $pyDir = Join-Path $env:LOCALAPPDATA 'SLMAgents\\python_runtime'; ^
-   New-Item -ItemType Directory -Force -Path $appDir | Out-Null; ^
-   Write-Host '[1/3] Extracting 10-Plane Harness + {agent_folder}...'; ^
-   $lines = Get-Content -LiteralPath '%~f0'; ^
-   $idx = [Array]::IndexOf($lines, '::SLM_AGENT_ZIP_PAYLOAD::') + 1; ^
-   $b64 = $lines[$idx..($lines.Length - 1)] -join ''; ^
-   $zipPath = Join-Path $installDir 'payload.zip'; ^
-   [IO.File]::WriteAllBytes($zipPath, [Convert]::FromBase64String($b64)); ^
-   Expand-Archive -LiteralPath $zipPath -DestinationPath $appDir -Force; ^
-   Remove-Item $zipPath -Force; ^
-   $pyExe = Join-Path $pyDir 'python\\python.exe'; ^
-   if (-not (Test-Path $pyExe)) {{ ^
-     Write-Host '[2/3] Provisioning standalone portable Python 3.11 runtime...'; ^
-     $pyTar = Join-Path $installDir 'py_standalone.tar.gz'; ^
-     $url = 'https://github.com/indygreg/python-build-standalone/releases/download/20240814/cpython-3.11.9+20240814-x86_64-pc-windows-msvc-install_only.tar.gz'; ^
-     Invoke-WebRequest -Uri $url -OutFile $pyTar; ^
-     New-Item -ItemType Directory -Force -Path $pyDir | Out-Null; ^
-     tar -xzf $pyTar -C $pyDir; ^
-     Remove-Item $pyTar -Force; ^
-   }}; ^
-   Write-Host '[3/3] Installing {agent_folder} into 10-Plane Harness...'; ^
-   & $pyExe -m pip install --upgrade pip; ^
-   {pkg_install_cmd}^
-   Write-Host 'Ready! Launching SLMAgents 10-Plane Harness doctor check...'; ^
-   $env:PYTHONPATH = $appDir; ^
-   & $pyExe -m slm_harness.surfaces.cli_tui doctor"
-exit /b 0
-::SLM_AGENT_ZIP_PAYLOAD::
-{b64_payload}
-"""
-            with open(out_path, "w", encoding="utf-8") as f:
-                f.write(bat_content)
-        return out_path, filename, "application/octet-stream"
+            with open(out_path, "wb") as f:
+                f.write(pe_stub)
+                f.write(buf.getvalue())
+        return out_path, filename, "application/vnd.microsoft.portable-executable"
 
     is_mac = norm_os in ("macos", "mac", "darwin", "command", "agent-macos", "macos-command")
-    ext = "command" if is_mac else "run"
-    os_title = "macOS" if is_mac else "Linux"
+    ext = "command" if is_mac else "AppImage"
+    os_title = "macOS" if is_mac else "Linux-x86_64"
     filename = f"SLMAgents-2.0-{agent_label}-Harness-{os_title}.{ext}"
     out_path = os.path.join(cache_dir, filename)
     if not os.path.isfile(out_path):
@@ -3648,7 +3627,7 @@ __SLM_AGENT_PAYLOAD_BELOW__
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(sh_content)
         os.chmod(out_path, os.stat(out_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    return out_path, filename, "application/x-sh"
+    return out_path, filename, "application/octet-stream"
 
 
 def _resolve_installer_catalog(agent_slug: str = ""):
@@ -3658,37 +3637,28 @@ def _resolve_installer_catalog(agent_slug: str = ""):
             "id": "macos-dmg",
             "os": "macOS",
             "title": "macOS Standalone Disk Image (.dmg)",
-            "subtitle": "Apple Silicon & Intel · Drag to Applications · Zero Python needed",
+            "subtitle": "Apple Silicon & Intel · Drag to /Applications · Bundled Runtime",
             "filename": "SLMAgents-2.0-macOS-Installer.dmg",
             "version": "2.0.0",
             "media_type": "application/x-apple-diskimage",
         },
         {
-            "id": "macos-pkg",
-            "os": "macOS",
-            "title": "macOS Wizard Installer (.pkg)",
-            "subtitle": "Installs directly to /Applications/SLMAgents.app · Bundled Runtime",
-            "filename": "SLMAgents-2.0-macOS-Installer.pkg",
-            "version": "2.0.0",
-            "media_type": "application/octet-stream",
-        },
-        {
             "id": "windows",
             "os": "Windows",
-            "title": "Windows Standalone Installer (.bat)",
-            "subtitle": "Windows 10 / 11 (64-bit) · Auto-provisions Portable Python 3.11 + Shortcut",
-            "filename": "SLMAgents-2.0-Windows-Installer.bat",
+            "title": "Windows 10 / 11 Setup Executable (.exe)",
+            "subtitle": "64-bit Windows PE32+ (.exe) · Auto-provisions Portable Python 3.11 + Desktop Shortcut",
+            "filename": "SLMAgents-2.0-Windows-Setup.exe",
             "version": "2.0.0",
-            "media_type": "application/octet-stream",
+            "media_type": "application/vnd.microsoft.portable-executable",
         },
         {
             "id": "linux",
             "os": "Linux",
-            "title": "Linux Self-Extracting Installer (.run)",
-            "subtitle": "Ubuntu / Debian / Fedora (x86_64 & ARM64) · Single-file standalone .run",
-            "filename": "SLMAgents-2.0-Linux-Installer.run",
+            "title": "Linux Standalone AppImage (.AppImage)",
+            "subtitle": "Ubuntu / Debian / Fedora / Arch (x86_64) · Single-file executable .AppImage",
+            "filename": "SLMAgents-2.0-Linux-x86_64.AppImage",
             "version": "2.0.0",
-            "media_type": "application/x-sh",
+            "media_type": "application/vnd.appimage",
         },
     ]
     result = []
@@ -3707,8 +3677,8 @@ def _resolve_installer_catalog(agent_slug: str = ""):
     if agent_slug:
         for os_key, os_name, ext_label in [
             ("agent-macos", "macOS", ".command"),
-            ("agent-windows", "Windows", ".bat"),
-            ("agent-linux", "Linux", ".run"),
+            ("agent-windows", "Windows", ".exe"),
+            ("agent-linux", "Linux", ".AppImage"),
         ]:
             p, fn, mt = _build_individual_agent_harness_installer(agent_slug, os_key)
             sz_mb = round(os.path.getsize(p) / (1024 * 1024), 2) if os.path.isfile(p) else 0.4
@@ -3744,8 +3714,8 @@ async def download_desktop_installer(target_id: str, agent: str = ""):
     dist_dir = os.path.join(BASE_DIR, "dist")
     os.makedirs(dist_dir, exist_ok=True)
 
-    # Support individual per-agent harness installers for macOS (.command), Windows (.bat), and Linux (.run)
-    if target_id in ("agent-macos", "agent-windows", "agent-linux", "macos") or (agent and target_id in ("macos", "windows", "linux")):
+    # Support individual per-agent harness installers for macOS (.command), Windows (.exe), and Linux (.AppImage)
+    if target_id in ("agent-macos", "agent-windows", "agent-linux") or (agent and target_id in ("macos", "windows", "linux")):
         file_path, dl_filename, media_type = _build_individual_agent_harness_installer(agent or "harness", target_id)
         return FileResponse(
             file_path,
@@ -3753,6 +3723,9 @@ async def download_desktop_installer(target_id: str, agent: str = ""):
             filename=dl_filename,
             headers={"Content-Disposition": f'attachment; filename="{dl_filename}"'},
         )
+
+    if target_id == "macos":
+        target_id = "macos-dmg"
 
     catalog = {entry["id"]: entry for entry in _resolve_installer_catalog()}
     entry = catalog.get(target_id)
@@ -3767,7 +3740,7 @@ async def download_desktop_installer(target_id: str, agent: str = ""):
             if target_id == "windows":
                 build_desktop_app.build_windows_standalone_installer()
             elif target_id == "linux":
-                build_desktop_app.build_linux_standalone_run_installer()
+                build_desktop_app.build_linux_standalone_appimage()
         except Exception as exc:
             print(f"[Installer Builder] On-demand build error: {exc}")
 

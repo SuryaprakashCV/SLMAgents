@@ -631,15 +631,29 @@ function applyFilters() {
 
 // Populate Sidebar lists dynamically on page load
 document.addEventListener("DOMContentLoaded", () => {
+  // Highlight active top-nav link across all pages
+  const currentPage = (window.location.pathname.split("/").pop() || "index.html");
+  if (currentPage === "index.html" || currentPage === "") {
+    document.getElementById("topnav-home")?.classList.add("active");
+  } else if (currentPage === "chat.html") {
+    document.getElementById("topnav-chat")?.classList.add("active");
+  } else if (currentPage === "playground.html") {
+    document.getElementById("topnav-playground")?.classList.add("active");
+  } else if (currentPage === "blogs.html" || currentPage === "harness_blog.html") {
+    document.getElementById("topnav-blogs")?.classList.add("active");
+  }
+
   // Populate Active Libraries in sidebar
   const activeList = document.getElementById("sidebar-active-list");
   if (activeList) {
     activeList.innerHTML = `
       <li class="sidebar-item" id="nav-home"><a href="index.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Home</a></li>
-      <li class="sidebar-item" id="nav-chat"><a href="chat.html"><svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> Chat</a></li>
+      <li class="sidebar-item" id="nav-chat"><a href="chat.html"><svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> Chat Studio</a></li>
+      <li class="sidebar-item" id="nav-playground"><a href="playground.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg> Playground</a></li>
+      <li class="sidebar-item" id="nav-blogs"><a href="blogs.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> Blogs</a></li>
       
       <!-- Productivity Category -->
-      <div class="sidebar-group-title" style="margin-top:1.2rem; font-size:0.72rem; color:#4f46e5; text-transform: uppercase; font-weight: 800; letter-spacing: 0.08em;">Productivity</div>
+      <div class="sidebar-group-title" style="margin-top:1.1rem;">Productivity &amp; RAG</div>
       <li class="sidebar-item" id="nav-summarizer"><a href="summarizer.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> SLM Summarizer</a></li>
       <li class="sidebar-item" id="nav-rag"><a href="rag.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><path d="M12 22c5.523 0 10-2.239 10-5V5c0-2.761-4.477-5-10-5S2 2.239 2 5v12c0 2.761 4.477 5 10 5z"></path><path d="M2 5c0 2.761 4.477 5 10 5s10-2.239 10-5"></path><path d="M2 11c0 2.761 4.477 5 10 5s10-2.239 10-5"></path></svg> SLM RAG</a></li>
       <li class="sidebar-item" id="nav-cli"><a href="cli.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg> SLM CLI Agent</a></li>
@@ -652,7 +666,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <li class="sidebar-item" id="nav-voice-agent"><a href="voice_agent.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg> SLM Voice Agent</a></li>
       
       <!-- Developer Tools Category -->
-      <div class="sidebar-group-title" style="margin-top:1.2rem; font-size:0.72rem; color:#4f46e5; text-transform: uppercase; font-weight: 800; letter-spacing: 0.08em;">Developer Tools</div>
+      <div class="sidebar-group-title" style="margin-top:1.1rem;">Developer Tools</div>
       <li class="sidebar-item" id="nav-orchestrator"><a href="orchestrator.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg> SLM Orchestrator</a></li>
       <li class="sidebar-item" id="nav-sql"><a href="sql.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg> SLM Text-to-SQL</a></li>
       <li class="sidebar-item" id="nav-code-interpreter"><a href="code_interpreter.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg> SLM Code Interpreter</a></li>
@@ -660,13 +674,13 @@ document.addEventListener("DOMContentLoaded", () => {
       <li class="sidebar-item" id="nav-database-migrator"><a href="database_migrator.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg> SLM Database Migrator</a></li>
       
       <!-- Web & Scraping Category -->
-      <div class="sidebar-group-title" style="margin-top:1.2rem; font-size:0.72rem; color:#0284c7; text-transform: uppercase; font-weight: 800; letter-spacing: 0.08em;">Web &amp; Scraping</div>
+      <div class="sidebar-group-title" style="margin-top:1.1rem;">Web &amp; Search</div>
       <li class="sidebar-item" id="nav-web-agent"><a href="web_agent.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2" ry="2"></rect><line x1="2" y1="8" x2="22" y2="8"></line><line x1="6" y1="6" x2="6" y2="6"></line><line x1="10" y1="6" x2="10" y2="6"></line></svg> SLM Web Agent</a></li>
       <li class="sidebar-item" id="nav-web-scraper"><a href="web_scraper.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> SLM Web Scraper</a></li>
       <li class="sidebar-item" id="nav-search-orchestrator"><a href="search_orchestrator.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg> SLM Search Orchestrator</a></li>
       
       <!-- Data & Utilities Category -->
-      <div class="sidebar-group-title" style="margin-top:1.2rem; font-size:0.72rem; color:#059669; text-transform: uppercase; font-weight: 800; letter-spacing: 0.08em;">Data &amp; Utilities</div>
+      <div class="sidebar-group-title" style="margin-top:1.1rem;">Data, Vision &amp; Security</div>
       <li class="sidebar-item" id="nav-json-cleaner"><a href="json_cleaner.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg> SLM JSON Cleaner</a></li>
       <li class="sidebar-item" id="nav-document-parser"><a href="document_parser.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg> SLM Document Parser</a></li>
       <li class="sidebar-item" id="nav-vision-parser"><a href="vision_parser.html"><svg class="sidebar-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> SLM Vision Parser</a></li>
@@ -684,6 +698,10 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("nav-home")?.classList.add("active");
     } else if (page === "chat.html") {
       document.getElementById("nav-chat")?.classList.add("active");
+    } else if (page === "playground.html") {
+      document.getElementById("nav-playground")?.classList.add("active");
+    } else if (page === "blogs.html" || page === "harness_blog.html") {
+      document.getElementById("nav-blogs")?.classList.add("active");
     } else if (page === "orchestrator.html") {
       document.getElementById("nav-orchestrator")?.classList.add("active");
     } else if (page === "rag.html") {
@@ -1343,7 +1361,7 @@ async function initStudioModel(agentKey) {
     runBtn.disabled = true;
     runBtn.style.opacity = "0.5";
     runBtn.style.cursor = "not-allowed";
-    runBtn.textContent = "⏳ Initializing Model...";
+    runBtn.textContent = "Initializing Model...";
   }
 
   if (consoleEl) {
@@ -1384,7 +1402,7 @@ async function initStudioModel(agentKey) {
         runBtn.disabled = false;
         runBtn.style.opacity = "1";
         runBtn.style.cursor = "pointer";
-        runBtn.textContent = "⚡ Run Agent Execution";
+        runBtn.textContent = "Execute Agent in Sandbox";
       }
     }
   }
@@ -1401,8 +1419,18 @@ function onStudioAgentChange(agentKey) {
 
 function setStudioMode(mode) {
   currentStudioMode = mode;
-  document.getElementById("tab-mode-exec")?.classList.toggle("active", mode === "exec");
-  document.getElementById("tab-mode-unittest")?.classList.toggle("active", mode === "unittest");
+  const execBtn = document.getElementById("tab-mode-exec");
+  const testBtn = document.getElementById("tab-mode-unittest");
+  if (execBtn) {
+    execBtn.classList.toggle("active", mode === "exec");
+    execBtn.style.background = mode === "exec" ? "#18181b" : "#f4f4f5";
+    execBtn.style.color = mode === "exec" ? "#ffffff" : "#3f3f46";
+  }
+  if (testBtn) {
+    testBtn.classList.toggle("active", mode === "unittest");
+    testBtn.style.background = mode === "unittest" ? "#18181b" : "#f4f4f5";
+    testBtn.style.color = mode === "unittest" ? "#ffffff" : "#3f3f46";
+  }
   updateStudioOutput();
 }
 
@@ -1804,7 +1832,7 @@ async function runStudioAgent() {
     runBtn.disabled = true;
     runBtn.style.opacity = "0.6";
     runBtn.style.cursor = "not-allowed";
-    runBtn.textContent = "⏳ Running Agent...";
+    runBtn.textContent = "Running Agent...";
   }
 
   const parentEl = document.getElementById("studio-console-parent");
@@ -1941,7 +1969,7 @@ async function runStudioAgent() {
       runBtn.disabled = false;
       runBtn.style.opacity = "1";
       runBtn.style.cursor = "pointer";
-      runBtn.textContent = "⚡ Run Agent Execution";
+      runBtn.textContent = "Execute Agent in Sandbox";
     }
   }
 }
@@ -5197,73 +5225,101 @@ function ensureGlobalDownloadModal() {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = `
   <div class="agent-modal" id="download-app-modal" onclick="if(event.target===this)closeDownloadModal()">
-    <div class="modal-content" style="max-width: 720px;">
-      <div class="modal-header" style="border-bottom: 1px solid #e2e8f0; padding-bottom: 14px;">
+    <div class="modal-content" style="max-width: 740px;">
+      <div class="modal-header" style="border-bottom: 1px solid #e4e4e7; padding-bottom: 14px;">
         <div>
-          <h3 style="margin: 0; color: #0f172a; font-size: 1.25rem; display: flex; align-items: center; gap: 10px;">
-            <img src="assets/slm-installer-icon.png" alt="SLMAgents Installer" width="32" height="32" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(79,70,229,0.25);">
-            Download SLMAgents 2.0 Harness Installers (All OSes)
+          <h3 style="margin: 0; color: #09090b; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 10px;">
+            <img src="assets/slm-installer-icon.png" alt="SLMAgents Installer" width="28" height="28" style="border-radius: 6px; border: 1px solid #e4e4e7;">
+            SLMAgents 2.0 OS Harness Installers (macOS / Windows / Linux)
           </h3>
-          <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #64748b;">
-            Zero pre-installed Python required • Includes 10-Plane Pure-CPU Harness (<code>slm_harness</code>) • Auto-downloads quantized CPU weights on first launch
+          <p style="margin: 4px 0 0 0; font-size: 0.82rem; color: #71717a;">
+            Zero pre-installed Python required · Includes 10-Plane Pure-CPU Harness (<code>slm_harness</code>) · Auto-provisions quantized CPU weights
           </p>
         </div>
         <button class="modal-close" onclick="closeDownloadModal()">&times;</button>
       </div>
-      <div class="modal-body" style="padding-top: 16px;">
-        <div id="download-versions-list" style="display: flex; flex-direction: column; gap: 12px;">
-          <div class="installer-row" data-os="mac" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+      <div class="modal-body" style="padding-top: 14px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin-bottom: 8px;">1. Full 26-Agent Desktop &amp; CLI Suite Installers</div>
+        <div id="download-versions-list" style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="installer-row" data-os="mac" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa;">
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <strong style="color: #0f172a; font-size: 0.96rem;">macOS Standalone Disk Image (.dmg)</strong>
-                <span style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 281 MB</span>
+                <strong style="color: #09090b; font-size: 0.9rem;">macOS Standalone Disk Image (.dmg)</strong>
+                <span style="background: #ffffff; color: #3f3f46; border: 1px solid #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; padding: 1px 6px; border-radius: 4px;">v2.0.0 · 280 MB</span>
               </div>
-              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Apple Silicon &amp; Intel • Drag to /Applications • Bundled Python 3.11 + C Runtimes + 10-Plane Harness</div>
+              <div style="font-size: 0.78rem; color: #52525b; margin-top: 2px;">Apple Silicon &amp; Intel · Drag to /Applications · Bundled Python 3.11 + C Runtimes + 10-Plane Harness</div>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" onclick="installAndOpenMacApp(this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; background: #10b981; color: #ffffff; border: none; border-radius: 8px; font-size: 0.84rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-                Install &amp; Open Now
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" onclick="installAndOpenMacApp(this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; background: #ffffff; color: #09090b; border: 1px solid #d4d4d8; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                Install Local
               </button>
-              <a href="/api/installers/download/macos-dmg" download="SLMAgents-2.0-macOS-Installer.dmg" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: #4f46e5; color: #ffffff; border-radius: 8px; font-size: 0.84rem; font-weight: 700; text-decoration: none; white-space: nowrap;">
+              <a href="/api/installers/download/macos-dmg" download="SLMAgents-2.0-macOS-Installer.dmg" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #09090b; color: #ffffff; border-radius: 6px; font-size: 0.78rem; font-weight: 600; text-decoration: none; white-space: nowrap;">
                 Download .dmg
               </a>
             </div>
           </div>
-          <div class="installer-row" data-os="mac" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+          <div class="installer-row" data-os="win" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa;">
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <strong style="color: #0f172a; font-size: 0.96rem;">macOS Wizard Installer (.pkg)</strong>
-                <span style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 236 MB</span>
+                <strong style="color: #09090b; font-size: 0.9rem;">Windows 10 / 11 Setup Executable (.exe)</strong>
+                <span style="background: #ffffff; color: #3f3f46; border: 1px solid #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; padding: 1px 6px; border-radius: 4px;">v2.0.0 · 2.8 MB</span>
               </div>
-              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Native macOS Installer Wizard • Installs directly to /Applications/SLMAgents.app</div>
+              <div style="font-size: 0.78rem; color: #52525b; margin-top: 2px;">64-bit Windows PE32+ (.exe) · Auto-provisions Portable Python 3.11 + 10-Plane Harness + Desktop Shortcut</div>
             </div>
-            <a href="/api/installers/download/macos-pkg" download="SLMAgents-2.0-macOS-Installer.pkg" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: #0f172a; color: #ffffff; border-radius: 8px; font-size: 0.84rem; font-weight: 700; text-decoration: none; white-space: nowrap;">
-              Download .pkg
+            <a href="/api/installers/download/windows" download="SLMAgents-2.0-Windows-Setup.exe" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #09090b; color: #ffffff; border-radius: 6px; font-size: 0.78rem; font-weight: 600; text-decoration: none; white-space: nowrap;">
+              Download .exe
             </a>
           </div>
-          <div class="installer-row" data-os="win" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+          <div class="installer-row" data-os="linux" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa;">
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <strong style="color: #0f172a; font-size: 0.96rem;">Windows 10 / 11 Standalone Installer (.bat)</strong>
-                <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 3.7 MB</span>
+                <strong style="color: #09090b; font-size: 0.9rem;">Linux Standalone AppImage (.AppImage)</strong>
+                <span style="background: #ffffff; color: #3f3f46; border: 1px solid #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; padding: 1px 6px; border-radius: 4px;">v2.0.0 · 3.4 MB</span>
               </div>
-              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">64-bit Windows • Self-extracting • Auto-provisions Portable Python 3.11 + 10-Plane Harness + Shortcut</div>
+              <div style="font-size: 0.78rem; color: #52525b; margin-top: 2px;">Ubuntu / Debian / Fedora / Arch (x86_64) · Single-file standalone .AppImage desktop executable</div>
             </div>
-            <a href="/api/installers/download/windows" download="SLMAgents-2.0-Windows-Installer.bat" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: #4f46e5; color: #ffffff; border-radius: 8px; font-size: 0.84rem; font-weight: 700; text-decoration: none; white-space: nowrap;">
-              Download Windows
+            <a href="/api/installers/download/linux" download="SLMAgents-2.0-Linux-x86_64.AppImage" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #09090b; color: #ffffff; border-radius: 6px; font-size: 0.78rem; font-weight: 600; text-decoration: none; white-space: nowrap;">
+              Download .AppImage
             </a>
           </div>
-          <div class="installer-row" data-os="linux" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
-            <div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <strong style="color: #0f172a; font-size: 0.96rem;">Linux Self-Extracting Installer (.run)</strong>
-                <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 3.4 MB</span>
-              </div>
-              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Ubuntu / Debian / Fedora (x86_64 &amp; ARM64) • Single-file standalone .run binary</div>
+        </div>
+
+        <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e4e4e7;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin-bottom: 8px;">2. Individual Agent + 10-Plane Harness OS Installers (26 Agents)</div>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa;">
+            <select id="modal-agent-installer-select" style="background: #ffffff; border: 1px solid #d4d4d8; border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; font-weight: 600; color: #09090b; min-width: 220px;" onchange="var v=this.value; document.getElementById('modal-agent-mac').href='/api/installers/download/agent-macos?agent='+v; document.getElementById('modal-agent-win').href='/api/installers/download/agent-windows?agent='+v; document.getElementById('modal-agent-lin').href='/api/installers/download/agent-linux?agent='+v;">
+              <option value="rag">slm_rag — SLM RAG</option>
+              <option value="orchestrator">slm_orchestrator — SLM Orchestrator</option>
+              <option value="sql">slm_text_to_sql — SLM Text-to-SQL</option>
+              <option value="code_interpreter">slm_code_interpreter — SLM Code Interpreter</option>
+              <option value="summarizer">slm_summarizer — SLM Summarizer</option>
+              <option value="cli">slm_cli — SLM CLI Agent</option>
+              <option value="data_analyst">slm_data — SLM Data Analyst</option>
+              <option value="pdf_chat">slm_pdf — SLM PDF Chat</option>
+              <option value="document_parser">slm_doc_parser — SLM Document Parser</option>
+              <option value="vision_parser">slm_vision_parser — SLM Vision Parser</option>
+              <option value="json_cleaner">slm_json_cleaner — SLM JSON Cleaner</option>
+              <option value="git_repo_manager">slm_git_manager — SLM Git Repo Manager</option>
+              <option value="database_migrator">slm_db_migration — SLM Database Migrator</option>
+              <option value="web_agent">slm_web — SLM Web Agent</option>
+              <option value="web_scraper">slm_scraper — SLM Web Scraper</option>
+              <option value="search_orchestrator">slm_search — SLM Search Orchestrator</option>
+              <option value="email_assistant">slm_email — SLM Email Assistant</option>
+              <option value="meeting_summarizer">slm_meeting — SLM Meeting Summarizer</option>
+              <option value="memory_manager">slm_memory — SLM Memory Manager</option>
+              <option value="task_planner">slm_task_planner — SLM Task Planner</option>
+              <option value="pkb_agent">slm_pkb — SLM PKB Agent</option>
+              <option value="voice_agent">slm_voice — SLM Voice Agent</option>
+              <option value="translation_hub">slm_translation — SLM Translation Hub</option>
+              <option value="math_agent">slm_math — SLM Math Agent</option>
+              <option value="security_audit">slm_security — SLM Security Audit</option>
+              <option value="embeddings_server">slm_embeddings — SLM Embeddings Server</option>
+            </select>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <a id="modal-agent-mac" href="/api/installers/download/agent-macos?agent=rag" class="builder-dl-btn">macOS (.command)</a>
+              <a id="modal-agent-win" href="/api/installers/download/agent-windows?agent=rag" class="builder-dl-btn">Windows (.exe)</a>
+              <a id="modal-agent-lin" href="/api/installers/download/agent-linux?agent=rag" class="builder-dl-btn">Linux (.AppImage)</a>
             </div>
-            <a href="/api/installers/download/linux" download="SLMAgents-2.0-Linux-Installer.run" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: #4f46e5; color: #ffffff; border-radius: 8px; font-size: 0.84rem; font-weight: 700; text-decoration: none; white-space: nowrap;">
-              Download .run
-            </a>
           </div>
         </div>
       </div>
