@@ -2869,6 +2869,31 @@ html.desktop-app-mode .chat-app-container {
   transition: all 0.12s ease;
 }
 
+.btn-sidebar-new-chat-full {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.14s ease;
+}
+
+.btn-sidebar-new-chat-full:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
 .btn-export-chip:hover {
   background: #0f172a;
   border-color: #0f172a;
