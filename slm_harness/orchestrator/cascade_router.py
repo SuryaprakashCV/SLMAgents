@@ -256,6 +256,8 @@ class CascadeRouter:
 
         if artifacts:
             kinds = [a.kind for a in artifacts]
+            if "video" in kinds:
+                return self._finish(t0, "slm_vision_parser", forced_mode or ExecutionMode.FAST_DIRECT, "vision", 0.99, "stage0_mime_video")
             if "audio" in kinds:
                 return self._finish(t0, "slm_voice", forced_mode or ExecutionMode.FAST_DIRECT, "stt", 0.99, "stage0_mime_audio")
             if "image" in kinds:
@@ -271,7 +273,18 @@ class CascadeRouter:
                     return self._finish(t0, "slm_rag", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.97, "stage0_mime_document", needs_rag=True)
 
         # --- STAGE 1: Deterministic High-Precision Signatures (<1ms) ---
+        from ..tools.media_doc_intelligence import extract_video_or_media_url
         from ..tools.machine_control import detect_machine_control_intent
+
+        if extract_video_or_media_url(q):
+            return self._finish(
+                t0,
+                "slm_web_agent",
+                forced_mode or ExecutionMode.FAST_DIRECT,
+                "primary",
+                0.99,
+                "stage1_online_video_url",
+            )
 
         machine_intent = detect_machine_control_intent(q)
         if machine_intent:
@@ -293,6 +306,28 @@ class CascadeRouter:
                 m_role,
                 0.99,
                 f"stage1_machine_{machine_intent}",
+            )
+
+        from ..personalization import detect_concierge_intent
+
+        concierge_intent = detect_concierge_intent(q)
+        if concierge_intent:
+            c_map = {
+                "email_tracker": ("slm_email", "primary"),
+                "job_assistant": ("slm_web_agent", "primary"),
+                "learning_opportunities": ("slm_search_orchestrator", "primary"),
+                "daily_dashboard": ("slm_task_planner", "primary"),
+                "personalize_setup": ("slm_task_planner", "primary"),
+                "multi_concierge": ("slm_task_planner", "primary"),
+            }
+            c_agent, c_role = c_map.get(concierge_intent, ("slm_task_planner", "primary"))
+            return self._finish(
+                t0,
+                c_agent,
+                forced_mode or ExecutionMode.FAST_DIRECT,
+                c_role,
+                0.99,
+                f"stage1_concierge_{concierge_intent}",
             )
 
         if _WORKSPACE_TOOL_RE.search(q):

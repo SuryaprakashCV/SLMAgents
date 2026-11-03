@@ -617,3 +617,53 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
         )
     )
 
+    # 17. analyze_media_or_document (YouTube, Online Video, Local Video/Audio & Deep Document Intelligence)
+    def _analyze_media_or_document(args: Dict[str, Any], ctx: ToolExecutionContext) -> str:
+        from .media_doc_intelligence import (
+            MediaDocIntelligenceEngine,
+            extract_local_media_path_from_query,
+            extract_video_or_media_url,
+        )
+
+        target = str(args.get("target") or args.get("url") or args.get("path") or args.get("query") or "")
+        question = str(args.get("question") or "")
+        engine = MediaDocIntelligenceEngine(workspace_dir=ctx.workspace_dir)
+
+        url = extract_video_or_media_url(target)
+        if url:
+            return engine.analyze_online_video_url(url, user_query=question or target).markdown_response
+
+        local_hit = extract_local_media_path_from_query(target, ctx.workspace_dir)
+        if local_hit:
+            lpath, lkind = local_hit
+            if lkind == "video":
+                return engine.analyze_video_file(lpath, user_query=question).markdown_response
+            if lkind == "audio":
+                return engine.analyze_audio_file(lpath, user_query=question).markdown_response
+            return engine.analyze_document_deep("", doc_name=os.path.basename(lpath), user_query=question, source_path=lpath).markdown_response
+
+        return engine.analyze_document_deep(target, doc_name="Document", user_query=question).markdown_response
+
+    registry.register(
+        ToolSpec(
+            name="analyze_media_or_document",
+            description=(
+                "Analyze YouTube URLs, online video links, local video files (.mp4/.mov/.webm), "
+                "audio files (.wav/.mp3/.m4a), or documents (.pdf/.docx/.pptx/.xlsx/.txt) with "
+                "timestamped transcripts, keyframe OCR, and section-by-section deep breakdowns."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string"},
+                    "question": {"type": "string"},
+                },
+                "required": ["target"],
+            },
+            risk_level=RiskLevel.L2_SANDBOX_COMPUTE,
+            handler=_analyze_media_or_document,
+            tags=["youtube", "video", "audio", "document", "pdf", "transcript", "analyze", "summarize"],
+        )
+    )
+
+

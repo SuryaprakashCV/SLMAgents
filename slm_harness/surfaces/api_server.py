@@ -91,10 +91,10 @@ def materialize_web_attachments(
     for idx, att in enumerate(attachments):
         if isinstance(att, dict):
             name = str(att.get("name") or f"file_{idx}")
-            data = att.get("data") or ""
+            data = att.get("data") or att.get("content") or ""
         else:
             name = str(getattr(att, "name", "") or f"file_{idx}")
-            data = getattr(att, "data", "") or ""
+            data = getattr(att, "data", "") or getattr(att, "content", "") or ""
 
         if not data:
             continue
@@ -215,11 +215,19 @@ _HUMAN_AGENT_THOUGHTS: Dict[str, str] = {
 
 def _human_routing_thought(primary_agent: str, user_message: str) -> str:
     q_low = (user_message or "").lower()
-    if any(w in q_low for w in ("ppt", "pptx", "powerpoint", "presentation", "slide")):
+    if any(w in q_low for w in ("youtube.com", "youtu.be", "vimeo.com", "loom.com", "ted.com")):
+        return "Inspecting online video metadata, creator chapters, and timestamped transcript..."
+    if any(w in q_low for w in (".mp4", ".mov", ".webm", ".mkv", ".avi", "analyze video", "analyse video")):
+        return "Inspecting video stream keyframes, running RapidOCR on visual frames, and transcribing audio..."
+    if any(w in q_low for w in (".wav", ".mp3", ".m4a", ".ogg", ".flac", "analyze audio", "analyse audio", "transcribe")):
+        return "Analyzing audio signal telemetry and running Whisper ONNX speech-to-text transcription..."
+    if any(w in q_low for w in ("read this document", "read document", "analyze document", "give me all details", "don't have to go through")):
+        return "Performing zero-omission deep document extraction across all pages, metrics, and sections..."
+    if any(w in q_low for w in ("ppt", "pptx", "powerpoint", "presentation", "slide deck")):
         return "Designing a widescreen 16:9 presentation deck with executive layout, visual hierarchy, and KPI cards..."
     if any(w in q_low for w in ("resume", "cv")) and any(w in q_low for w in ("improve", "review", "rewrite", "critique", "upgrade")):
         return "Reviewing your resume against 2026 executive hiring benchmarks to strengthen impact metrics and positioning..."
-    if any(w in q_low for w in ("download", "down load", "export", "convert", "linjk", "link", "pdf", "docx", "word", "excel")):
+    if any(w in q_low for w in ("download", "down load", "export", "convert")):
         return "Structuring content and preparing styled downloadable files (.pptx, .pdf, .docx, .html)..."
     return _HUMAN_AGENT_THOUGHTS.get(
         primary_agent,
@@ -1151,6 +1159,81 @@ def mount_harness_routes(app: FastAPI) -> None:
         cfg = get_config()
         get_procedural_memory().remember_fact(req.fact, workspace=cfg.workspace_dir)
         return {"ok": True, "facts": get_procedural_memory().list_facts(workspace=cfg.workspace_dir)}
+
+    # -----------------------------------------------------------------------
+    # Opt-In Personalization & Daily Concierge Studio Endpoints
+    # -----------------------------------------------------------------------
+
+    @app.get("/api/harness/personalize")
+    async def get_personalization_status() -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        return get_concierge_engine().get_status_bundle()
+
+    @app.post("/api/harness/personalize")
+    async def save_personalization_settings(request: Request) -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+        prof_updates = body.get("profile") if isinstance(body.get("profile"), dict) else body
+        cred_updates = body.get("credentials") if isinstance(body.get("credentials"), dict) else None
+        return get_concierge_engine().save_profile(prof_updates, cred_updates)
+
+    @app.get("/api/harness/personalize/dashboard")
+    async def get_personal_dashboard(refresh: bool = False) -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        eng = get_concierge_engine()
+        if not refresh:
+            cached = eng.get_cached_dashboard()
+            if cached:
+                return {"ok": True, "dashboard": cached}
+        loop = asyncio.get_running_loop()
+        dash = await loop.run_in_executor(None, eng.build_daily_dashboard)
+        return {"ok": True, "dashboard": dash}
+
+    @app.post("/api/harness/personalize/dashboard/run")
+    async def run_personal_dashboard_now() -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        eng = get_concierge_engine()
+        loop = asyncio.get_running_loop()
+        dash = await loop.run_in_executor(None, eng.build_daily_dashboard)
+        return {"ok": True, "dashboard": dash}
+
+    @app.post("/api/harness/personalize/jobs/apply")
+    async def apply_personal_job(request: Request) -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+        job_id = str(body.get("job_id") or "").strip()
+        if not job_id:
+            raise HTTPException(status_code=400, detail="Missing job_id")
+        return get_concierge_engine().apply_to_job(
+            job_id=job_id,
+            job_title=str(body.get("title") or ""),
+            portal=str(body.get("portal") or "Naukri.com"),
+            job_url=str(body.get("url") or ""),
+        )
+
+    @app.post("/api/harness/personalize/emails/update")
+    async def update_personal_email_reminder(request: Request) -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+        return get_concierge_engine().add_or_update_email_reminder(body)
 
     # -----------------------------------------------------------------------
     # OpenAI `/v1` Compatible Local CPU Endpoints

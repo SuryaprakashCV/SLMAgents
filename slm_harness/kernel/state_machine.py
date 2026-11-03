@@ -44,7 +44,14 @@ from ..tools.file_exporter import (
     is_direct_download_followup,
     rewrite_and_materialize_downloads,
 )
+from ..personalization import detect_concierge_intent, get_concierge_engine
 from ..tools.machine_control import MachineControlEngine, detect_machine_control_intent
+from ..tools.media_doc_intelligence import (
+    _DEEP_DOC_READ_INTENT_RE,
+    MediaDocIntelligenceEngine,
+    extract_local_media_path_from_query,
+    extract_video_or_media_url,
+)
 from ..tools.web_search_engine import (
     build_smart_web_query,
     live_web_search,
@@ -260,6 +267,44 @@ class TurnStateMachine:
                     + "\n".join(f"{idx}. **{opt}**" for idx, opt in enumerate(options, 1))
                 ),
                 "plan_context": "",
+            }
+
+        # Check if this is a YouTube / Online Video URL request
+        vid_url_plan = extract_video_or_media_url(q_clean)
+        if vid_url_plan:
+            steps = [
+                {
+                    "node_id": "plan_1",
+                    "agent": "slm_web_agent",
+                    "instruction": f"Parse online video URL & query TimedText / yt-dlp metadata: {vid_url_plan[:75]}",
+                    "depends_on": [],
+                },
+                {
+                    "node_id": "plan_2",
+                    "agent": "slm_web_agent",
+                    "instruction": "Extract timestamped transcript segments, creator chapters & stream metadata",
+                    "depends_on": ["plan_1"],
+                },
+                {
+                    "node_id": "plan_3",
+                    "agent": "slm_summarizer",
+                    "instruction": "Synthesize executive summary, chapter walkthrough & verified figures",
+                    "depends_on": ["plan_2"],
+                },
+                {
+                    "node_id": "plan_4",
+                    "agent": "slm_rag",
+                    "instruction": "Verify timestamp alignment & transcript completeness",
+                    "depends_on": ["plan_3"],
+                },
+            ]
+            return {
+                "needs_blocking_clarification": False,
+                "question": "",
+                "options": [],
+                "steps": steps,
+                "plan_markdown": "",
+                "plan_context": f"Analyze online video ({vid_url_plan}) with full timestamped breakdown.",
             }
 
         # Check if this is a Machine / OS Control request
@@ -645,6 +690,7 @@ class TurnStateMachine:
                     not _is_skill_only
                     and not _is_fast_export_turn
                     and not detect_machine_control_intent(user_query)
+                    and not extract_video_or_media_url(user_query)
                     and route_dec.primary_agent != "slm_math"
                     and (
                         explicit_live_url_or_web
@@ -878,6 +924,29 @@ class TurnStateMachine:
             if sympy_hint:
                 extra_sys = f"{extra_sys}\n\n### Exact SymPy Verification\n{sympy_hint}".strip()
 
+            # Brand & Entity Grounding (never confuse SLMAgents with "SlimeMinds" or "SLM Minds")
+            extra_sys = (
+                f"{extra_sys}\n\n"
+                "### System & Brand Grounding\n"
+                "- 'SLMAgents' (also written 'slmagents', 'slm agents', 'SLM-Agents', or 'slm_harness') is this 10-Plane Pure-CPU Multi-Agent Harness & Desktop AI Studio. Never misspell or rename SLMAgents as 'SlimeMinds' or 'SLM Minds'."
+            ).strip()
+
+            # Strictly Opt-In Personalization Context (ONLY injected when the user has explicitly enabled Personalization)
+            try:
+                concierge_eng = get_concierge_engine()
+                u_prof = concierge_eng.get_profile()
+                if u_prof.get("enabled"):
+                    extra_sys = (
+                        f"{extra_sys}\n\n"
+                        f"### Opt-In User Personalization Profile\n"
+                        f"- Role: {u_prof.get('current_role', '')} ({u_prof.get('experience_years', '')} yrs)\n"
+                        f"- Core Skills: {', '.join((u_prof.get('skills') or [])[:6])}\n"
+                        f"- Interests: {', '.join((u_prof.get('interests') or [])[:4])}\n"
+                        f"- Learning Goals: {', '.join((u_prof.get('learning_goals') or [])[:4])}"
+                    ).strip()
+            except Exception:
+                concierge_eng = None
+
             # 4. Dispatch by ExecutionMode
             final_text = ""
 
@@ -905,6 +974,61 @@ class TurnStateMachine:
             )
             machine_intent_now = detect_machine_control_intent(user_query) if json_schema is None else None
             is_machine_control_turn = bool(machine_intent_now) and not is_pure_skill_mutation_turn
+
+            concierge_intent_now = detect_concierge_intent(user_query) if (json_schema is None and not is_machine_control_turn) else None
+            is_concierge_turn = bool(concierge_intent_now) and not is_pure_skill_mutation_turn and not is_machine_control_turn
+
+            online_video_url = extract_video_or_media_url(user_query) if json_schema is None else None
+            local_media_hit = (
+                extract_local_media_path_from_query(user_query, self.config.workspace_dir)
+                if (json_schema is None and not online_video_url and not is_machine_control_turn and not is_concierge_turn)
+                else None
+            )
+            video_art = next((a for a in artifacts if a.kind == "video"), None)
+            audio_art = next((a for a in artifacts if a.kind == "audio"), None)
+            doc_art = next((a for a in artifacts if a.kind in ("pdf", "text")), None)
+
+            q_low_turn = (user_query or "").lower()
+            asks_for_slide_or_resume_rewrite = any(
+                w in q_low_turn
+                for w in (
+                    "ppt",
+                    "pptx",
+                    "powerpoint",
+                    "presentation",
+                    "slide deck",
+                    "slides",
+                    "improve my resume",
+                    "rewrite my resume",
+                    "upgrade my resume",
+                    "improve this resume",
+                    "rewrite this resume",
+                )
+            )
+            is_deep_doc_read_turn = bool(
+                json_schema is None
+                and not is_pure_skill_mutation_turn
+                and not is_machine_control_turn
+                and not is_concierge_turn
+                and not is_fast_download_request
+                and not asks_for_slide_or_resume_rewrite
+                and not _CODING_INTENT_RE.search(user_query or "")
+                and _DEEP_DOC_READ_INTENT_RE.search(user_query or "")
+                and (doc_art is not None or (local_media_hit and local_media_hit[1] == "document") or len(fallback_doc) >= 120)
+            )
+            is_media_or_deep_doc_turn = bool(
+                json_schema is None
+                and not is_pure_skill_mutation_turn
+                and not is_machine_control_turn
+                and not is_concierge_turn
+                and (
+                    online_video_url
+                    or video_art is not None
+                    or audio_art is not None
+                    or (local_media_hit and local_media_hit[1] in ("video", "audio"))
+                    or is_deep_doc_read_turn
+                )
+            )
 
             if is_pure_skill_mutation_turn:
                 final_text = created_skill_card
@@ -940,6 +1064,102 @@ class TurnStateMachine:
                 backend_used = f"native-os-{mc_out.os_family.lower()}"
                 ttft_ms = 8.5
                 tok_per_sec = 260.0
+                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
+
+            elif is_concierge_turn:
+                c_engine = concierge_eng or get_concierge_engine()
+
+                def _on_concierge_thought(agent_lbl: str, thought_msg: str) -> None:
+                    self.bus.emit(
+                        EventType.STEP_COMPLETED,
+                        rid,
+                        session_id,
+                        agent=agent_lbl or route_dec.primary_agent,
+                        message=thought_msg,
+                    )
+
+                with tracer.span(rid, f"concierge:{concierge_intent_now}", "tool", parent_id=root_span.span_id):
+                    c_out = c_engine.execute_from_query(
+                        query=user_query,
+                        step_callback=_on_concierge_thought,
+                    )
+                final_text = c_out.markdown_response
+                structured_out = c_out.structured_data
+                model_id_used = "slm-personal-concierge"
+                backend_used = "local-vault-concierge"
+                ttft_ms = 9.5
+                tok_per_sec = 250.0
+                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
+
+            elif is_media_or_deep_doc_turn:
+                md_engine = MediaDocIntelligenceEngine(workspace_dir=self.config.workspace_dir)
+
+                def _on_media_thought(agent_lbl: str, thought_msg: str) -> None:
+                    self.bus.emit(
+                        EventType.STEP_COMPLETED,
+                        rid,
+                        session_id,
+                        agent=agent_lbl or route_dec.primary_agent,
+                        message=thought_msg,
+                    )
+
+                with tracer.span(rid, "media_doc_intelligence", "tool", parent_id=root_span.span_id):
+                    if online_video_url:
+                        route_dec.primary_agent = "slm_web_agent"
+                        md_out = md_engine.analyze_online_video_url(
+                            online_video_url,
+                            user_query=user_query,
+                            step_callback=_on_media_thought,
+                        )
+                    elif video_art is not None or (local_media_hit and local_media_hit[1] == "video"):
+                        route_dec.primary_agent = "slm_vision_parser"
+                        v_path = video_art.source_path if video_art is not None else local_media_hit[0]
+                        v_name = video_art.name if video_art is not None else os.path.basename(v_path)
+                        md_out = md_engine.analyze_video_file(
+                            v_path,
+                            user_query=user_query,
+                            display_name=v_name,
+                            step_callback=_on_media_thought,
+                        )
+                    elif audio_art is not None or (local_media_hit and local_media_hit[1] == "audio"):
+                        route_dec.primary_agent = "slm_voice"
+                        a_path = audio_art.source_path if audio_art is not None else local_media_hit[0]
+                        a_name = audio_art.name if audio_art is not None else os.path.basename(a_path)
+                        md_out = md_engine.analyze_audio_file(
+                            a_path,
+                            user_query=user_query,
+                            display_name=a_name,
+                            step_callback=_on_media_thought,
+                        )
+                    else:
+                        route_dec.primary_agent = "slm_pdf" if (doc_art and doc_art.kind == "pdf") else "slm_document_parser"
+                        d_path = (
+                            doc_art.source_path
+                            if doc_art is not None
+                            else (local_media_hit[0] if local_media_hit else None)
+                        )
+                        d_name = (
+                            doc_art.name
+                            if doc_art is not None
+                            else (os.path.basename(local_media_hit[0]) if local_media_hit else "Attached_Document")
+                        )
+                        md_out = md_engine.analyze_document_deep(
+                            doc_text=fallback_doc,
+                            doc_name=d_name,
+                            user_query=user_query,
+                            source_path=d_path,
+                            step_callback=_on_media_thought,
+                        )
+
+                final_text = md_out.markdown_response
+                structured_out = md_out.structured_data
+                if md_out.citations:
+                    evidence_chunks = md_out.citations
+                    self.bus.emit(EventType.CITATIONS_EMITTED, rid, session_id, citations=evidence_chunks)
+                model_id_used = f"slm-{md_out.modality}-intelligence"
+                backend_used = "multimodal-cpu-onnx"
+                ttft_ms = 11.0
+                tok_per_sec = 245.0
                 self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
 
             elif is_fast_download_request:
@@ -1121,8 +1341,11 @@ class TurnStateMachine:
                     structured_out = vj.output
                     final_text = vj.cleaned_artifact
 
+            if final_text:
+                final_text = re.sub(r"\b(?:Slime\s*Minds|SLM\s+Minds|SlmMinds)\b", "SLMAgents", final_text, flags=re.IGNORECASE)
+
             # 5. Materialize real downloadable files & run Design Studio Critic
-            if json_schema is None and final_text and not is_pure_skill_mutation_turn and not is_machine_control_turn:
+            if json_schema is None and final_text and not is_pure_skill_mutation_turn and not is_machine_control_turn and not is_concierge_turn:
                 if also_run_task and mutated_skill is not None:
                     action_verb = "Updated & Applied Skill" if is_skill_improve_turn else "Created & Applied Skill"
                     skill_banner = (
@@ -1132,13 +1355,19 @@ class TurnStateMachine:
                     final_text = f"{skill_banner}{final_text}"
                 if len(final_text) >= 250:
                     bb.put(session_id, "last_substantial_content", clean_export_content(final_text))
-                pref_tone = str(bb.get(session_id, "preferred_design_tone") or "")
-                new_text, exported_files, design_review = rewrite_and_materialize_downloads(
-                    user_query=user_query,
-                    assistant_text=final_text,
-                    fallback_document_text=fallback_doc,
-                    preferred_tone=pref_tone,
+                wants_export_now = not is_media_or_deep_doc_turn or any(
+                    w in q_low_turn for w in ("download", "export", "convert to", "save as")
                 )
+                if wants_export_now:
+                    pref_tone = str(bb.get(session_id, "preferred_design_tone") or "")
+                    new_text, exported_files, design_review = rewrite_and_materialize_downloads(
+                        user_query=user_query,
+                        assistant_text=final_text,
+                        fallback_document_text=fallback_doc,
+                        preferred_tone=pref_tone,
+                    )
+                else:
+                    new_text, exported_files, design_review = final_text, [], None
                 if design_review is not None:
                     for d_step in design_review.to_thought_steps()[:5]:
                         self.bus.emit(

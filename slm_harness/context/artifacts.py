@@ -437,7 +437,7 @@ class ArtifactStore:
                 pass
 
         # 5. Audio files
-        if ext in (".wav", ".mp3", ".m4a", ".aiff", ".flac", ".ogg"):
+        if ext in (".wav", ".mp3", ".m4a", ".aiff", ".flac", ".ogg", ".aac"):
             try:
                 from ..runtime import get_runtime
 
@@ -449,6 +449,21 @@ class ArtifactStore:
                 return "audio", transcript, desc, {"transcript_chars": len(transcript)}
             except Exception:
                 pass
+
+        # 5b. Video files (.mp4, .mov, .webm, .mkv, .avi, .m4v)
+        if ext in (".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v", ".flv", ".wmv"):
+            try:
+                from ..tools.media_doc_intelligence import MediaDocIntelligenceEngine
+
+                vid_out = MediaDocIntelligenceEngine().analyze_video_file(abspath, display_name=name)
+                desc = (
+                    f"[Video Artifact {uri} | file={name} | {vid_out.structured_data.get('width', 0)}x{vid_out.structured_data.get('height', 0)} "
+                    f"@ {vid_out.structured_data.get('fps', 0):.1f}fps | duration={vid_out.structured_data.get('duration_sec', 0)}s]\n"
+                    f"Preview:\n{vid_out.markdown_response[:1200]}"
+                )
+                return "video", vid_out.markdown_response, desc, vid_out.structured_data
+            except Exception:
+                return "video", f"Video file {name} ({byte_size} bytes)", f"[Video Artifact {uri} | file={name}]", {}
 
         # 6. Source code, JSON, Markdown, Plain text
         try:

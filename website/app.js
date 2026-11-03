@@ -5669,5 +5669,396 @@ window.installAndOpenMacApp = async function installAndOpenMacApp(btn) {
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(syncHarnessStatusHud, 200);
   setTimeout(loadSkillsFromRepo, 250);
+  setTimeout(loadPersonalizationState, 300);
   setupDownloadLinkInterceptor();
 });
+
+// ============================================================================
+// Opt-In Personalization & Daily Concierge Studio (Profile, Vault, Dashboard)
+// ============================================================================
+
+let _personalizeState = null;
+
+async function loadPersonalizationState() {
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/personalize"));
+    if (!res.ok) return;
+    const data = await res.json();
+    _personalizeState = data;
+    applyPersonalizationToUI(data);
+  } catch (e) {
+    // Silent fallback
+  }
+}
+
+function applyPersonalizationToUI(data) {
+  if (!data || !data.profile) return;
+  const prof = data.profile;
+  const creds = data.credentials || {};
+  const enabled = !!prof.enabled;
+
+  // Update header button status dot
+  const dot = document.getElementById("personalize-status-dot");
+  const btn = document.getElementById("btn-personalize-studio");
+  if (dot) {
+    dot.style.background = enabled ? "#10b981" : "#94a3b8";
+  }
+  if (btn) {
+    btn.style.borderColor = enabled ? "#10b981" : "#cbd5e1";
+    btn.style.background = enabled ? "#f0fdf4" : "#ffffff";
+  }
+
+  // Render Opt-In Personalized Smart Suggestion Chips above the composer ONLY when enabled
+  const tray = document.getElementById("personalize-suggestions-tray");
+  if (tray) {
+    const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+    if (enabled && suggestions.length > 0) {
+      tray.style.display = "flex";
+      tray.innerHTML = suggestions
+        .map((s) => {
+          const safePrompt = (s.prompt || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+          return `<button type="button" onclick="applyQuickPrompt('${safePrompt}'); handleChatSubmit(new Event('submit'));" style="background:#f8fafc;border:1px solid #cbd5e1;color:#0f172a;border-radius:999px;padding:4px 11px;font-size:0.74rem;font-weight:600;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.background='#0f172a';this.style.color='#fff';" onmouseout="this.style.background='#f8fafc';this.style.color='#0f172a';">${escapeHtml(s.label)}</button>`;
+        })
+        .join("");
+    } else {
+      tray.style.display = "none";
+      tray.innerHTML = "";
+    }
+  }
+
+  // Populate modal fields if present
+  const setVal = (id, v) => {
+    const el = document.getElementById(id);
+    if (el && v !== undefined && v !== null) el.value = Array.isArray(v) ? v.join(", ") : String(v);
+  };
+  const optCheck = document.getElementById("pers-optin-enabled");
+  if (optCheck) optCheck.checked = enabled;
+
+  setVal("pers-full-name", prof.full_name || "");
+  setVal("pers-current-role", prof.current_role || "");
+  setVal("pers-exp-years", prof.experience_years || "");
+  setVal("pers-locations", prof.preferred_locations || []);
+  setVal("pers-skills", prof.skills || []);
+  setVal("pers-target-roles", prof.target_roles || []);
+  setVal("pers-interests", prof.interests || []);
+  setVal("pers-learning-goals", prof.learning_goals || []);
+  setVal("pers-vip-senders", prof.vip_email_senders || []);
+  setVal("pers-daily-time", prof.daily_job_time || "08:30");
+
+  const dailyJobChk = document.getElementById("pers-daily-job-enabled");
+  if (dailyJobChk) dailyJobChk.checked = !!prof.daily_job_enabled;
+
+  // Populate masked credentials
+  if (creds.twitter) {
+    setVal("cred-twitter-user", creds.twitter.username || "");
+    if (creds.twitter.password) setVal("cred-twitter-pass", creds.twitter.password);
+  }
+  if (creds.hackernews) {
+    setVal("cred-hn-user", creds.hackernews.username || "");
+    if (creds.hackernews.password) setVal("cred-hn-pass", creds.hackernews.password);
+  }
+  if (creds.email) {
+    setVal("cred-email-addr", creds.email.email || "");
+    setVal("cred-email-host", creds.email.imap_host || "imap.gmail.com");
+    if (creds.email.password) setVal("cred-email-pass", creds.email.password);
+  }
+  if (creds.naukri) {
+    setVal("cred-naukri-user", creds.naukri.username || "");
+    if (creds.naukri.password) setVal("cred-naukri-pass", creds.naukri.password);
+  }
+}
+
+window.openPersonalizeModal = async function openPersonalizeModal(defaultTab) {
+  const modal = document.getElementById("personalize-modal-backdrop");
+  if (!modal) return;
+  modal.style.display = "flex";
+  await loadPersonalizationState();
+  if (defaultTab) {
+    switchPersonalizeTab(defaultTab);
+  }
+};
+
+window.closePersonalizeModal = function closePersonalizeModal(e) {
+  if (e && e.target && e.target.id && e.target.id !== "personalize-modal-backdrop") return;
+  const modal = document.getElementById("personalize-modal-backdrop");
+  if (modal) modal.style.display = "none";
+};
+
+window.switchPersonalizeTab = function switchPersonalizeTab(tabKey) {
+  ["profile", "accounts", "dashboard"].forEach((k) => {
+    const pane = document.getElementById(`pers-tab-${k}`);
+    const btn = document.getElementById(`pers-tab-btn-${k}`);
+    const active = k === tabKey;
+    if (pane) pane.style.display = active ? "block" : "none";
+    if (btn) {
+      btn.style.background = active ? "#0f172a" : "#ffffff";
+      btn.style.color = active ? "#ffffff" : "#334155";
+      btn.style.borderColor = active ? "#0f172a" : "#cbd5e1";
+    }
+  });
+  if (tabKey === "dashboard") {
+    fetchCachedPersonalDashboard();
+  }
+};
+
+window.handlePersonalizeOptInToggle = async function handlePersonalizeOptInToggle(checked) {
+  await savePersonalizationSettings(true, checked);
+};
+
+window.savePersonalizationSettings = async function savePersonalizationSettings(silent, forcedEnabled) {
+  const getVal = (id) => {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : "";
+  };
+  const optCheck = document.getElementById("pers-optin-enabled");
+  const dailyChk = document.getElementById("pers-daily-job-enabled");
+  const isEnabled = forcedEnabled !== undefined ? !!forcedEnabled : (optCheck ? optCheck.checked : true);
+  if (optCheck && forcedEnabled === undefined) {
+    optCheck.checked = true; // Saving profile explicitly opts in unless toggled off
+  }
+
+  const payload = {
+    profile: {
+      enabled: forcedEnabled !== undefined ? isEnabled : true,
+      onboarded: true,
+      full_name: getVal("pers-full-name"),
+      current_role: getVal("pers-current-role") || "AI & Software Systems Engineer",
+      experience_years: getVal("pers-exp-years") || "4",
+      preferred_locations: getVal("pers-locations"),
+      skills: getVal("pers-skills"),
+      target_roles: getVal("pers-target-roles"),
+      interests: getVal("pers-interests"),
+      learning_goals: getVal("pers-learning-goals"),
+      vip_email_senders: getVal("pers-vip-senders"),
+      daily_job_time: getVal("pers-daily-time") || "08:30",
+      daily_job_enabled: dailyChk ? dailyChk.checked : false,
+    },
+    credentials: {
+      twitter: {
+        username: getVal("cred-twitter-user"),
+        password: getVal("cred-twitter-pass"),
+      },
+      hackernews: {
+        username: getVal("cred-hn-user"),
+        password: getVal("cred-hn-pass"),
+      },
+      email: {
+        email: getVal("cred-email-addr"),
+        password: getVal("cred-email-pass"),
+        imap_host: getVal("cred-email-host") || "imap.gmail.com",
+      },
+      naukri: {
+        username: getVal("cred-naukri-user"),
+        password: getVal("cred-naukri-pass"),
+      },
+    },
+  };
+
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/personalize"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    _personalizeState = data;
+    applyPersonalizationToUI(data);
+    const fb = document.getElementById("pers-save-feedback");
+    if (fb && !silent) {
+      fb.textContent = "✓ Personalization & Local Vault saved! Smart suggestions updated.";
+      setTimeout(() => {
+        fb.textContent = "";
+      }, 4000);
+    }
+  } catch (e) {
+    // Ignore
+  }
+};
+
+async function fetchCachedPersonalDashboard() {
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/personalize/dashboard?refresh=false"));
+    const data = await res.json();
+    if (data && data.dashboard) {
+      renderPersonalDashboardInModal(data.dashboard);
+    }
+  } catch (e) {
+    // Ignore
+  }
+}
+
+window.refreshPersonalDashboardNow = async function refreshPersonalDashboardNow() {
+  const btn = document.getElementById("btn-run-dash-now");
+  const cont = document.getElementById("pers-dashboard-container");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Building Daily Dashboard...";
+  }
+  if (cont) {
+    cont.innerHTML = `<div style="padding:20px;text-align:center;color:#0f172a;font-size:0.84rem;">🔄 Logging into configured feeds, checking priority email reminders, matching Naukri/LinkedIn jobs, and scanning X/Twitter learning opportunities...</div>`;
+  }
+  try {
+    await savePersonalizationSettings(true);
+    const res = await fetch(getApiEndpoint("/api/harness/personalize/dashboard/run"), {
+      method: "POST",
+    });
+    const data = await res.json();
+    if (data && data.dashboard) {
+      renderPersonalDashboardInModal(data.dashboard);
+    }
+  } catch (e) {
+    if (cont) cont.innerHTML = `<div style="padding:16px;color:#dc2626;">Failed to build dashboard: ${escapeHtml(String(e))}</div>`;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "⚡ Build & Refresh Dashboard Now";
+    }
+  }
+};
+
+function renderPersonalDashboardInModal(dash) {
+  const cont = document.getElementById("pers-dashboard-container");
+  const ts = document.getElementById("pers-dash-timestamp");
+  if (!cont || !dash) return;
+  if (ts) ts.textContent = dash.generated_at ? `(Updated: ${dash.generated_at})` : "";
+
+  const newsItems = (dash.news && dash.news.items) || [];
+  const emailItems = (dash.emails && dash.emails.emails) || [];
+  const jobItems = (dash.jobs && dash.jobs.jobs) || [];
+  const learnItems = (dash.learning && dash.learning.opportunities) || [];
+
+  const newsHtml = newsItems
+    .slice(0, 4)
+    .map(
+      (n) => `
+      <div style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:0.8rem;">
+        <a href="${escapeHtml(n.url)}" target="_blank" style="font-weight:700;color:#0f172a;text-decoration:none;">${escapeHtml(n.title)}</a>
+        <span style="font-size:0.72rem;color:#64748b;margin-left:6px;">(${escapeHtml(n.source)} · ${escapeHtml(n.engagement || "")})</span>
+        <div style="font-size:0.76rem;color:#475569;margin-top:2px;">${escapeHtml(n.summary || "")}</div>
+      </div>`
+    )
+    .join("");
+
+  const emailHtml = emailItems
+    .slice(0, 4)
+    .map((em) => {
+      const isReplied = em.status === "replied";
+      const badgeColor = em.priority === "HIGH" ? "#dc2626" : "#d97706";
+      return `
+      <div style="padding:9px 10px;border-bottom:1px solid #f1f5f9;font-size:0.8rem;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div>
+          <span style="background:${badgeColor};color:#fff;padding:1px 6px;border-radius:4px;font-size:0.68rem;font-weight:700;">${escapeHtml(em.priority)}</span>
+          <strong style="color:#0f172a;margin-left:6px;">${escapeHtml(em.subject)}</strong>
+          <div style="font-size:0.74rem;color:#475569;margin-top:2px;">From: <code>${escapeHtml(em.sender)}</code> — <em>${escapeHtml(em.reminder_note)}</em></div>
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0;">
+          ${
+            isReplied
+              ? `<span style="color:#059669;font-size:0.74rem;font-weight:700;">✓ Replied</span>`
+              : `<button type="button" onclick="markPersonalEmailReplied('${escapeHtml(em.id)}')" style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:5px;padding:3px 8px;font-size:0.72rem;font-weight:600;cursor:pointer;">✓ Mark Replied</button>`
+          }
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  const jobsHtml = jobItems
+    .slice(0, 4)
+    .map((j) => {
+      const applied = j.status === "applied";
+      const safeId = escapeHtml(j.id);
+      const safeTitle = escapeHtml(j.title).replace(/'/g, "\\'");
+      const safePortal = escapeHtml(j.portal).replace(/'/g, "\\'");
+      const safeUrl = escapeHtml(j.url).replace(/'/g, "\\'");
+      return `
+      <div style="padding:9px 10px;border-bottom:1px solid #f1f5f9;font-size:0.8rem;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div>
+          <span style="background:#0f172a;color:#fff;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">${escapeHtml(j.match_score)} Match</span>
+          <a href="${escapeHtml(j.url)}" target="_blank" style="font-weight:700;color:#0f172a;margin-left:6px;text-decoration:none;">${escapeHtml(j.title)}</a>
+          <div style="font-size:0.73rem;color:#64748b;margin-top:2px;">${escapeHtml(j.portal)} · ${escapeHtml(j.location)} · Skills: ${escapeHtml((j.matched_skills || []).join(", "))}</div>
+        </div>
+        <div style="flex-shrink:0;">
+          ${
+            applied
+              ? `<span style="background:#dcfce7;color:#15803d;padding:4px 9px;border-radius:6px;font-size:0.73rem;font-weight:700;">✓ Applied</span>`
+              : `<button type="button" onclick="applyToPersonalJob('${safeId}', '${safeTitle}', '${safePortal}', '${safeUrl}')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:0.74rem;font-weight:600;cursor:pointer;">🚀 Apply (${escapeHtml(j.portal)})</button>`
+          }
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  const learnHtml = learnItems
+    .slice(0, 4)
+    .map(
+      (l) => `
+      <div style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:0.8rem;">
+        <a href="${escapeHtml(l.url)}" target="_blank" style="font-weight:700;color:#0f172a;text-decoration:none;">${escapeHtml(l.title)}</a>
+        <span style="font-size:0.72rem;color:#2563eb;margin-left:6px;">[${escapeHtml(l.platform)}]</span>
+        <div style="font-size:0.75rem;color:#475569;margin-top:2px;">${escapeHtml(l.summary || "")}</div>
+      </div>`
+    )
+    .join("");
+
+  cont.innerHTML = `
+    <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
+      <div style="background:#f8fafc;padding:8px 12px;font-weight:700;font-size:0.82rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">📰 1. Social Media &amp; News Digest (${newsItems.length} items)</div>
+      ${newsHtml || '<div style="padding:10px;font-size:0.78rem;color:#64748b;">No items yet.</div>'}
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
+      <div style="background:#f8fafc;padding:8px 12px;font-weight:700;font-size:0.82rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">📧 2. Email Tracker &amp; Important Reply Reminders</div>
+      ${emailHtml || '<div style="padding:10px;font-size:0.78rem;color:#64748b;">No pending email reminders.</div>'}
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
+      <div style="background:#f8fafc;padding:8px 12px;font-weight:700;font-size:0.82rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">💼 3. Relevant Jobs (Naukri.com · LinkedIn · Wellfound)</div>
+      ${jobsHtml || '<div style="padding:10px;font-size:0.78rem;color:#64748b;">No matched jobs yet.</div>'}
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
+      <div style="background:#f8fafc;padding:8px 12px;font-weight:700;font-size:0.82rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">🎓 4. New Learning Opportunities (X/Twitter &amp; Internet)</div>
+      ${learnHtml || '<div style="padding:10px;font-size:0.78rem;color:#64748b;">No learning items yet.</div>'}
+    </div>
+  `;
+}
+
+window.applyToPersonalJob = async function applyToPersonalJob(jobId, title, portal, url) {
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/personalize/jobs/apply"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: jobId, title: title, portal: portal, url: url }),
+    });
+    const data = await res.json();
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+    await fetchCachedPersonalDashboard();
+    refreshPersonalDashboardNow();
+  } catch (e) {
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
+};
+
+window.markPersonalEmailReplied = async function markPersonalEmailReplied(emailId) {
+  try {
+    await fetch(getApiEndpoint("/api/harness/personalize/emails/update"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "mark_replied", id: emailId }),
+    });
+    await refreshPersonalDashboardNow();
+  } catch (e) {
+    // Ignore
+  }
+};
+
+window.sendDashboardRequestToChat = function sendDashboardRequestToChat() {
+  closePersonalizeModal();
+  applyQuickPrompt("Build my daily personalized dashboard with my news digest, important email reply reminders, relevant Naukri/LinkedIn jobs, and new learning opportunities from X/Twitter and the internet.");
+  handleChatSubmit(new Event("submit"));
+};
+
+window.startConversationalPersonalizeInterview = function startConversationalPersonalizeInterview() {
+  closePersonalizeModal();
+  applyQuickPrompt("Personalize my profile and ask me step-by-step about my role, skills, interests, email reminders, and target jobs on Naukri so you can suggest relevant things to me.");
+  handleChatSubmit(new Event("submit"));
+};

@@ -26,3 +26,5 @@ rich
 duckduckgo-search
 numpy
 pydantic
+youtube-transcript-api
+yt-dlp

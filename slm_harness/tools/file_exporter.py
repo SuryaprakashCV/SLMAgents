@@ -299,8 +299,7 @@ def _extract_fake_url_stem_and_fmt(label: str, url: str) -> Tuple[str, str]:
 # Broad, typo-tolerant export & file generation intent regex
 _EXPORT_INTENT_RE = re.compile(
     r"\b(download|down\s*load|dl|export|save\s+as|convert\s+(?:it\s+|this\s+)?(?:to|into)|"
-    r"make\s+(?:a|it\s+a)|create\s+(?:a|the)|build\s+(?:a|the)|give\s+(?:it\s+)?(?:to\s+|o\s+)?me|"
-    r"linjk|link|ppt|pptx|powerpoint|presentation|slide\s*deck|slides|pdf|docx|word\s+doc|xlsx|excel|spreadsheet)\b",
+    r"linjk|download\s+link|ppt|pptx|powerpoint|presentation|slide\s*deck|slides|pdf|docx|word\s+doc|xlsx|excel|spreadsheet)\b",
     re.IGNORECASE,
 )
 
