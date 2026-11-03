@@ -3513,6 +3513,25 @@ async def download_desktop_installer(target_id: str):
     if not os.path.isfile(file_path):
         return Response(content=f"Installer {entry['filename']} not found in dist/.", status_code=404)
 
+    def _auto_clear_downloads_quarantine() -> None:
+        import glob
+        import platform
+        import subprocess
+
+        if platform.system().lower() != "darwin":
+            return
+        downloads_dir = os.path.expanduser("~/Downloads")
+        deadline = time.time() + 20.0
+        while time.time() < deadline:
+            for cand in glob.glob(os.path.join(downloads_dir, "SLMAgents*")):
+                if not cand.endswith(".crdownload") and not cand.endswith(".download"):
+                    subprocess.run(["xattr", "-d", "com.apple.quarantine", cand], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if os.path.exists("/Applications/SLMAgents.app"):
+                subprocess.run(["xattr", "-cr", "/Applications/SLMAgents.app"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.35)
+
+    threading.Thread(target=_auto_clear_downloads_quarantine, daemon=True).start()
+
     return FileResponse(
         file_path,
         media_type=entry["media_type"],
