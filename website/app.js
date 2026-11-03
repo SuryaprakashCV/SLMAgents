@@ -1309,19 +1309,19 @@ function renderStudioFields(agentKey) {
     html += `<div>`;
     html += `<label style="display: block; font-size: 0.8rem; color: #475569; font-weight: 600; margin-bottom: 0.4rem;">${f.label}:</label>`;
     if (f.type === "select") {
-      html += `<select id="studio-field-${f.id}" onchange="updateStudioOutput()" style="width: 100%; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.6rem 0.8rem; color: #0f172a; font-size: 0.85rem; outline: none;">`;
+      html += `<select id="studio-field-${f.id}" onchange="updateStudioOutput()" style="width: 100%; background: #f8fafc; border: 1px solid transparent; border-radius: 10px; padding: 0.6rem 0.85rem; color: #0f172a; font-size: 0.85rem; outline: none;">`;
       f.options.forEach(opt => {
         const sel = opt === f.default ? "selected" : "";
         html += `<option value="${opt}" ${sel}>${opt}</option>`;
       });
       html += `</select>`;
     } else if (f.type === "file") {
-      html += `<input type="file" id="studio-field-input-${f.id}" accept="${f.accept || '*'}" onchange="handleStudioFileUpload(this, '${f.id}', ${f.maxSize || 1024 * 1024})" style="width: 100%; font-size: 0.85rem; border: 1px solid #cbd5e1; padding: 0.4rem; border-radius: 8px; background: #fff; outline: none;">`;
+      html += `<input type="file" id="studio-field-input-${f.id}" accept="${f.accept || '*'}" onchange="handleStudioFileUpload(this, '${f.id}', ${f.maxSize || 1024 * 1024})" style="width: 100%; font-size: 0.85rem; border: none; padding: 0.45rem 0.7rem; border-radius: 10px; background: #f8fafc; outline: none;">`;
       html += `<input type="hidden" id="studio-field-${f.id}" value="">`;
     } else if (f.type === "audio") {
       html += `<div style="display: flex; gap: 8px; align-items: center;">`;
-      html += `  <input type="file" id="studio-field-upload-${f.id}" accept="audio/*" onchange="handleStudioAudioUpload(this, '${f.id}', ${f.maxSize || 2 * 1024 * 1024})" style="flex: 1; font-size: 0.85rem; border: 1px solid #cbd5e1; padding: 0.4rem; border-radius: 8px; background: #fff; outline: none;">`;
-      html += `  <button type="button" id="studio-field-record-${f.id}" onclick="toggleStudioAudioRecord('${f.id}')" style="background: #ef4444; border: none; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; gap: 6px; height: 38px;">`;
+      html += `  <input type="file" id="studio-field-upload-${f.id}" accept="audio/*" onchange="handleStudioAudioUpload(this, '${f.id}', ${f.maxSize || 2 * 1024 * 1024})" style="flex: 1; font-size: 0.85rem; border: none; padding: 0.45rem 0.7rem; border-radius: 10px; background: #f8fafc; outline: none;">`;
+      html += `  <button type="button" id="studio-field-record-${f.id}" onclick="toggleStudioAudioRecord('${f.id}')" style="background: #ef4444; border: none; color: #fff; padding: 8px 14px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; gap: 6px; height: 38px;">`;
       html += `    <span class="rec-dot" style="width: 8px; height: 8px; background: #fff; border-radius: 50%; display: none; animation: pulse 1s infinite alternate;"></span>`;
       html += `    <span class="rec-text">🎤 Record</span>`;
       html += `  </button>`;
@@ -1329,7 +1329,7 @@ function renderStudioFields(agentKey) {
       html += `<div id="studio-audio-preview-container-${f.id}" style="margin-top: 8px; display: none;"></div>`;
       html += `<input type="hidden" id="studio-field-${f.id}" value="">`;
     } else {
-      html += `<input type="${f.type}" id="studio-field-${f.id}" onkeyup="updateStudioOutput()" value="${f.default || ''}" style="width: 100%; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.6rem 0.8rem; color: #0f172a; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; outline: none;">`;
+      html += `<input type="${f.type}" id="studio-field-${f.id}" onkeyup="updateStudioOutput()" value="${f.default || ''}" style="width: 100%; background: #f8fafc; border: 1px solid transparent; border-radius: 10px; padding: 0.6rem 0.85rem; color: #0f172a; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; outline: none;">`;
     }
     html += `</div>`;
   });
@@ -2428,9 +2428,44 @@ function getAgentWelcomeCards(agentKey = "auto") {
   return [
     { tag: "Code", title: "Fibonacci Generator", desc: "Generates recursive & cached Python functions", prompt: "Write a Python script to compute the Fibonacci sequence with caching." },
     { tag: "Machine Control", title: "OS & Machine Automation", desc: "Merge 2 Excel sheets, git checkout, copy files, play music & schedule jobs", prompt: "merge 2 excel sheets, check git status, copy README.md to backup, and search for *.py files" },
-    { tag: "Text-to-SQL", title: "SQL Aggregation", desc: "Translate natural language into optimized SQL", prompt: "Generate SQL to find top 5 customers with total orders > $1000 in 2024" },
+    { tag: "Video & Docs", title: "YouTube & Document Intelligence", desc: "Analyze YouTube/video links, audio files, or read documents in full detail", prompt: "Read README.md and give me all details, sections, and verified metrics so I don't have to read it." },
     { tag: "Math", title: "Math Solver", desc: "Step-by-step symbolic algebra & calculus", prompt: "Solve this math equation step-by-step: 3x^2 + 6x - 24 = 0" }
   ];
+}
+
+function getWelcomeCardIconSpec(tag, idx) {
+  const t = String(tag || "").toLowerCase();
+  const palette = ["icon-indigo", "icon-emerald", "icon-amber", "icon-rose"];
+  const iconClass = palette[idx % palette.length];
+
+  if (t.includes("sql") || t.includes("db") || t.includes("data")) {
+    return {
+      iconClass: "icon-amber",
+      svg: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>`
+    };
+  }
+  if (t.includes("machine") || t.includes("os") || t.includes("git") || t.includes("cli")) {
+    return {
+      iconClass: "icon-emerald",
+      svg: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>`
+    };
+  }
+  if (t.includes("video") || t.includes("doc") || t.includes("pdf") || t.includes("rag") || t.includes("web")) {
+    return {
+      iconClass: "icon-amber",
+      svg: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>`
+    };
+  }
+  if (t.includes("math") || t.includes("embed") || t.includes("vector")) {
+    return {
+      iconClass: "icon-rose",
+      svg: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>`
+    };
+  }
+  return {
+    iconClass,
+    svg: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>`
+  };
 }
 
 function renderCurrentSessionMessages() {
@@ -2449,21 +2484,28 @@ function renderCurrentSessionMessages() {
       ? "Execute code, query SQL databases, analyze documents, or solve equations. Everything runs 100% locally on your CPU with zero cloud costs."
       : `Specialized ${agentMeta ? agentMeta.category : 'SLM'} agent ready. Select a suggested prompt or type your query below.`;
 
-    let cardsHtml = cards.map(c => `
+    let cardsHtml = cards.map((c, idx) => {
+      const iconSpec = getWelcomeCardIconSpec(c.tag, idx);
+      return `
       <div class="suggestion-card" onclick="applyQuickPrompt('${c.prompt.replace(/'/g, "\\'")}')">
         <div class="card-top">
-          <div class="card-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          <div class="card-icon ${iconSpec.iconClass}">
+            ${iconSpec.svg}
           </div>
-          <span class="card-tag">${c.tag}</span>
+          <span class="card-tag">${c.tag} <span class="card-arrow">&rarr;</span></span>
         </div>
         <strong>${c.title}</strong>
         <p>${c.desc}</p>
       </div>
-    `).join("");
+      `;
+    }).join("");
 
     viewport.innerHTML = `
       <div class="chat-welcome-hero" id="chat-welcome-hero">
+        <div class="welcome-hero-badge">
+          <span class="hero-pulse-dot"></span>
+          <span>Local SLM Agents • Offline CPU Engine</span>
+        </div>
         <h2>${heroTitle}</h2>
         <p>${heroDesc}</p>
         <div class="welcome-suggestions-grid">
@@ -2736,18 +2778,7 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
     const contentEl = document.createElement("div");
     contentEl.className = "chat-assistant-content";
 
-    let cleanedText = text || "";
-    if (cleanedText.includes("</think>")) {
-      cleanedText = cleanedText.split("</think>").pop().trim();
-    }
-    cleanedText = cleanedText.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>/g, "").replace(/<\/think>/g, "").trim();
-
-    if (!cleanedText.startsWith("```")) {
-      const codeTriggers = ["python", "import ", "from ", "def ", "class ", "@app", "app ="];
-      if (codeTriggers.some(t => cleanedText.startsWith(t))) {
-        cleanedText = "```python\n" + cleanedText + "\n```";
-      }
-    }
+    let cleanedText = sanitizeAssistantMarkdown(text || "");
 
     try {
       if (typeof marked !== "undefined") {
@@ -2759,26 +2790,7 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
       contentEl.textContent = cleanedText;
     }
 
-    contentEl.querySelectorAll("pre").forEach((pre) => {
-      const codeBlock = pre.querySelector("code") || pre;
-      if (typeof hljs !== "undefined") {
-        hljs.highlightElement(codeBlock);
-      }
-      
-      const wrapper = document.createElement("div");
-      wrapper.className = "code-block-wrapper";
-      
-      const header = document.createElement("div");
-      header.className = "code-header";
-      header.innerHTML = `
-        <span>Code Output</span>
-        <button class="code-copy-btn" onclick="copyCodeSnippet(this)">Copy</button>
-      `;
-      
-      pre.parentNode.insertBefore(wrapper, pre);
-      wrapper.appendChild(header);
-      wrapper.appendChild(pre);
-    });
+    enhanceAssistantContentDom(contentEl);
 
     body.appendChild(contentEl);
 
@@ -3184,9 +3196,14 @@ function renderAttachmentsTray() {
     chip.className = "attachment-chip";
     
     let iconSvg = "";
+    const lowName = (att.name || "").toLowerCase();
     if (att.type.startsWith("image")) {
       iconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`;
-    } else if (att.name.toLowerCase().endsWith(".pdf") || att.type.includes("pdf")) {
+    } else if (att.type.startsWith("video") || /\.(mp4|mov|webm|mkv|avi|m4v)$/.test(lowName)) {
+      iconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>`;
+    } else if (att.type.startsWith("audio") || /\.(mp3|wav|m4a|ogg|flac|aac)$/.test(lowName)) {
+      iconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>`;
+    } else if (lowName.endsWith(".pdf") || att.type.includes("pdf")) {
       iconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`;
     } else {
       iconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>`;
@@ -3417,20 +3434,71 @@ function playMessageSpeech(encodedText, btn) {
 }
 
 
-/* Real-time Streaming Markdown & Code Box Renderer */
-function renderLiveStreamedContent(container, rawTokens) {
-  let clean = rawTokens || "";
+function sanitizeAssistantMarkdown(rawText) {
+  let clean = rawText || "";
   if (clean.includes("</think>")) {
     clean = clean.split("</think>").pop().trim();
   }
   clean = clean.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>/g, "").replace(/<\/think>/g, "").trim();
 
+  // Remove duplicate inline "Agent Thought Process" numbered lists when already displayed in the top Thought Accordion
+  clean = clean.replace(/#{3,4}\s*(?:🧠\s*)?(?:Complete\s+)?Agent Thought Process[^\n]*\n+(?:\d+\.\s+[^\n]+\n?)+/gi, "");
+
+  // Strip noisy decorative emojis from headings and download link labels
+  clean = clean.replace(/^(#{1,4}\s+)[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]+\s*/gmu, "$1");
+  clean = clean.replace(/\[\s*[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]+\s*([^\]]+)\]/gu, "[$1]");
+
   if (!clean.startsWith("```")) {
     const codeTriggers = ["python", "import ", "from ", "def ", "class ", "@app", "app ="];
     if (codeTriggers.some(t => clean.startsWith(t))) {
-      clean = "```python\n" + clean;
+      clean = "```python\n" + clean + "\n```";
     }
   }
+  return clean.trim();
+}
+
+function enhanceAssistantContentDom(container) {
+  if (!container) return;
+
+  // 1. Wrap all tables in a responsive horizontal scroll container so headers and cells never break mid-word
+  container.querySelectorAll("table").forEach((tbl) => {
+    if (tbl.parentElement && tbl.parentElement.classList.contains("chat-table-scroll")) return;
+    const scrollWrap = document.createElement("div");
+    scrollWrap.className = "chat-table-scroll";
+    tbl.parentNode.insertBefore(scrollWrap, tbl);
+    scrollWrap.appendChild(tbl);
+  });
+
+  // 2. Format and highlight all code blocks inside clean .code-block-wrapper boxes
+  container.querySelectorAll("pre").forEach((pre) => {
+    if (pre.parentElement && pre.parentElement.classList.contains("code-block-wrapper")) return;
+    const codeBlock = pre.querySelector("code") || pre;
+    if (typeof hljs !== "undefined") {
+      hljs.highlightElement(codeBlock);
+    }
+
+    const langClass = Array.from(codeBlock.classList).find(c => c.startsWith("language-"));
+    const langName = langClass ? langClass.replace("language-", "").toUpperCase() : "CODE";
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "code-block-wrapper";
+
+    const header = document.createElement("div");
+    header.className = "code-header";
+    header.innerHTML = `
+      <span>${langName}</span>
+      <button class="code-copy-btn" onclick="copyCodeSnippet(this)">Copy</button>
+    `;
+
+    pre.parentNode.insertBefore(wrapper, pre);
+    wrapper.appendChild(header);
+    wrapper.appendChild(pre);
+  });
+}
+
+/* Real-time Streaming Markdown & Code Box Renderer */
+function renderLiveStreamedContent(container, rawTokens) {
+  let clean = sanitizeAssistantMarkdown(rawTokens || "");
 
   // If a code block was started (odd number of ```), temporarily close it for markdown parsing
   const backtickMatches = clean.match(/```/g);
@@ -3452,32 +3520,7 @@ function renderLiveStreamedContent(container, rawTokens) {
   }
 
   container.innerHTML = html;
-
-  // Format and highlight all code blocks inside clean .code-block-wrapper boxes
-  container.querySelectorAll("pre").forEach((pre) => {
-    const codeBlock = pre.querySelector("code") || pre;
-    if (typeof hljs !== "undefined") {
-      hljs.highlightElement(codeBlock);
-    }
-    
-    // Check language
-    const langClass = Array.from(codeBlock.classList).find(c => c.startsWith("language-"));
-    const langName = langClass ? langClass.replace("language-", "").toUpperCase() : "CODE";
-    
-    const wrapper = document.createElement("div");
-    wrapper.className = "code-block-wrapper";
-    
-    const header = document.createElement("div");
-    header.className = "code-header";
-    header.innerHTML = `
-      <span>${langName}</span>
-      <button class="code-copy-btn" onclick="copyCodeSnippet(this)">Copy</button>
-    `;
-    
-    pre.parentNode.insertBefore(wrapper, pre);
-    wrapper.appendChild(header);
-    wrapper.appendChild(pre);
-  });
+  enhanceAssistantContentDom(container);
 }
 
 /* Chat Submission */
@@ -5053,51 +5096,47 @@ function renderSkillsRepoList() {
 
   if (statsEl) {
     const pinnedCount = window.pinnedSkillsSet ? window.pinnedSkillsSet.size : 0;
-    statsEl.textContent = `${filtered.length} of ${allSkills.length} skills in .slm/skills/ • ${pinnedCount > 0 ? pinnedCount + " pinned" : "Auto-Match Active"}`;
+    statsEl.textContent = `${filtered.length} of ${allSkills.length} skills • ${pinnedCount > 0 ? pinnedCount + " pinned" : "Auto-Match Active"}`;
   }
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="inspector-empty" style="grid-column:1/-1;">No matching skills found. Use the <strong>Autonomous Skill Creator</strong> above to generate and save a new skill to <code>.slm/skills/</code>!</div>`;
+    container.innerHTML = `<div class="inspector-empty">No matching skills found. Use <strong>Create a Reusable Skill</strong> above to synthesize and save a new skill to <code>.slm/skills/</code>.</div>`;
     return;
   }
 
   container.innerHTML = filtered.map(sk => {
     const isPinned = window.pinnedSkillsSet && window.pinnedSkillsSet.has(sk.name);
     const isEnabled = sk.enabled !== false;
-    const srcClass = sk.source === "ai-generated" || sk.source === "user" ? sk.source : "builtin";
-    const srcLabel = sk.source === "ai-generated" ? "AI Created" : (sk.source === "user" ? "Custom" : "Built-in");
+    const isCustom = sk.source === "ai-generated" || sk.source === "user";
+    const srcLabel = sk.source === "ai-generated" ? "AI Created" : (sk.source === "user" ? "Custom" : "");
     const verNum = sk.version || 1;
-    const trigs = (sk.triggers || []).slice(0, 5).map(t => `<span class="skill-trigger-pill">${escapeHtmlSafe(t)}</span>`).join("");
     const safeName = escapeHtmlSafe(sk.name);
     const safeTitle = escapeHtmlSafe(sk.title || sk.name);
 
     return `
-      <div class="skill-repo-card ${isPinned ? "pinned" : ""} ${!isEnabled ? "disabled" : ""}">
-        <div class="skill-card-head">
-          <div>
-            <div class="skill-card-title">${safeTitle} <span style="font-size:0.68rem; font-weight:700; color:#4f46e5; background:#eef2ff; padding:1px 6px; border-radius:999px; margin-left:4px;">v${verNum}</span></div>
-            <div class="skill-card-path">${escapeHtmlSafe(sk.rel_path || (".slm/skills/" + sk.name + "/SKILL.md"))}</div>
+      <div class="skill-repo-row ${isPinned ? "pinned" : ""} ${!isEnabled ? "disabled" : ""}">
+        <div class="skill-row-main">
+          <div class="skill-row-title-line">
+            <span class="skill-card-title">${safeTitle}</span>
+            <span class="skill-ver-meta">v${verNum}</span>
+            ${isCustom ? `<span class="skill-source-badge ${sk.source}">${srcLabel}</span>` : ""}
           </div>
-          <span class="skill-source-badge ${srcClass}">${srcLabel}</span>
+          <div class="skill-card-desc">${escapeHtmlSafe(sk.description || "")}</div>
         </div>
-        <div class="skill-card-desc">${escapeHtmlSafe(sk.description || "")}</div>
-        <div class="skill-card-triggers">${trigs}</div>
-        <div class="skill-card-actions">
-          <div style="display:flex; gap:6px;">
-            <button type="button" class="btn-skill-mini ${isPinned ? "active" : ""}" onclick="togglePinSkill('${safeName}')">
-              ${isPinned ? "Pinned (Active)" : "Pin for Chat"}
-            </button>
-            <button type="button" class="btn-skill-mini" onclick="promptImproveSkill('${safeName}')" title="Tell the AI how to improve or evolve this skill">
-              Improve Skill
-            </button>
-          </div>
-          <div style="display:flex; gap:6px;">
-            <button type="button" class="btn-skill-mini" onclick="openSkillEditorForm('${safeName}')">Edit SKILL.md</button>
-            <button type="button" class="btn-skill-mini" onclick="toggleSkillEnabled('${safeName}', ${!isEnabled})">
-              ${isEnabled ? "On" : "Off"}
-            </button>
-            <button type="button" class="btn-skill-mini" onclick="deleteSkillFromRepo('${safeName}')" title="Delete skill from .slm/skills/">&times;</button>
-          </div>
+        <div class="skill-row-actions">
+          <button type="button" class="btn-skill-pin ${isPinned ? "active" : ""}" onclick="togglePinSkill('${safeName}')">
+            ${isPinned ? "Pinned" : "Pin"}
+          </button>
+          <button type="button" class="btn-skill-ghost" onclick="promptImproveSkill('${safeName}')" title="Tell the AI how to improve or evolve this skill">
+            Improve
+          </button>
+          <button type="button" class="btn-skill-ghost" onclick="openSkillEditorForm('${safeName}')">
+            Edit
+          </button>
+          <button type="button" class="btn-skill-ghost ${isEnabled ? "state-on" : "state-off"}" onclick="toggleSkillEnabled('${safeName}', ${!isEnabled})" title="Toggle auto-matching for this skill">
+            ${isEnabled ? "On" : "Off"}
+          </button>
+          <button type="button" class="btn-skill-ghost btn-skill-del" onclick="deleteSkillFromRepo('${safeName}')" title="Delete skill from .slm/skills/">&times;</button>
         </div>
       </div>
     `;
@@ -5114,24 +5153,23 @@ function renderInspectorSkillsTab() {
     return;
   }
   const topBar = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <span style="font-size:0.76rem; color:#475569; font-weight:600;">${skills.length} skills in <code>.slm/skills/</code></span>
-      <button type="button" class="btn-skill-mini active" onclick="openSkillsRepoModal()">Open Skill Studio</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #f1f5f9;">
+      <span style="font-size:0.76rem; color:#475569; font-weight:600;">${skills.length} skills available</span>
+      <button type="button" class="btn-skill-pin active" onclick="openSkillsRepoModal()">Open Studio</button>
     </div>
   `;
   const cards = skills.map(sk => {
     const isPinned = window.pinnedSkillsSet && window.pinnedSkillsSet.has(sk.name);
     const safeName = escapeHtmlSafe(sk.name);
     return `
-      <div class="inspector-card" style="margin-bottom:8px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <strong>${escapeHtmlSafe(sk.title || sk.name)}</strong>
-          <button type="button" class="btn-skill-mini ${isPinned ? "active" : ""}" onclick="togglePinSkill('${safeName}')">
+      <div class="inspector-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <strong style="font-size:0.82rem; color:#0f172a;">${escapeHtmlSafe(sk.title || sk.name)}</strong>
+          <button type="button" class="btn-skill-pin ${isPinned ? "active" : ""}" onclick="togglePinSkill('${safeName}')">
             ${isPinned ? "Pinned" : "Pin"}
           </button>
         </div>
-        <div style="font-size:0.71rem; color:#64748b; font-family:var(--font-mono); margin:2px 0;">${escapeHtmlSafe(sk.rel_path || "")}</div>
-        <div style="font-size:0.76rem; color:#334155; margin-top:4px;">${escapeHtmlSafe(sk.description || "")}</div>
+        <div style="font-size:0.75rem; color:#475569; margin-top:3px; line-height:1.45;">${escapeHtmlSafe(sk.description || "")}</div>
       </div>
     `;
   }).join("");
@@ -5485,69 +5523,69 @@ function ensureGlobalDownloadModal() {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = `
   <div class="agent-modal" id="download-app-modal" onclick="if(event.target===this)closeDownloadModal()">
-    <div class="modal-content" style="max-width: 740px;">
-      <div class="modal-header" style="border-bottom: 1px solid #e4e4e7; padding-bottom: 14px;">
+    <div class="modal-content" style="max-width: 720px; border: none; box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.06);">
+      <div class="modal-header" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 14px;">
         <div>
-          <h3 style="margin: 0; color: #09090b; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 10px;">
-            <img src="assets/slm-installer-icon.png" alt="SLMAgents Installer" width="28" height="28" style="border-radius: 6px; border: 1px solid #e4e4e7;">
-            SLMAgents 2.0 OS Harness Installers (macOS / Windows / Linux)
+          <h3 style="margin: 0; color: #09090b; font-size: 1.12rem; font-weight: 700; display: flex; align-items: center; gap: 10px;">
+            <img src="assets/slm-installer-icon.png" alt="SLMAgents Installer" width="26" height="26" style="border-radius: 6px;">
+            SLMAgents 2.0 Desktop &amp; CLI Installers
           </h3>
-          <p style="margin: 4px 0 0 0; font-size: 0.82rem; color: #71717a;">
+          <p style="margin: 4px 0 0 0; font-size: 0.81rem; color: #64748b;">
             Zero pre-installed Python required · Includes 10-Plane Pure-CPU Harness (<code>slm_harness</code>) · Auto-provisions quantized CPU weights
           </p>
         </div>
         <button class="modal-close" onclick="closeDownloadModal()">&times;</button>
       </div>
-      <div class="modal-body" style="padding-top: 14px;">
-        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin-bottom: 8px;">1. Full 26-Agent Desktop &amp; CLI Suite Installers</div>
-        <div id="download-versions-list" style="display: flex; flex-direction: column; gap: 10px;">
-          <div class="installer-row" data-os="mac" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa;">
+      <div class="modal-body" style="padding-top: 8px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin-bottom: 4px;">Full 26-Agent Desktop Suite</div>
+        <div id="download-versions-list" style="display: flex; flex-direction: column;">
+          <div class="installer-row" data-os="mac" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f1f5f9;">
             <div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <strong style="color: #09090b; font-size: 0.9rem;">macOS Standalone Disk Image (.dmg)</strong>
-                <span style="background: #ffffff; color: #3f3f46; border: 1px solid #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; padding: 1px 6px; border-radius: 4px;">v2.0.0 · 280 MB</span>
+              <div style="display: flex; align-items: baseline; gap: 8px;">
+                <strong style="color: #09090b; font-size: 0.9rem;">macOS Disk Image (.dmg)</strong>
+                <span style="color: #64748b; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 500;">v2.0.0 · 280 MB</span>
               </div>
-              <div style="font-size: 0.78rem; color: #52525b; margin-top: 2px;">Apple Silicon &amp; Intel · Drag to /Applications · Bundled Python 3.11 + C Runtimes + 10-Plane Harness</div>
+              <div style="font-size: 0.78rem; color: #52525b; margin-top: 2px;">Apple Silicon &amp; Intel · Drag to /Applications · Bundled Python 3.11 + C Runtimes</div>
             </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <button type="button" onclick="installAndOpenMacApp(this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; background: #ffffff; color: #09090b; border: 1px solid #d4d4d8; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+              <button type="button" onclick="installAndOpenMacApp(this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #f1f5f9; color: #09090b; border: none; border-radius: 999px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
                 Install Local
               </button>
-              <a href="/api/installers/download/macos-dmg" download="SLMAgents-2.0-macOS-Installer.dmg" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #09090b; color: #ffffff; border-radius: 6px; font-size: 0.78rem; font-weight: 600; text-decoration: none; white-space: nowrap;">
+              <a href="/api/installers/download/macos-dmg" download="SLMAgents-2.0-macOS-Installer.dmg" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 15px; background: #09090b; color: #ffffff; border-radius: 999px; font-size: 0.78rem; font-weight: 600; text-decoration: none; white-space: nowrap;">
                 Download .dmg
               </a>
             </div>
           </div>
-          <div class="installer-row" data-os="win" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa;">
+          <div class="installer-row" data-os="win" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f1f5f9;">
             <div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <strong style="color: #09090b; font-size: 0.9rem;">Windows 10 / 11 Setup Executable (.exe)</strong>
-                <span style="background: #ffffff; color: #3f3f46; border: 1px solid #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; padding: 1px 6px; border-radius: 4px;">v2.0.0 · 2.8 MB</span>
+              <div style="display: flex; align-items: baseline; gap: 8px;">
+                <strong style="color: #09090b; font-size: 0.9rem;">Windows 10 / 11 Setup (.exe)</strong>
+                <span style="color: #64748b; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 500;">v2.0.0 · 2.8 MB</span>
               </div>
-              <div style="font-size: 0.78rem; color: #52525b; margin-top: 2px;">64-bit Windows PE32+ (.exe) · Auto-provisions Portable Python 3.11 + 10-Plane Harness + Desktop Shortcut</div>
+              <div style="font-size: 0.78rem; color: #52525b; margin-top: 2px;">64-bit Windows PE32+ (.exe) · Auto-provisions Portable Python 3.11 + Desktop Shortcut</div>
             </div>
-            <a href="/api/installers/download/windows" download="SLMAgents-2.0-Windows-Setup.exe" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #09090b; color: #ffffff; border-radius: 6px; font-size: 0.78rem; font-weight: 600; text-decoration: none; white-space: nowrap;">
+            <a href="/api/installers/download/windows" download="SLMAgents-2.0-Windows-Setup.exe" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 15px; background: #09090b; color: #ffffff; border-radius: 999px; font-size: 0.78rem; font-weight: 600; text-decoration: none; white-space: nowrap; flex-shrink: 0;">
               Download .exe
             </a>
           </div>
-          <div class="installer-row" data-os="linux" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa;">
+          <div class="installer-row" data-os="linux" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f1f5f9;">
             <div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <strong style="color: #09090b; font-size: 0.9rem;">Linux Standalone AppImage (.AppImage)</strong>
-                <span style="background: #ffffff; color: #3f3f46; border: 1px solid #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; padding: 1px 6px; border-radius: 4px;">v2.0.0 · 3.4 MB</span>
+              <div style="display: flex; align-items: baseline; gap: 8px;">
+                <strong style="color: #09090b; font-size: 0.9rem;">Linux AppImage (.AppImage)</strong>
+                <span style="color: #64748b; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 500;">v2.0.0 · 3.4 MB</span>
               </div>
-              <div style="font-size: 0.78rem; color: #52525b; margin-top: 2px;">Ubuntu / Debian / Fedora / Arch (x86_64) · Single-file standalone .AppImage desktop executable</div>
+              <div style="font-size: 0.78rem; color: #52525b; margin-top: 2px;">Ubuntu / Debian / Fedora / Arch (x86_64) · Single-file standalone desktop executable</div>
             </div>
-            <a href="/api/installers/download/linux" download="SLMAgents-2.0-Linux-x86_64.AppImage" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #09090b; color: #ffffff; border-radius: 6px; font-size: 0.78rem; font-weight: 600; text-decoration: none; white-space: nowrap;">
+            <a href="/api/installers/download/linux" download="SLMAgents-2.0-Linux-x86_64.AppImage" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 15px; background: #09090b; color: #ffffff; border-radius: 999px; font-size: 0.78rem; font-weight: 600; text-decoration: none; white-space: nowrap; flex-shrink: 0;">
               Download .AppImage
             </a>
           </div>
         </div>
 
-        <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e4e4e7;">
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin-bottom: 8px;">2. Individual Agent + 10-Plane Harness OS Installers (26 Agents)</div>
-          <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid #e4e4e7; border-radius: 8px; background: #fafafa;">
-            <select id="modal-agent-installer-select" style="background: #ffffff; border: 1px solid #d4d4d8; border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; font-weight: 600; color: #09090b; min-width: 220px;" onchange="var v=this.value; document.getElementById('modal-agent-mac').href='/api/installers/download/agent-macos?agent='+v; document.getElementById('modal-agent-win').href='/api/installers/download/agent-windows?agent='+v; document.getElementById('modal-agent-lin').href='/api/installers/download/agent-linux?agent='+v;">
+        <div style="margin-top: 16px; padding-top: 4px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin-bottom: 10px;">Single-Agent Standalone Installers (26 Agents)</div>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;">
+            <select id="modal-agent-installer-select" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; color: #09090b; min-width: 240px; outline: none;" onchange="var v=this.value; document.getElementById('modal-agent-mac').href='/api/installers/download/agent-macos?agent='+v; document.getElementById('modal-agent-win').href='/api/installers/download/agent-windows?agent='+v; document.getElementById('modal-agent-lin').href='/api/installers/download/agent-linux?agent='+v;">
               <option value="rag">slm_rag — SLM RAG</option>
               <option value="orchestrator">slm_orchestrator — SLM Orchestrator</option>
               <option value="sql">slm_text_to_sql — SLM Text-to-SQL</option>

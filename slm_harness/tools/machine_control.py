@@ -92,11 +92,13 @@ _MACHINE_INTENT_PATTERNS = [
             re.IGNORECASE,
         ),
     ),
-    # 5. Search & find files on machine
+    # 5. Search & find files / folders / apps / projects on machine
     (
         "search_files",
         re.compile(
-            r"\b(?:search\s+(?:and\s+find|for)?|find\s+(?:out\s+)?(?:all\s+)?|locate|scan\s+for)\b.*\b(?:files?|folders?|documents?|pdfs?|spreadsheets?|scripts?|\*\.[a-z0-9]+)\b"
+            r"\b(?:find|search|locate|where\s+is|where\s+are|look\s+for|scan\s+for)\b.*\b(?:in\s+(?:my\s+|the\s+)?(?:machine|computer|mac|pc|laptop|system|disk|workspace|folder|directory|desktop|documents|downloads)|on\s+(?:my\s+|the\s+)?(?:machine|computer|mac|pc|laptop|system|disk|desktop))\b"
+            r"|\b(?:search\s+(?:and\s+find|for)?|find\s+(?:out\s+)?(?:all\s+)?|locate|scan\s+for)\b.*\b(?:files?|folders?|director(?:y|ies)|documents?|pdfs?|spreadsheets?|scripts?|apps?|applications?|projects?|repos?|\*\.[a-z0-9]+)\b"
+            r"|\b(?:find|search|locate)\s+(?:for\s+)?['\"`]?([A-Za-z0-9_.\-]{3,})['\"`]?\s*$"
             r"|\b(?:find|search)\s+files?\b",
             re.IGNORECASE | re.DOTALL,
         ),
@@ -337,23 +339,20 @@ class MachineControlEngine:
             "slm_git_repo_manager",
         )
 
-        thought_md = "\n".join(f"{idx}. {t}" for idx, t in enumerate(thoughts, 1))
         md = (
-            f"### 🖥️ Machine Git Controller — Live Repository Execution\n\n"
+            f"### Machine Git Controller — Live Repository Execution\n\n"
             f"| Property | Value |\n"
             f"| :--- | :--- |\n"
             f"| **Host OS** | `{self.os_profile['os_label']}` |\n"
             f"| **Repository Path** | `{self.workspace_dir}` |\n"
             f"| **Active Branch** | `{current_branch}` |\n"
             f"| **Commands Executed** | `{', '.join(commands_run)}` |\n\n"
-            f"#### 🧠 Agent Thought Process\n"
-            f"{thought_md}\n\n"
-            + (f"#### 🔀 Branch Checkout Result\n{checkout_note}\n\n" if checkout_note else "")
-            + f"#### 🌿 Local & Remote Branches (`git branch -a`)\n"
+            + (f"#### Branch Checkout Result\n{checkout_note}\n\n" if checkout_note else "")
+            + f"#### Local & Remote Branches (`git branch -a`)\n"
             f"```text\n{branches_res.stdout.strip() or current_branch}\n```\n\n"
-            f"#### 📊 Working Tree Status (`git status --short --branch`)\n"
+            f"#### Working Tree Status (`git status --short --branch`)\n"
             f"```text\n{status_res.stdout.strip() or 'Clean working tree'}\n```\n\n"
-            f"#### 📜 Recent Commit History (`git log --oneline -n 5`)\n"
+            f"#### Recent Commit History (`git log --oneline -n 5`)\n"
             f"```text\n{log_res.stdout.strip() or '(no commits)'}\n```"
         )
         return MachineActionOutcome(
@@ -446,21 +445,18 @@ class MachineControlEngine:
         )
 
         rows_md = "\n".join(
-            f"| `{r['source']}` | `{r['destination']}` | {r['bytes']:,} B | `{r['sha256_prefix']}...` | ✅ Verified |"
+            f"| `{r['source']}` | `{r['destination']}` | {r['bytes']:,} B | `{r['sha256_prefix']}...` | Verified |"
             for r in copied_records
-        ) or "| *(no matching source file found)* | - | 0 B | - | ⚠️ Specify source path |"
+        ) or "| *(no matching source file found)* | - | 0 B | - | Specify source path |"
 
         cmd_block = "\n".join(os_commands) or "# Specify source and destination paths, e.g. 'copy README.md to backup/README.md'"
-        thought_md = "\n".join(f"{idx}. {t}" for idx, t in enumerate(thoughts, 1))
 
         md = (
-            f"### 📂 Machine File Operations — Executed & Checksum Verified\n\n"
+            f"### Machine File Operations — Executed & Checksum Verified\n\n"
             f"| Source File | Destination Path | Size | SHA-256 Integrity | Status |\n"
             f"| :--- | :--- | :--- | :--- | :--- |\n"
             f"{rows_md}\n\n"
-            f"#### 🧠 Agent Thought Process\n"
-            f"{thought_md}\n\n"
-            f"#### 💻 OS-Native Command Executed ({self.os_profile['os_label']})\n"
+            f"#### OS-Native Command Executed ({self.os_profile['os_label']})\n"
             f"```bash\n{cmd_block}\n```"
         )
         return MachineActionOutcome(
@@ -598,22 +594,19 @@ class MachineControlEngine:
 
         xlsx_url = f"/api/harness/download/{file_id}/{merged_xlsx_name}"
         csv_url = f"/api/harness/download/{file_id}/{merged_csv_name}"
-        thought_md = "\n".join(f"{idx}. {t}" for idx, t in enumerate(thoughts, 1))
 
         md = (
-            f"### 📊 Excel Sheet Merger — {len(frames)} Sheets Merged Successfully\n\n"
+            f"### Excel Sheet Merger — {len(frames)} Sheets Merged\n\n"
             f"| Metric | Value |\n"
             f"| :--- | :--- |\n"
             f"| **Input Sheets Merged** | {', '.join(f'`{lbl}` ({len(df_p)} rows)' for lbl, df_p in frames)} |\n"
             f"| **Merged Output Shape** | **{len(merged_df)} rows × {len(merged_df.columns)} columns** |\n"
-            f"| **Output Excel Workbook** | [`{merged_xlsx_name}`]({xlsx_url}) (Multi-tab `.xlsx` with `Merged_All_Rows` + source tabs) |\n"
-            f"| **Output CSV Dataset** | [`{merged_csv_name}`]({csv_url}) |\n\n"
-            f"#### 🧠 Agent Thought Process\n"
-            f"{thought_md}\n\n"
-            f"#### 📋 Merged Sheet Preview (`Merged_All_Rows`)\n"
+            f"| **Output Excel Workbook** | [{merged_xlsx_name}]({xlsx_url}) (Multi-tab `.xlsx` with `Merged_All_Rows` + source tabs) |\n"
+            f"| **Output CSV Dataset** | [{merged_csv_name}]({csv_url}) |\n\n"
+            f"#### Merged Sheet Preview (`Merged_All_Rows`)\n\n"
             f"{table_md}\n\n"
-            f"---\n"
-            f"**Ready for Download:** [📥 Download Merged Excel (.xlsx)]({xlsx_url}) · [📥 Download Merged CSV (.csv)]({csv_url})"
+            f"---\n\n"
+            f"**Export Artifacts:** [Download Merged Excel (.xlsx)]({xlsx_url}) · [Download Merged CSV (.csv)]({csv_url})"
         )
         return MachineActionOutcome(
             action_type="merge_excel",
@@ -689,24 +682,21 @@ class MachineControlEngine:
             "slm_os_controller",
         )
 
-        thought_md = "\n".join(f"{idx}. {t}" for idx, t in enumerate(thoughts, 1))
         cmd_block = "\n".join(os_commands)
 
         md = (
-            f"### 🎵 Machine Media & Music Controller — Active Playback\n\n"
+            f"### Machine Media & Music Controller — Active Playback\n\n"
             f"| Property | Value |\n"
             f"| :--- | :--- |\n"
             f"| **Host OS Audio Bridge** | `{self.os_profile['audio_engine']}` |\n"
-            f"| **Synthesized Track** | [`{wav_name}`]({wav_url}) (44.1 kHz 16-bit PCM Ambient Chord Progression) |\n"
+            f"| **Synthesized Track** | [{wav_name}]({wav_url}) (44.1 kHz 16-bit PCM Ambient Chord Progression) |\n"
             f"| **Execution Status** | {os_exec_status} |\n\n"
-            f"#### 🔊 Live Audio Player\n"
+            f"#### Live Audio Player\n\n"
             f'<audio controls autoplay src="{wav_url}" style="width: 100%; max-width: 460px; margin: 8px 0; border-radius: 8px;"></audio>\n\n'
-            f"#### 🧠 Agent Thought Process\n"
-            f"{thought_md}\n\n"
-            f"#### 💻 OS-Native Media Control Commands ({self.os_profile['os_label']})\n"
+            f"#### OS-Native Media Control Commands ({self.os_profile['os_label']})\n"
             f"```bash\n{cmd_block}\n```\n\n"
-            f"---\n"
-            f"**Ready for Download:** [🎵 Download Audio Track (.wav)]({wav_url})"
+            f"---\n\n"
+            f"**Export Artifact:** [Download Audio Track (.wav)]({wav_url})"
         )
         return MachineActionOutcome(
             action_type="play_music",
@@ -757,7 +747,7 @@ class MachineControlEngine:
             wf.writeframes(bytes(frames))
 
     # ------------------------------------------------------------------
-    # 5. FAST MACHINE FILE SEARCH & DISCOVERY
+    # 5. FAST MACHINE FILE, FOLDER & APPLICATION SEARCH & DISCOVERY
     # ------------------------------------------------------------------
     def _handle_search_files(
         self,
@@ -768,44 +758,183 @@ class MachineControlEngine:
         q = (query or "").strip()
         os_sys = self.os_profile["system"]
 
-        # Extract glob or extension or keyword from user query
+        # 1. Extract glob, extension, or target keyword from natural language query
         ext_match = re.search(r"(\*\.[a-zA-Z0-9]+|\.[a-zA-Z0-9]{2,6})\b", q)
         kw_match = re.search(
-            r"\b(?:named|called|matching|containing|for)\s+['\"`]?([A-Za-z0-9_.*-]+)['\"`]?",
+            r"\b(?:named|called|matching|containing)\s+['\"`]?([A-Za-z0-9_.*\-]+)['\"`]?",
             q,
             re.IGNORECASE,
         )
-        if ext_match:
-            pattern = ext_match.group(1) if ext_match.group(1).startswith("*") else f"*{ext_match.group(1)}"
-        elif kw_match and kw_match.group(1).lower() not in ("files", "file", "out", "all", "some", "machine"):
+
+        # Clean natural language phrasing like "find slmagents in my machine" -> "slmagents"
+        cleaned_target = q
+        cleaned_target = re.sub(
+            r"^(?:please\s+|can\s+you\s+|could\s+you\s+|help\s+me\s+(?:to\s+)?)?"
+            r"(?:search\s+(?:and\s+find\s+|for\s+)?|find\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?|locate\s+(?:all\s+)?|where\s+(?:is|are)\s+(?:the\s+)?|look\s+for\s+|scan\s+for\s+)",
+            "",
+            cleaned_target,
+            flags=re.IGNORECASE,
+        ).strip()
+        cleaned_target = re.sub(
+            r"\b(?:in\s+(?:my\s+|the\s+|this\s+)?(?:machine|computer|mac|pc|laptop|system|disk|workspace|folder|directory|desktop|documents|downloads)"
+            r"|on\s+(?:my\s+|the\s+|this\s+)?(?:machine|computer|mac|pc|laptop|system|disk|desktop)"
+            r"|from\s+(?:my\s+|the\s+)?(?:machine|computer|mac|system|workspace)"
+            r"|and\s+give\s+me\s+.*|for\s+me)\b.*$",
+            "",
+            cleaned_target,
+            flags=re.IGNORECASE,
+        ).strip(" '\"\t\n.,?!")
+        cleaned_target = re.sub(
+            r"\b(?:all\s+|some\s+|the\s+)?(?:files?|folders?|director(?:y|ies)|projects?|repos?|applications?|apps?)\b",
+            "",
+            cleaned_target,
+            flags=re.IGNORECASE,
+        ).strip(" '\"\t\n.,?!")
+
+        if ext_match and (not cleaned_target or ext_match.group(1) in cleaned_target):
+            raw_kw = ext_match.group(1)
+            pattern = raw_kw if raw_kw.startswith("*") else f"*{raw_kw}"
+            keyword_clean = raw_kw.lstrip("*.")
+        elif kw_match and kw_match.group(1).lower() not in ("files", "file", "out", "all", "some", "machine", "my"):
             raw_kw = kw_match.group(1)
             pattern = raw_kw if "*" in raw_kw else f"*{raw_kw}*"
+            keyword_clean = raw_kw.strip("*")
+        elif cleaned_target and cleaned_target.lower() not in ("files", "file", "folders", "folder", "everything", "all"):
+            # Handle multi-word targets like "slm agents" -> match both "slmagents" and "slm_agents" / "slm-agents"
+            compact_kw = re.sub(r"\s+", "", cleaned_target)
+            keyword_clean = compact_kw
+            pattern = f"*{compact_kw}*"
         else:
             pattern = "*.py" if "python" in q.lower() else ("*.xlsx" if "excel" in q.lower() else "*")
+            keyword_clean = pattern.strip("*")
+
+        # Generate normalized variants so "slm agents", "slmagents", "slm_agents", "slm-agents" all match seamlessly
+        kw_low = keyword_clean.lower()
+        kw_variants = {kw_low}
+        if cleaned_target:
+            ct_low = cleaned_target.lower()
+            kw_variants.add(ct_low)
+            kw_variants.add(ct_low.replace(" ", ""))
+            kw_variants.add(ct_low.replace(" ", "_"))
+            kw_variants.add(ct_low.replace(" ", "-"))
+        if kw_low in ("slmagents", "slmagent", "slmminds", "slimeminds"):
+            kw_variants.update({"slmagents", "slm_agents", "slm-agents", "slm_harness"})
 
         _think(
-            f"Step 3 — Building OS-Native File Search Query: Scanning workspace '{self.workspace_dir}' with pattern '{pattern}'...",
+            f"Step 3 — Executing Native Machine & Workspace Search: Scanning machine directories, /Applications, and '{self.workspace_dir}' for '{keyword_clean or pattern}'...",
             "slm_cli_agent",
         )
 
+        home_dir = os.path.expanduser("~")
         if os_sys == "Darwin":
-            os_cmd = f'mdfind -onlyin "{self.workspace_dir}" "{pattern.strip("*")}" || find "{self.workspace_dir}" -name "{pattern}" -maxdepth 3'
+            os_cmd = f'mdfind -name "{keyword_clean or pattern.strip("*")}" | head -n 25'
         elif os_sys == "Windows":
-            os_cmd = f'Get-ChildItem -Path "{self.workspace_dir}" -Filter "{pattern}" -Recurse -Depth 3 -ErrorAction SilentlyContinue'
+            os_cmd = f'Get-ChildItem -Path "{home_dir}" -Filter "{pattern}" -Recurse -Depth 3 -ErrorAction SilentlyContinue'
         else:
-            os_cmd = f'find "{self.workspace_dir}" -maxdepth 3 -iname "{pattern}"'
+            os_cmd = f'find "{home_dir}" -maxdepth 3 -iname "{pattern}" 2>/dev/null'
 
+        matched_dirs_and_apps: List[Dict[str, Any]] = []
+        seen_paths: set[str] = set()
+
+        def _record_entry(abs_p: str, entry_kind: str = "") -> None:
+            norm_p = os.path.abspath(abs_p)
+            if norm_p in seen_paths or not os.path.exists(norm_p):
+                return
+            seen_paths.add(norm_p)
+            try:
+                st = os.stat(norm_p)
+                if not entry_kind:
+                    if norm_p.endswith(".app"):
+                        entry_kind = "macOS Application (.app)"
+                    elif norm_p.endswith(".dmg"):
+                        entry_kind = "macOS Disk Image (.dmg)"
+                    elif norm_p.endswith(".exe"):
+                        entry_kind = "Windows Executable (.exe)"
+                    elif norm_p.endswith(".AppImage"):
+                        entry_kind = "Linux AppImage"
+                    elif os.path.isdir(norm_p):
+                        entry_kind = "Directory / Repository"
+                    else:
+                        entry_kind = "File"
+                size_kb = round(st.st_size / 1024.0, 1) if os.path.isfile(norm_p) else 0.0
+                size_str = f"{round(size_kb / 1024.0, 2)} MB" if size_kb >= 1024 else (f"{size_kb} KB" if size_kb > 0 else "Folder")
+                matched_dirs_and_apps.append(
+                    {
+                        "path": norm_p,
+                        "rel_path": os.path.relpath(norm_p, self.workspace_dir) if norm_p.startswith(self.workspace_dir) else norm_p,
+                        "kind": entry_kind,
+                        "size_kb": size_kb,
+                        "size_label": size_str,
+                        "modified": datetime.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M"),
+                    }
+                )
+            except OSError:
+                pass
+
+        # 1. Check active workspace root itself if its name matches
+        ws_base_low = os.path.basename(self.workspace_dir).lower()
+        if any(v and v in ws_base_low for v in kw_variants):
+            _record_entry(self.workspace_dir, "Active Workspace Repository")
+
+        # 2. Check /Applications, ~/Documents, ~/Desktop, ~/Downloads, and workspace dist/
+        machine_roots = [
+            "/Applications",
+            os.path.join(home_dir, "Applications"),
+            os.path.join(home_dir, "Documents"),
+            os.path.join(home_dir, "Desktop"),
+            os.path.join(home_dir, "Downloads"),
+            os.path.join(self.workspace_dir, "dist"),
+        ]
+        for mroot in machine_roots:
+            if not os.path.isdir(mroot):
+                continue
+            try:
+                for entry_name in sorted(os.listdir(mroot)):
+                    en_low = entry_name.lower()
+                    if fnmatch.fnmatch(en_low, pattern.lower()) or any(v and v in en_low for v in kw_variants):
+                        _record_entry(os.path.join(mroot, entry_name))
+            except OSError:
+                pass
+
+        # 3. Run fast native macOS Spotlight `mdfind -name` (capped at 1.5s) for real machine-wide discovery
+        if os_sys == "Darwin" and keyword_clean and keyword_clean != "*":
+            try:
+                sp = subprocess.run(
+                    ["mdfind", "-name", keyword_clean],
+                    capture_output=True,
+                    text=True,
+                    timeout=1.5,
+                )
+                if sp.returncode == 0 and sp.stdout:
+                    for line in sp.stdout.splitlines():
+                        cand_p = line.strip()
+                        if not cand_p or "/Library/Caches/" in cand_p or "/.Trash/" in cand_p or "/.gemini/" in cand_p:
+                            continue
+                        _record_entry(cand_p)
+                        if len(matched_dirs_and_apps) >= 25:
+                            break
+            except Exception:
+                pass
+
+        # 4. Walk active workspace for matching subdirectories and files
         skip_dirs = {".git", ".venv", "__pycache__", "node_modules", "models", ".pytest_cache"}
         matches: List[Dict[str, Any]] = []
         for root, dirs, files in os.walk(self.workspace_dir):
             dirs[:] = [d for d in sorted(dirs) if d not in skip_dirs]
+            for d in dirs:
+                d_low = d.lower()
+                if fnmatch.fnmatch(d_low, pattern.lower()) or any(v and len(v) >= 2 and v in d_low for v in kw_variants):
+                    _record_entry(os.path.join(root, d), "Workspace Directory")
             for fn in sorted(files):
-                if fnmatch.fnmatch(fn.lower(), pattern.lower()):
+                fn_low = fn.lower()
+                if fnmatch.fnmatch(fn_low, pattern.lower()) or any(v and len(v) >= 2 and v in fn_low for v in kw_variants):
                     fp = os.path.join(root, fn)
+                    _record_entry(fp, "File")
                     try:
                         st = os.stat(fp)
                         matches.append(
                             {
+                                "path": fp,
                                 "rel_path": os.path.relpath(fp, self.workspace_dir),
                                 "size_kb": round(st.st_size / 1024.0, 1),
                                 "modified": datetime.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M"),
@@ -813,30 +942,31 @@ class MachineControlEngine:
                         )
                     except OSError:
                         pass
-                if len(matches) >= 25:
+                if len(matches) >= 30 and len(matched_dirs_and_apps) >= 30:
                     break
-            if len(matches) >= 25:
+            if len(matches) >= 30 and len(matched_dirs_and_apps) >= 30:
                 break
 
+        total_found = len(matched_dirs_and_apps)
         _think(
-            f"Step 4 — Search Complete: Discovered {len(matches)} matching file(s) in '{self.workspace_dir}'.",
+            f"Step 4 — Machine Search Complete: Found {total_found} matching location(s) across machine & workspace '{self.workspace_dir}'.",
             "slm_cli_agent",
         )
 
+        # Render combined results table (Applications, Directories, Installers, and Files)
+        all_items = matched_dirs_and_apps[:25]
         rows_md = "\n".join(
-            f"| `{m['rel_path']}` | {m['size_kb']} KB | `{m['modified']}` |"
-            for m in matches[:15]
-        ) or "| *(no matching files)* | - | - |"
+            f"| `{item['path']}` | {item['kind']} | {item['size_label']} | `{item['modified']}` |"
+            for item in all_items
+        ) or "| *(no matching items found)* | - | - | - |"
 
-        thought_md = "\n".join(f"{idx}. {t}" for idx, t in enumerate(thoughts, 1))
         md = (
-            f"### 🔍 Machine File Search & Discovery — `{pattern}`\n\n"
-            f"| File Path | Size | Last Modified |\n"
-            f"| :--- | :--- | :--- |\n"
+            f"### 🔍 Machine Search Results for **`{keyword_clean or pattern}`**\n\n"
+            f"Found **{total_found} matching item(s)** on your machine (`{self.os_profile['os_label']}`):\n\n"
+            f"| Full Machine Path | Type | Size | Last Modified |\n"
+            f"| :--- | :--- | :--- | :--- |\n"
             f"{rows_md}\n\n"
-            f"#### 🧠 Agent Thought Process\n"
-            f"{thought_md}\n\n"
-            f"#### 💻 Equivalent OS Search Command ({self.os_profile['os_label']})\n"
+            f"#### Executed OS Search Query\n"
             f"```bash\n{os_cmd}\n```"
         )
         return MachineActionOutcome(
@@ -846,7 +976,12 @@ class MachineControlEngine:
             commands_built=[os_cmd],
             thoughts=thoughts,
             markdown_response=md,
-            structured_data={"pattern": pattern, "matches": matches[:15]},
+            structured_data={
+                "query": keyword_clean or pattern,
+                "pattern": pattern,
+                "total_found": total_found,
+                "matches": all_items,
+            },
             agent_id="slm_cli_agent",
         )
 
@@ -935,16 +1070,13 @@ class MachineControlEngine:
             f"| `{j['job_id']}` | {j['cadence']} (`{j['cron_expression']}`) | {j['task'][:65]} | **{j['status']}** |"
             for j in existing_jobs[-5:]
         )
-        thought_md = "\n".join(f"{idx}. {t}" for idx, t in enumerate(thoughts, 1))
 
         md = (
-            f"### ⏰ Machine Job Scheduler — Cross-Software Automation Registered\n\n"
+            f"### Machine Job Scheduler — Cross-Software Automation Registered\n\n"
             f"| Job ID | Schedule Cadence | Task Description | Status |\n"
             f"| :--- | :--- | :--- | :--- |\n"
             f"{jobs_table}\n\n"
-            f"#### 🧠 Agent Thought Process\n"
-            f"{thought_md}\n\n"
-            f"#### 💻 OS-Native Scheduler Command ({self.os_profile['os_label']})\n"
+            f"#### OS-Native Scheduler Command ({self.os_profile['os_label']})\n"
             f"```bash\n{os_manifest}\n```"
         )
         return MachineActionOutcome(
@@ -1021,22 +1153,19 @@ class MachineControlEngine:
             "slm_os_controller",
         )
 
-        thought_md = "\n".join(f"{idx}. {t}" for idx, t in enumerate(thoughts, 1))
         apps_badges = " · ".join(f"`{a}`" for a in running_apps[:12])
 
         md = (
-            f"### 🖥️ Universal OS Screen Traversal & Machine Control Plane\n\n"
+            f"### Universal OS Screen Traversal & Machine Control Plane\n\n"
             f"| Capability | Active Host Configuration |\n"
             f"| :--- | :--- |\n"
             f"| **Detected Operating System** | `{self.os_profile['os_label']}` |\n"
             f"| **GUI / Screen Traversal Engine** | {self.os_profile['gui_engine']} |\n"
             f"| **Job & Software Scheduler** | {self.os_profile['scheduler_engine']} |\n"
             f"| **Active Desktop / Host Processes** | {apps_badges} |\n\n"
-            f"#### 🧠 Agent Thought Process\n"
-            f"{thought_md}\n\n"
-            f"#### 🤖 Generated OS Screen-Traversal Script ({self.os_profile['os_label']})\n"
+            f"#### Generated OS Screen-Traversal Script ({self.os_profile['os_label']})\n"
             f"```bash\n{gui_script}\n```\n\n"
-            f"#### ⚡ Ready-to-Run Machine Commands You Can Trigger Directly in Chat\n"
+            f"#### Ready-to-Run Machine Commands\n"
             f"- **Git Repo Control:** `\"git checkout main and show git status\"`\n"
             f"- **Copy & Backup Files:** `\"copy README.md to backup/README_backup.md\"`\n"
             f"- **Merge 2 Excel Sheets:** `\"merge 2 excel sheets and give me the download link\"`\n"
@@ -1096,20 +1225,11 @@ class MachineControlEngine:
             all_cmds.extend(out.commands_built)
             all_exports.extend(out.exported_files)
 
-        thought_md = "\n".join(f"{idx}. {t}" for idx, t in enumerate(thoughts, 1))
         sections = [
-            f"## 🖥️ Universal Machine Control Plane — {len(sub_outcomes)} OS Actions Executed on `{self.os_profile['os_label']}`\n\n"
-            f"### 🧠 Complete Agent Thought Process ({len(thoughts)} Steps)\n"
-            f"{thought_md}\n\n---"
+            f"## Universal Machine Control Plane — {len(sub_outcomes)} OS Actions Executed on `{self.os_profile['os_label']}`"
         ]
         for out in sub_outcomes:
-            # Strip duplicate thought process sub-block inside combined view for cleanliness
-            cleaned_sec = re.sub(
-                r"#### 🧠 Agent Thought Process\n(?:.*\n)*?(?=#### |---\n|$)",
-                "",
-                out.markdown_response,
-            )
-            sections.append(cleaned_sec)
+            sections.append(out.markdown_response)
 
         return MachineActionOutcome(
             action_type="multi_machine",

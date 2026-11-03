@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Chat Studio: Local Multi-Agent SLM Orchestrator | SLMAgents</title>
   <meta name="description" content="Full-page private AI Chat Studio powered by local SLM agents. Run code interpretation, Text-to-SQL, document RAG, and multi-agent workflows offline on CPU.">
-  <link rel="stylesheet" href="chat.css?v=11.0">
+  <link rel="stylesheet" href="chat.css?v=13.0">
   <!-- Offline Vendored Highlight.js & Marked.js (Zero External CDN Calls) -->
   <link rel="stylesheet" href="vendor/github-dark.min.css">
   <script src="vendor/highlight.min.js"></script>
@@ -56,7 +56,7 @@
       display: inline-flex;
       align-items: center;
       background: #f1f5f9;
-      border: 1px solid #cbd5e1;
+      border: none;
       border-radius: 999px;
       padding: 2px;
       gap: 2px;
@@ -82,33 +82,31 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
+      white-space: nowrap;
     }
     .btn-reasoning-pill:hover {
       color: #0f172a;
       background: rgba(255, 255, 255, 0.7);
     }
     .btn-reasoning-pill.active[data-effort="low"] {
-      background: #10b981;
+      background: #0f172a;
       color: #ffffff;
-      box-shadow: 0 1px 3px rgba(16, 185, 129, 0.35);
     }
     .btn-reasoning-pill.active[data-effort="medium"] {
-      background: #4f46e5;
+      background: #0f172a;
       color: #ffffff;
-      box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
     }
     .btn-reasoning-pill.active[data-effort="high"] {
-      background: #7c3aed;
+      background: #0f172a;
       color: #ffffff;
-      box-shadow: 0 1px 4px rgba(124, 58, 237, 0.4);
     }
 
-    /* Execution Plan Card & Interactive Clarification Option Chips */
+    /* Execution Plan Card & Interactive Clarification Option Chips (Borderless Left-Accent Editorial Style) */
     .harness-plan-card {
       background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-left: 3.5px solid #4f46e5;
-      border-radius: 10px;
+      border: none;
+      border-left: 2.5px solid #0f172a;
+      border-radius: 0 8px 8px 0;
       padding: 10px 14px;
       margin: 8px 0 10px 0;
       font-size: 0.83rem;
@@ -119,11 +117,11 @@
       align-items: center;
       justify-content: space-between;
       font-weight: 700;
-      color: #312e81;
+      color: #0f172a;
       margin-bottom: 6px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       text-transform: uppercase;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.04em;
     }
     .harness-plan-steps {
       margin: 0;
@@ -135,17 +133,17 @@
       margin-bottom: 3px;
     }
     .clarify-chips-card {
-      background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
-      border: 1px solid #c7d2fe;
-      border-radius: 11px;
+      background: #f8fafc;
+      border: none;
+      border-left: 2.5px solid #0f172a;
+      border-radius: 0 8px 8px 0;
       padding: 12px 14px;
       margin: 10px 0;
-      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.06);
     }
     .clarify-card-header {
       font-weight: 700;
       font-size: 0.84rem;
-      color: #312e81;
+      color: #0f172a;
       margin-bottom: 8px;
       display: flex;
       align-items: center;
@@ -158,22 +156,20 @@
     }
     .btn-clarify-chip {
       background: #ffffff;
-      border: 1px solid #a5b4fc;
-      color: #3730a3;
-      border-radius: 8px;
-      padding: 6px 11px;
-      font-size: 0.8rem;
+      border: none;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      color: #0f172a;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.15s ease;
       text-align: left;
     }
     .btn-clarify-chip:hover {
-      background: #4f46e5;
+      background: #0f172a;
       color: #ffffff;
-      border-color: #4f46e5;
-      transform: translateY(-1px);
-      box-shadow: 0 3px 8px rgba(79, 70, 229, 0.2);
     }
   </style>
   <script>
@@ -275,26 +271,20 @@
         </div>
       </div>
 
-      <!-- Live Functional Local RAM Footprint Widget -->
+      <!-- Live Functional Local RAM Footprint Status Row -->
       <div class="chat-sidebar-footer">
         <div class="ram-footprint-card">
           <div class="ram-header-row">
             <div class="ram-badge-live">
               <span class="dot-green"></span>
-              <span>Local Engine RAM</span>
+              <span>Local Engine</span>
             </div>
             <strong class="ram-process-mb" id="stat-ram-mb">-- MB</strong>
           </div>
-          
-          <div class="ram-detail-row">
-            <span class="ram-label">System RAM:</span>
-            <span class="ram-val" id="stat-sys-ram">-- GB</span>
-          </div>
-
           <div class="ram-footer-actions">
-            <span class="ram-runtime-tag">Local Engine • Offline</span>
+            <span class="ram-runtime-tag">Sys <span class="ram-val" id="stat-sys-ram">-- GB</span></span>
             <button type="button" class="btn-purge-ram" id="btn-clear-ram" onclick="handleClearRamCache()" title="Purge intermediate KV cache and run garbage collection">
-              Purge Cache
+              Purge
             </button>
           </div>
         </div>
@@ -417,45 +407,45 @@
           <div class="welcome-suggestions-grid">
             <div class="suggestion-card" onclick="applyQuickPrompt('Write a Python script to compute the Fibonacci sequence with caching.')">
               <div class="card-top">
-                <div class="card-icon code-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                <div class="card-icon icon-indigo">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                 </div>
-                <span class="card-tag">Python Run</span>
+                <span class="card-tag">Code <span class="card-arrow">&rarr;</span></span>
               </div>
               <strong>Fibonacci Generator</strong>
-              <p>Generates recursive & cached Python functions with unit tests</p>
+              <p>Generates recursive &amp; cached Python functions with unit tests</p>
+            </div>
+
+            <div class="suggestion-card" onclick="applyQuickPrompt('merge 2 excel sheets, check git status, copy README.md to backup, and search for *.py files')">
+              <div class="card-top">
+                <div class="card-icon icon-emerald">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                </div>
+                <span class="card-tag">Machine Control <span class="card-arrow">&rarr;</span></span>
+              </div>
+              <strong>OS &amp; Machine Automation</strong>
+              <p>Merge 2 Excel sheets, git checkout, copy files, play music &amp; schedule jobs</p>
             </div>
 
             <div class="suggestion-card" onclick="applyQuickPrompt('Generate SQL to find top 5 customers with total orders > $1000 in 2024')">
               <div class="card-top">
-                <div class="card-icon sql-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                <div class="card-icon icon-amber">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
                 </div>
-                <span class="card-tag">Text-to-SQL</span>
+                <span class="card-tag">Text-to-SQL <span class="card-arrow">&rarr;</span></span>
               </div>
               <strong>SQL Aggregation</strong>
               <p>Translate natural language into optimized SQL queries</p>
             </div>
 
-            <div class="suggestion-card" onclick="applyQuickPrompt('Break down the milestone plan to launch a privacy-first mobile app.')">
-              <div class="card-top">
-                <div class="card-icon planner-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-                </div>
-                <span class="card-tag">Milestone Plan</span>
-              </div>
-              <strong>Roadmap Decomposer</strong>
-              <p>Decomposes complex goals into actionable dependency steps</p>
-            </div>
-
             <div class="suggestion-card" onclick="applyQuickPrompt('Solve this math equation step-by-step: 3x^2 + 6x - 24 = 0')">
               <div class="card-top">
-                <div class="card-icon math-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>
+                <div class="card-icon icon-rose">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>
                 </div>
-                <span class="card-tag">Math Solver</span>
+                <span class="card-tag">Math <span class="card-arrow">&rarr;</span></span>
               </div>
-              <strong>Symbolic Math</strong>
+              <strong>Symbolic Math Solver</strong>
               <p>Step-by-step symbolic algebra, calculus, and proof solver</p>
             </div>
           </div>
@@ -552,7 +542,7 @@
         <!-- Sleek Single-Line Floating Composer -->
         <form class="chat-command-form" id="chat-input-form" onsubmit="handleChatSubmit(event)">
           <!-- Attach File Icon Button (Inside Composer) -->
-          <button type="button" class="btn-dock-icon" title="Attach Document, Dataset, Image, or Code" onclick="document.getElementById('chat-file-input').click()">
+          <button type="button" class="btn-dock-icon" title="Attach Document, Audio, Video, Dataset, Image, or Code" onclick="document.getElementById('chat-file-input').click()">
             <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
             </svg>
@@ -647,19 +637,19 @@
         <!-- AI Skill Generator & Quick Actions Bar -->
         <div class="skill-ai-generator-box">
           <div class="skill-ai-generator-top">
-            <strong>Autonomous Skill Creator</strong>
-            <span>Describe any workflow or domain rule — the app generates a structured <code>SKILL.md</code> and saves it in <code>.slm/skills/</code></span>
+            <strong>Create a Reusable Skill</strong>
+            <span>Describe any workflow or domain rule to synthesize and save a structured <code>SKILL.md</code> in <code id="skills-repo-dir-label">.slm/skills/</code></span>
           </div>
           <div class="skill-ai-generator-controls">
-            <input type="text" id="skill-ai-prompt-input" class="issue-input" placeholder="e.g. Kubernetes Postmortem Architect, LinkedIn Viral Tech Post Writer, FinOps Cost Auditor..." onkeydown="if(event.key==='Enter'){event.preventDefault(); generateSkillWithAI();}">
+            <input type="text" id="skill-ai-prompt-input" class="issue-input" placeholder="e.g. Kubernetes Postmortem Architect, LinkedIn Tech Writer, FinOps Cost Auditor..." onkeydown="if(event.key==='Enter'){event.preventDefault(); generateSkillWithAI();}">
             <button type="button" class="btn-issue-primary" id="btn-generate-skill-ai" onclick="generateSkillWithAI()">
-              <span>Create &amp; Save to Repo</span>
+              <span>Create Skill</span>
             </button>
             <button type="button" class="btn-issue-secondary" onclick="learnSkillFromCurrentSession()" title="Extract reusable skill from current conversation &amp; save to .slm/skills/">
               <span>Learn from Chat</span>
             </button>
             <button type="button" class="btn-issue-secondary" onclick="openSkillEditorForm(null)" title="Author a custom SKILL.md manually">
-              <span>+ Manual Skill</span>
+              <span>+ Manual</span>
             </button>
           </div>
         </div>
@@ -721,15 +711,15 @@
           <span class="skill-repo-stats" id="skill-repo-stats-label">Loading skills...</span>
         </div>
 
-        <!-- Skill Cards Grid -->
-        <div class="skills-repo-grid" id="skills-repo-list">
+        <!-- Skill Rows List (Clean Flush Editorial List, Zero Card Boxes) -->
+        <div class="skills-repo-list" id="skills-repo-list">
           <!-- Populated dynamically by app.js -->
         </div>
       </div>
 
       <div class="issue-modal-footer">
-        <span style="font-size:0.78rem; color:#64748b; margin-right:auto;">
-          Tip: Type <code>/skill &lt;topic&gt;</code> in chat anytime and the app will create &amp; save a new skill to <code>.slm/skills/</code> automatically.
+        <span style="font-size:0.76rem; color:#64748b; margin-right:auto;">
+          Tip: Type <code>/skill &lt;topic&gt;</code> in chat anytime to create &amp; save a new skill automatically.
         </span>
         <button type="button" class="btn-issue-secondary" onclick="clearPinnedSkills()">Reset to Auto-Match</button>
         <button type="button" class="btn-issue-primary" onclick="closeSkillsRepoModal()">Done</button>
@@ -877,6 +867,6 @@
       }
     }
   </script>
-  <script src="app.js?v=98.0"></script>
+  <script src="app.js?v=100.0"></script>
 </body>
 </html>

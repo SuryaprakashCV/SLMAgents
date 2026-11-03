@@ -6,7 +6,7 @@
   <meta name="description" content="Interactive API sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry, Watermark LRU MemoryArena metrics, and standalone OS harness installers.">
   <link rel="canonical" href="https://www.slmagents.ai/playground.html">
   <title>Interactive 10-Plane Agent Harness Sandbox &amp; Unit Test Generator | SLMAgents 2.0</title>
-  <link rel="stylesheet" href="style.css?v=62.0">
+  <link rel="stylesheet" href="style.css?v=64.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -135,7 +135,7 @@
 
             <div style="margin-bottom: 1rem;">
               <label for="studio-agent-select" style="display: block; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem;">Target Agent Module</label>
-              <select id="studio-agent-select" onchange="onStudioAgentChange(this.value)" style="width: 100%; background: #fafafa; border: 1px solid var(--border-strong); border-radius: 6px; padding: 0.6rem 0.75rem; color: var(--text-primary); font-size: 0.86rem; font-weight: 600; outline: none; cursor: pointer;">
+              <select id="studio-agent-select" onchange="onStudioAgentChange(this.value)" style="width: 100%; background: #f8fafc; border: 1px solid transparent; border-radius: 10px; padding: 0.6rem 0.85rem; color: var(--text-primary); font-size: 0.86rem; font-weight: 600; outline: none; cursor: pointer;">
                 <option value="rag" selected>slm_rag — SLM RAG</option>
                 <option value="orchestrator">slm_orchestrator — SLM Orchestrator</option>
                 <option value="sql">slm_text_to_sql — SLM Text-to-SQL</option>
@@ -176,8 +176,8 @@
           <!-- Console Panel (Open Editorial Column, No Outer Box) -->
           <div class="studio-panel" style="background: transparent; border: none; padding: 0; display: flex; flex-direction: column;">
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.65rem;">
-              <button id="tab-mode-exec" class="code-tab-btn active" onclick="setStudioMode('exec')" style="background: #18181b; color: #ffffff; border-radius: 5px; padding: 0.35rem 0.75rem; border: none; font-family: var(--font-mono); font-size: 0.76rem; font-weight: 600; cursor: pointer;">Execute Sandbox</button>
-              <button id="tab-mode-unittest" class="code-tab-btn" onclick="setStudioMode('unittest')" style="background: #f4f4f5; color: var(--text-secondary); border-radius: 5px; padding: 0.35rem 0.75rem; border: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.76rem; font-weight: 600; cursor: pointer;">Generate Pytest Suite</button>
+              <button id="tab-mode-exec" class="code-tab-btn active" onclick="setStudioMode('exec')" style="background: #18181b; color: #ffffff; border-radius: 999px; padding: 0.35rem 0.9rem; border: none; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; cursor: pointer;">Execute Sandbox</button>
+              <button id="tab-mode-unittest" class="code-tab-btn" onclick="setStudioMode('unittest')" style="background: #f4f4f5; color: var(--text-secondary); border-radius: 999px; padding: 0.35rem 0.9rem; border: none; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; cursor: pointer;">Generate Pytest Suite</button>
             </div>
 
             <div class="code-panel" style="flex: 1; min-height: 410px;">
@@ -213,7 +213,7 @@
     </main>
   </div>
 
-  <script src="app.js?v=62.0"></script>
+  <script src="app.js?v=100.0"></script>
   <script>
     (function() {
       const sel = document.getElementById('studio-agent-select');
