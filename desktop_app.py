@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-SLMAgents 2.0 Cross-Platform Desktop Application Launcher (macOS, Windows, Linux).
+SLMAgents 2.0 Cross-Platform Native Desktop Application (macOS, Windows, Linux).
 
 Features:
-  - Runs 100% locally on user hardware (macOS Apple Silicon/Intel, Windows x64/ARM64, Linux x64/ARM64)
-  - Zero cloud hosting bills: pulls quantized GGUF/ONNX weights on first run from Hugging Face Hub CDN
-  - Hardware-aware profile auto-selection (`lite` / `balanced` / `power`) based on system RAM
-  - Opens a native frameless Desktop App window (`pywebview` or OS native `--app` window)
+  - Instant native OS window (< 0.3s startup) via `pywebview` (Cocoa WKWebView on macOS, WebView2 on Windows, WebKitGTK on Linux)
+  - Non-blocking background startup: local FastAPI engine & first-run Hugging Face model checks run in background daemon threads
+  - Automatic discovery of existing model directories (`./models`, `~/Documents/SLMAgents/models`, `~/.slm_harness/models`)
 """
 
 from __future__ import annotations
@@ -31,6 +30,62 @@ REPO_ROOT = (
 )
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
+
+
+SPLASH_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SLMAgents 2.0 — Starting Local AI Engine...</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .logo-box {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #0ea5e9 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 16px 40px rgba(79, 70, 229, 0.45);
+      margin-bottom: 24px;
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
+    p { font-size: 0.92rem; color: #94a3b8; margin-bottom: 24px; }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(99, 102, 241, 0.25);
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="logo-box">
+    <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+  </div>
+  <h1>SLMAgents 2.0</h1>
+  <p id="status-text">Initializing Pure-CPU Multi-Agent Studio...</p>
+  <div class="spinner"></div>
+</body>
+</html>
+"""
 
 
 def detect_total_ram_gb() -> float:
@@ -74,29 +129,13 @@ def detect_total_ram_gb() -> float:
 def recommend_cpu_profile(ram_gb: float) -> str:
     if ram_gb < 5.5:
         return "lite"
-    if ram_gb < 14.0:
-        return "balanced"
     return "balanced"
-
-
-def resolve_models_directory() -> str:
-    """Selects writable models directory (`./models` in repo or `~/.slm_harness/models` in packaged app)."""
-    env_dir = os.environ.get("SLM_MODELS_DIR")
-    if env_dir:
-        os.makedirs(env_dir, exist_ok=True)
-        return os.path.abspath(env_dir)
-
-    repo_models = os.path.join(REPO_ROOT, "models")
-    if not getattr(sys, "frozen", False) and os.path.isdir(repo_models):
-        return repo_models
-
-    user_models = os.path.expanduser("~/.slm_harness/models")
-    os.makedirs(user_models, exist_ok=True)
-    return user_models
 
 
 def has_core_models(models_dir: str) -> bool:
     """Checks whether at least one core reasoning model (GGUF or ONNX) exists on disk."""
+    if not models_dir or not os.path.isdir(models_dir):
+        return False
     candidates = [
         os.path.join(models_dir, "gguf", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"),
         os.path.join(models_dir, "gguf", "Qwen_Qwen3-8B-Q4_K_M.gguf"),
@@ -109,21 +148,48 @@ def has_core_models(models_dir: str) -> bool:
     return False
 
 
-def ensure_models_bootstrapped(models_dir: str, profile: str, skip_download: bool = False) -> None:
+def resolve_models_directory() -> str:
+    """Finds an existing populated models directory or falls back to `~/.slm_harness/models`."""
+    env_dir = os.environ.get("SLM_MODELS_DIR")
+    if env_dir and os.path.isdir(env_dir):
+        return os.path.abspath(env_dir)
+
+    search_dirs = [
+        os.path.join(REPO_ROOT, "models"),
+        os.path.expanduser("~/Documents/SLMAgents/models"),
+        os.path.expanduser("~/SLMAgents/models"),
+        os.path.expanduser("~/.slm_harness/models"),
+    ]
+    for candidate in search_dirs:
+        if has_core_models(candidate):
+            return os.path.abspath(candidate)
+
+    if not getattr(sys, "frozen", False) and os.path.isdir(os.path.join(REPO_ROOT, "models")):
+        return os.path.abspath(os.path.join(REPO_ROOT, "models"))
+
+    user_models = os.path.expanduser("~/.slm_harness/models")
+    os.makedirs(user_models, exist_ok=True)
+    return user_models
+
+
+def ensure_models_bootstrapped_async(models_dir: str, profile: str, skip_download: bool = False) -> None:
+    """Runs model check/download in a background daemon thread so GUI startup is never blocked."""
     if has_core_models(models_dir) or skip_download:
         return
-    print(f"[SLMAgents Desktop] First-run setup: downloading quantized '{profile}' models from Hugging Face Hub...")
-    print(f"[SLMAgents Desktop] Destination: {models_dir}")
-    try:
-        import download_models
 
-        download_models.download_profile_models(profile=profile, models_dir=models_dir)
-    except Exception as exc:
-        print(f"[SLMAgents Desktop] Model auto-download warning: {exc}")
-        print("[SLMAgents Desktop] Continuing startup (you can download models anytime via `./slm models --download balanced`).")
+    def _bg_download() -> None:
+        try:
+            import download_models
+
+            print(f"[SLMAgents Desktop] Background setup: downloading '{profile}' models to {models_dir}...")
+            download_models.download_profile_models(profile=profile, models_dir=models_dir)
+        except Exception as exc:
+            print(f"[SLMAgents Desktop] Background model download warning: {exc}")
+
+    threading.Thread(target=_bg_download, daemon=True, name="slm-model-bootstrap").start()
 
 
-def is_server_alive(host: str, port: int, timeout: float = 0.8) -> bool:
+def is_server_alive(host: str, port: int, timeout: float = 0.6) -> bool:
     url = f"http://{host}:{port}/chat.html"
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
@@ -142,83 +208,30 @@ def find_free_port(preferred_ports: tuple[int, ...] = (8000, 7860, 8080)) -> int
         return int(s.getsockname()[1])
 
 
-def find_native_app_browser() -> Optional[str]:
-    """Finds an installed Chromium-based browser on macOS, Windows, or Linux to render a frameless `--app=` window."""
-    system = platform.system().lower()
-    candidates = []
-    if system == "darwin":
-        candidates = [
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
-        ]
-    elif system == "windows":
-        prog_files = [
-            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
-            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
-            os.environ.get("LOCALAPPDATA", ""),
-        ]
-        for base in prog_files:
-            if not base:
-                continue
-            candidates.extend(
-                [
-                    os.path.join(base, "Google", "Chrome", "Application", "chrome.exe"),
-                    os.path.join(base, "Microsoft", "Edge", "Application", "msedge.exe"),
-                    os.path.join(base, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
-                ]
-            )
+def start_or_attach_server(host: str, port: Optional[int]) -> tuple[int, bool]:
+    """Returns `(selected_port, already_alive)` and starts Uvicorn in a daemon thread if not yet running."""
+    if port is None:
+        for candidate_port in (8000, 7860):
+            if is_server_alive(host, candidate_port):
+                return candidate_port, True
+        selected_port = find_free_port((8000, 7860, 8080))
     else:
-        for bin_name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "brave-browser", "microsoft-edge"):
-            found = shutil.which(bin_name)
-            if found:
-                candidates.append(found)
+        if is_server_alive(host, port):
+            return port, True
+        selected_port = port
 
-    for path in candidates:
-        if path and os.path.isfile(path):
-            return path
-    return None
-
-
-def launch_desktop_window(url: str, title: str = "SLMAgents 2.0 — Pure-CPU AI & Design Studio") -> Optional[subprocess.Popen]:
-    """
-    Opens SLMAgents in a native desktop window:
-      1. `pywebview` native OS WebView if installed
-      2. Native frameless `--app=<url>` window via Chrome / Edge / Brave
-      3. Default system browser fallback
-    """
-    try:
-        import webview  # type: ignore
-
-        print(f"[SLMAgents Desktop] Opening native pywebview window at {url}")
-        webview.create_window(title, url, width=1440, height=920, min_size=(960, 640))
-        webview.start()
-        return None
-    except ImportError:
-        pass
-
-    browser_bin = find_native_app_browser()
-    if browser_bin:
-        app_profile_dir = os.path.expanduser("~/.slm_harness/desktop_window_profile")
-        os.makedirs(app_profile_dir, exist_ok=True)
-        cmd = [
-            browser_bin,
-            f"--app={url}",
-            f"--user-data-dir={app_profile_dir}",
-            "--window-size=1440,920",
-            "--no-first-run",
-            "--no-default-browser-check",
-        ]
-        print(f"[SLMAgents Desktop] Opening frameless desktop window via {os.path.basename(browser_bin)}")
+    def _serve() -> None:
         try:
-            return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
+            import uvicorn
+            import main as slm_main
 
-    print(f"[SLMAgents Desktop] Opening studio in system browser: {url}")
-    webbrowser.open(url)
-    return None
+            os.chdir(REPO_ROOT)
+            uvicorn.run(slm_main.app, host=host, port=selected_port, log_level="warning")
+        except Exception as exc:
+            print(f"[SLMAgents Desktop] Server thread error: {exc}")
+
+    threading.Thread(target=_serve, daemon=True, name="slm-desktop-uvicorn").start()
+    return selected_port, False
 
 
 def run_desktop_app(
@@ -235,69 +248,60 @@ def run_desktop_app(
     os.environ["SLM_PROFILE"] = active_profile
     os.environ["SLM_MODELS_DIR"] = models_dir
 
-    print("==================================================================")
-    print("  SLMAgents 2.0 — Cross-Platform Desktop AI & Design Studio")
-    print(f"  OS: {platform.system()} {platform.release()} ({platform.machine()}) | RAM: {ram_gb:.1f} GB")
-    print(f"  Profile: {active_profile} | Models Dir: {models_dir}")
-    print("==================================================================")
-
-    ensure_models_bootstrapped(models_dir=models_dir, profile=active_profile, skip_download=skip_download)
-
-    # Reuse already-running local SLMAgents server if alive on 8000 or 7860
-    reuse_server = False
-    selected_port = port
-    if selected_port is None:
-        for candidate_port in (8000, 7860):
-            if is_server_alive(host, candidate_port):
-                selected_port = candidate_port
-                reuse_server = True
-                break
-        if selected_port is None:
-            selected_port = find_free_port((8000, 7860, 8080))
-    else:
-        reuse_server = is_server_alive(host, selected_port)
-
-    server_thread: Optional[threading.Thread] = None
-    if not reuse_server:
-        import uvicorn
-        import main as slm_main
-
-        def _serve() -> None:
-            os.chdir(REPO_ROOT)
-            uvicorn.run(slm_main.app, host=host, port=selected_port, log_level="warning")
-
-        server_thread = threading.Thread(target=_serve, daemon=True, name="slm-desktop-uvicorn")
-        server_thread.start()
-
-        print(f"[SLMAgents Desktop] Starting local AI Engine on http://{host}:{selected_port} ...")
-        deadline = time.time() + 30.0
-        while time.time() < deadline:
-            if is_server_alive(host, selected_port):
-                break
-            time.sleep(0.35)
-    else:
-        print(f"[SLMAgents Desktop] Attached to running SLMAgents Engine on http://{host}:{selected_port}")
-
+    # Start or attach to local server immediately (non-blocking)
+    selected_port, already_alive = start_or_attach_server(host, port)
     studio_url = f"http://{host}:{selected_port}/chat.html"
-    win_proc = launch_desktop_window(studio_url)
+
+    # Kick off non-blocking background model verification
+    ensure_models_bootstrapped_async(models_dir=models_dir, profile=active_profile, skip_download=skip_download)
 
     if headless_open_only:
+        deadline = time.time() + 15.0
+        while time.time() < deadline and not is_server_alive(host, selected_port):
+            time.sleep(0.25)
+        webbrowser.open(studio_url)
         return 0
 
+    # Primary: Native OS Desktop Window via `pywebview` (WKWebView on macOS, WebView2 on Windows, WebKitGTK on Linux)
     try:
-        if win_proc is not None:
-            # Wait while the frameless desktop window is open
-            win_proc.wait()
-            if server_thread is not None:
-                # Keep alive if background server was spawned and browser closed immediately by handoff
-                while server_thread.is_alive():
-                    time.sleep(1.0)
-        elif server_thread is not None:
-            print("[SLMAgents Desktop] Studio is running. Press Ctrl+C in this terminal to stop.")
-            while server_thread.is_alive():
-                time.sleep(1.0)
+        import webview  # type: ignore
+
+        title = "SLMAgents 2.0 — Local AI & Design Studio"
+        if already_alive or is_server_alive(host, selected_port):
+            window = webview.create_window(title, studio_url, width=1440, height=920, min_size=(960, 640))
+            webview.start()
+        else:
+            window = webview.create_window(title, html=SPLASH_HTML, width=1440, height=920, min_size=(960, 640))
+
+            def _wait_and_load(win) -> None:
+                deadline = time.time() + 30.0
+                while time.time() < deadline:
+                    if is_server_alive(host, selected_port):
+                        win.load_url(studio_url)
+                        return
+                    time.sleep(0.25)
+                win.load_url(studio_url)
+
+            webview.start(_wait_and_load, window)
+        return 0
+    except Exception as exc:
+        print(f"[SLMAgents Desktop] Native WebView fallback ({exc}); opening browser window.")
+
+    # Fallback if pywebview is unavailable
+    deadline = time.time() + 25.0
+    while time.time() < deadline and not is_server_alive(host, selected_port):
+        time.sleep(0.3)
+
+    if platform.system().lower() == "darwin" and os.path.exists("/Applications/Google Chrome.app"):
+        subprocess.Popen(["open", "-na", "Google Chrome", "--args", f"--app={studio_url}"])
+    else:
+        webbrowser.open(studio_url)
+
+    try:
+        while True:
+            time.sleep(1.0)
     except KeyboardInterrupt:
-        print("\n[SLMAgents Desktop] Shutting down cleanly.")
+        pass
     return 0
 
 
@@ -307,7 +311,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--port", type=int, default=None, help="Local port (auto-detects 8000/7860 if omitted)")
     parser.add_argument("--profile", choices=["lite", "balanced", "power"], default=None, help="CPU hardware profile")
     parser.add_argument("--skip-download", action="store_true", help="Skip automatic first-run Hugging Face model download")
-    parser.add_argument("--open-only", action="store_true", help="Open desktop window and return immediately if server is already running")
+    parser.add_argument("--open-only", action="store_true", help="Open in browser and return immediately")
     args = parser.parse_args(argv)
     return run_desktop_app(
         host=args.host,

@@ -3520,6 +3520,33 @@ async def download_desktop_installer(target_id: str):
         headers={"Content-Disposition": f'attachment; filename="{entry["filename"]}"'},
     )
 
+
+@app.post("/api/installers/install-local")
+async def install_and_launch_local_desktop_app():
+    """Installs `dist/SLMAgents.app` directly to `/Applications/SLMAgents.app` (macOS), strips Gatekeeper quarantine, and launches it."""
+    import platform
+    import shutil
+    import subprocess
+
+    if platform.system().lower() != "darwin":
+        return {"status": "unsupported", "message": "Direct local install is for macOS; please download the installer for your OS."}
+
+    app_src = os.path.join(BASE_DIR, "dist", "SLMAgents.app")
+    target_app = "/Applications/SLMAgents.app"
+    try:
+        if os.path.exists(app_src):
+            if os.path.exists(target_app):
+                shutil.rmtree(target_app)
+            shutil.copytree(app_src, target_app, symlinks=True)
+            subprocess.run(["xattr", "-cr", target_app], check=False)
+            subprocess.run(["codesign", "--force", "--deep", "--sign", "-", target_app], check=False)
+        if os.path.exists(target_app):
+            subprocess.Popen(["open", target_app])
+            return {"status": "ok", "installed_to": target_app}
+        return {"status": "error", "message": "dist/SLMAgents.app not found."}
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
+
 if app is not None:
     try:
         from slm_harness.surfaces.api_server import mount_harness_routes
