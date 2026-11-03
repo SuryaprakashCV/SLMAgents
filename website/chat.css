@@ -1048,31 +1048,29 @@ html.desktop-app-mode .chat-app-container {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid #f1f5f9;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 4px;
 }
 
 .btn-ghost-action {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
-  border-radius: 7px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #475569;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #64748b;
   font-size: 0.73rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.14s ease;
 }
 
 .btn-ghost-action:hover {
   background: #f1f5f9;
   color: #0f172a;
-  border-color: #cbd5e1;
 }
 
 /* Attachments */
@@ -2704,9 +2702,6 @@ html.desktop-app-mode .chat-app-container {
 }
 
 @media (max-width: 1024px) {
-  .harness-profile-bar {
-    display: none;
-  }
   .harness-inspector-drawer {
     position: fixed;
     right: 0;
@@ -2714,4 +2709,168 @@ html.desktop-app-mode .chat-app-container {
     max-width: 92vw;
     box-shadow: -8px 0 24px rgba(15, 23, 42, 0.14);
   }
+}
+
+/* --- On-Demand Compact Popovers (Top Workspace, Composer Options, Message More) --- */
+
+.top-workspace-menu-wrap,
+.msg-more-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.top-workspace-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 1200;
+}
+
+.top-workspace-popover .harness-profile-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 2px 0 4px 0;
+  background: transparent;
+  border: none;
+}
+
+.top-workspace-popover .harness-select {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.popover-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  padding: 4px 8px 2px 8px;
+}
+
+.popover-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 4px 0;
+}
+
+.popover-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #334155;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.popover-menu-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.composer-options-popover {
+  width: 100%;
+  max-width: 440px;
+  align-self: flex-start;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1100;
+}
+
+.composer-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.composer-popover-actions {
+  justify-content: flex-start;
+  padding-top: 6px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.composer-popover-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.btn-composer-tune.active {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.msg-more-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: 220px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  padding: 8px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 1150;
+}
+
+.msg-export-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  padding: 4px 4px 2px 4px;
+}
+
+.btn-export-chip {
+  padding: 5px 0;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-export-chip:hover {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
 }

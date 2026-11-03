@@ -2811,56 +2811,58 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
       body.appendChild(citeRow);
     }
 
-    // Ghost Actions
+    // Compact On-Demand Ghost Actions (Copy, Listen, and More/Export Popover)
     const actionRow = document.createElement("div");
     actionRow.className = "chat-msg-actions";
     const encoded = encodeURIComponent(cleanedText);
     const safeAgent = (routedAgent || "SLM Agents").replace(/'/g, "\\'");
-    const traceBtnHtml = (meta && meta.run_id)
-      ? `<button class="btn-ghost-action" onclick="inspectRunTrace('${meta.run_id}')" title="View 10-Plane Waterfall Span Trace">
+    const traceMenuItemHtml = (meta && meta.run_id)
+      ? `<button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); inspectRunTrace('${meta.run_id}')" title="View 10-Plane Waterfall Span Trace">
            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
            <span>Waterfall Trace</span>
          </button>`
       : "";
     const safeEncoded = encoded.replace(/'/g, "\\'");
     actionRow.innerHTML = `
-      <button class="btn-ghost-action" onclick="copyMsgText(this, decodeURIComponent('${safeEncoded}'))" title="Copy response">
+      <button type="button" class="btn-ghost-action" onclick="copyMsgText(this, decodeURIComponent('${safeEncoded}'))" title="Copy response">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
         <span>Copy</span>
       </button>
-      <button class="btn-ghost-action" onclick="exportAssistantMessage('pdf', decodeURIComponent('${safeEncoded}'), null, this)" title="Download as PDF (.pdf)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        <span>PDF</span>
-      </button>
-      <button class="btn-ghost-action" onclick="exportAssistantMessage('docx', decodeURIComponent('${safeEncoded}'), null, this)" title="Download as Word (.docx)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-        <span>DOCX</span>
-      </button>
-      <select class="msg-export-select" onchange="if(this.value){exportAssistantMessage(this.value, decodeURIComponent('${safeEncoded}'), null, this); this.value='';}" title="Download response in any file format">
-        <option value="">Export Format...</option>
-        <option value="pdf">PDF Document (.pdf)</option>
-        <option value="docx">Word Document (.docx)</option>
-        <option value="xlsx">Excel Workbook (.xlsx)</option>
-        <option value="csv">CSV Table (.csv)</option>
-        <option value="pptx">PowerPoint Deck (.pptx)</option>
-        <option value="md">Markdown (.md)</option>
-        <option value="html">HTML Page (.html)</option>
-        <option value="json">JSON Data (.json)</option>
-        <option value="txt">Plain Text (.txt)</option>
-      </select>
-      <button class="btn-ghost-action" onclick="playMessageSpeech('${safeEncoded}', this)" title="Listen to response">
+      <button type="button" class="btn-ghost-action" onclick="playMessageSpeech('${safeEncoded}', this)" title="Listen to response">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
         <span>Listen</span>
       </button>
-      ${traceBtnHtml}
-      <button class="btn-ghost-action" onclick="saveResponseAsSkill(decodeURIComponent('${safeEncoded}'), '${safeAgent}', this)" title="Save this workflow as a reusable SKILL.md in .slm/skills/">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-        <span>Save as Skill</span>
-      </button>
-      <button class="btn-ghost-action" onclick="openCreateIssueModal('${safeEncoded}', '${safeAgent}')" title="Create GitHub Issue from this response">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-        <span>Create Issue</span>
-      </button>
+      <div class="msg-more-menu-wrap">
+        <button type="button" class="btn-ghost-action btn-msg-more" onclick="toggleMsgMoreMenu(this, event)" title="Export, Save as Skill, or More Actions">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="1.5"></circle>
+            <circle cx="19" cy="12" r="1.5"></circle>
+            <circle cx="5" cy="12" r="1.5"></circle>
+          </svg>
+          <span>More</span>
+        </button>
+        <div class="msg-more-popover" style="display: none;" onclick="event.stopPropagation()">
+          <div class="popover-section-label">Export Response</div>
+          <div class="msg-export-quick-grid">
+            <button type="button" class="btn-export-chip" onclick="closeAllFloatingPopovers(); exportAssistantMessage('pdf', decodeURIComponent('${safeEncoded}'), null, this)">PDF</button>
+            <button type="button" class="btn-export-chip" onclick="closeAllFloatingPopovers(); exportAssistantMessage('docx', decodeURIComponent('${safeEncoded}'), null, this)">DOCX</button>
+            <button type="button" class="btn-export-chip" onclick="closeAllFloatingPopovers(); exportAssistantMessage('pptx', decodeURIComponent('${safeEncoded}'), null, this)">PPTX</button>
+            <button type="button" class="btn-export-chip" onclick="closeAllFloatingPopovers(); exportAssistantMessage('xlsx', decodeURIComponent('${safeEncoded}'), null, this)">XLSX</button>
+            <button type="button" class="btn-export-chip" onclick="closeAllFloatingPopovers(); exportAssistantMessage('md', decodeURIComponent('${safeEncoded}'), null, this)">MD</button>
+            <button type="button" class="btn-export-chip" onclick="closeAllFloatingPopovers(); exportAssistantMessage('html', decodeURIComponent('${safeEncoded}'), null, this)">HTML</button>
+          </div>
+          <div class="popover-divider"></div>
+          ${traceMenuItemHtml}
+          <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); saveResponseAsSkill(decodeURIComponent('${safeEncoded}'), '${safeAgent}', this)" title="Save this workflow as a reusable SKILL.md in .slm/skills/">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            <span>Save as Skill</span>
+          </button>
+          <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openCreateIssueModal('${safeEncoded}', '${safeAgent}')" title="Report Issue from this response">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>Report Issue</span>
+          </button>
+        </div>
+      </div>
     `;
     body.appendChild(actionRow);
     row.appendChild(body);
@@ -2872,6 +2874,54 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
     viewport.scrollTop = viewport.scrollHeight;
   }
 }
+
+window.closeAllFloatingPopovers = function(exceptEl) {
+  const topPop = document.getElementById("top-workspace-popover");
+  if (topPop && topPop !== exceptEl) topPop.style.display = "none";
+  const compPop = document.getElementById("composer-options-popover");
+  if (compPop && compPop !== exceptEl) compPop.style.display = "none";
+  const compBtn = document.getElementById("btn-composer-options");
+  if (compBtn && (!compPop || compPop.style.display === "none")) compBtn.classList.remove("active");
+  document.querySelectorAll(".msg-more-popover").forEach(el => {
+    if (el !== exceptEl) el.style.display = "none";
+  });
+};
+
+window.toggleTopWorkspaceMenu = function(event) {
+  if (event) event.stopPropagation();
+  const pop = document.getElementById("top-workspace-popover");
+  if (!pop) return;
+  const isOpen = pop.style.display !== "none";
+  window.closeAllFloatingPopovers(pop);
+  pop.style.display = isOpen ? "none" : "flex";
+};
+
+window.toggleComposerOptionsPopover = function(event) {
+  if (event) event.stopPropagation();
+  const pop = document.getElementById("composer-options-popover");
+  const btn = document.getElementById("btn-composer-options");
+  if (!pop) return;
+  const isOpen = pop.style.display !== "none";
+  window.closeAllFloatingPopovers(pop);
+  pop.style.display = isOpen ? "none" : "flex";
+  if (btn) btn.classList.toggle("active", !isOpen);
+};
+
+window.toggleMsgMoreMenu = function(btnEl, event) {
+  if (event) event.stopPropagation();
+  const wrap = btnEl ? btnEl.closest(".msg-more-menu-wrap") : null;
+  const pop = wrap ? wrap.querySelector(".msg-more-popover") : null;
+  if (!pop) return;
+  const isOpen = pop.style.display !== "none";
+  window.closeAllFloatingPopovers(pop);
+  pop.style.display = isOpen ? "none" : "flex";
+};
+
+document.addEventListener("click", function() {
+  if (typeof window.closeAllFloatingPopovers === "function") {
+    window.closeAllFloatingPopovers();
+  }
+});
 
 window.copyMsgText = function(btn, text) {
   navigator.clipboard.writeText(text).then(() => {

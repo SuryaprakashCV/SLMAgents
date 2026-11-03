@@ -134,6 +134,17 @@ def fetch_newest_remote_commit(timeout: float = 3.5) -> Optional[Dict[str, Any]]
 
 
 def check_for_updates(repo_dir: Optional[str] = None, timeout: float = 3.5) -> Dict[str, Any]:
+    if os.environ.get("SPACE_ID"):
+        return {
+            "status": "ok",
+            "update_available": False,
+            "central_repo": DEFAULT_CENTRAL_REPO,
+            "branch": DEFAULT_CENTRAL_BRANCH,
+            "local_sha": "hf-space",
+            "remote_sha": "hf-space",
+            "message": "Managed by Hugging Face Space container.",
+            "auto_sync_enabled": False,
+        }
     state = read_sync_state(repo_dir)
     remote = fetch_newest_remote_commit(timeout=timeout)
     git_sha = get_local_git_sha(repo_dir) if repo_dir else None
