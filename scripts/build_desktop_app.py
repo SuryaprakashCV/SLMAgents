@@ -290,6 +290,12 @@ def build_pyinstaller_frozen_bundle() -> str:
                 dest_p = os.path.join(staging_dir, rel_w)
                 os.makedirs(os.path.dirname(dest_p), exist_ok=True)
                 shutil.copy2(abs_p, dest_p)
+                if fn == "chat.html":
+                    with open(dest_p, "r", encoding="utf-8") as cf:
+                        html_txt = cf.read()
+                    html_txt = html_txt.replace('<html lang="en">', '<html lang="en" class="desktop-app-mode">')
+                    with open(dest_p, "w", encoding="utf-8") as cf:
+                        cf.write(html_txt)
 
         add_data_args = [
             f"--add-data={staged_website}{os.pathsep}website",

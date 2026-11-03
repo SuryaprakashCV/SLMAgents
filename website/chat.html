@@ -45,6 +45,37 @@
     }
   }
   </script>
+  <style>
+    html.desktop-app-mode .web-only-nav,
+    html.desktop-app-mode .btn-top-github-issue {
+      display: none !important;
+    }
+  </style>
+  <script>
+    (function() {
+      function enableDesktopMode() {
+        document.documentElement.classList.add('desktop-app-mode');
+        var brand = document.getElementById('sidebar-brand-link');
+        if (brand) {
+          brand.setAttribute('href', '#');
+          brand.setAttribute('title', 'SLM Agents Chat Studio');
+          brand.onclick = function(e) {
+            e.preventDefault();
+            if (typeof createNewChatSession === 'function') createNewChatSession();
+            return false;
+          };
+        }
+      }
+      var ua = navigator.userAgent || '';
+      var isNativeWebView = !!(window.webkit && window.webkit.messageHandlers) ||
+                            (!/Chrome|CriOS|Firefox|FxiOS|Edg|OPR/i.test(ua) && !/Version\/[\d.]+.*Safari/i.test(ua));
+      if (window.location.search.indexOf('desktop=1') !== -1 || !!window.pywebview || isNativeWebView) {
+        enableDesktopMode();
+        document.addEventListener('DOMContentLoaded', enableDesktopMode);
+      }
+      window.addEventListener('pywebviewready', enableDesktopMode);
+    })();
+  </script>
 </head>
 <body class="chat-page-body chat-light-theme">
 

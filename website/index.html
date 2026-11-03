@@ -2,27 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <script>
+    (function() {
+      var ua = navigator.userAgent || '';
+      var isDesktopApp = window.location.search.indexOf('desktop=1') !== -1 ||
+                         !!window.pywebview ||
+                         !!(window.webkit && window.webkit.messageHandlers) ||
+                         (!/Chrome|CriOS|Firefox|FxiOS|Edg|OPR/i.test(ua) && !/Version\/[\d.]+.*Safari/i.test(ua));
+      if (isDesktopApp) {
+        window.location.replace('chat.html?desktop=1');
+      }
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Open source collection of lightweight, specialized Small Language Model (SLM) agents running 100% locally and offline on standard CPUs with ONNX Runtime.">
+  <meta name="description" content="SLMAgents 2.0: 10-Plane Pure-CPU Local AI Agent Harness (slm_harness) and 26 specialized agents. Run offline RAG, Text-to-SQL, Code Interpreter, and Vision on standard CPUs with standalone installers for macOS, Windows, and Linux.">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.slmagents.ai/">
-  <meta property="og:title" content="SLMAgents: Privacy-First Small Language Model Ecosystem for Standard CPUs">
-  <meta property="og:description" content="Open source collection of lightweight, specialized Small Language Model (SLM) agents running 100% locally and offline on standard CPUs with ONNX Runtime.">
+  <meta property="og:title" content="SLMAgents 2.0: 10-Plane Pure-CPU Local AI Agent Harness & Standalone OS Installers">
+  <meta property="og:description" content="Run 26 specialized Small Language Model (SLM) agents 100% offline on standard CPUs via the 10-Plane Agent Harness (slm_harness) with individual installers for macOS, Windows, and Linux.">
   <meta property="og:image" content="https://www.slmagents.ai/assets/preview.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://www.slmagents.ai/">
-  <meta property="twitter:title" content="Open Source SLM Agents Community: Privacy-First AI for CPUs">
-  <meta property="twitter:description" content="Build and run secure, private, and lightweight AI agent workflows locally on standard CPUs using Small Language Models (SLMs) with zero API costs.">
+  <meta property="twitter:title" content="SLMAgents 2.0: 10-Plane Pure-CPU Local AI Agent Harness">
+  <meta property="twitter:description" content="Sub-35ms 4-Stage Cascade Router, Watermark LRU MemoryArena, GBNF Grammar Decoding, Deterministic Verifiers, and Standalone OS Installers for macOS, Windows, and Linux.">
   <meta property="twitter:image" content="https://www.slmagents.ai/assets/preview.png">
 
   <!-- Canonical Link -->
   <link rel="canonical" href="https://www.slmagents.ai/">
 
-  <title>SLMAgents: Privacy-First Small Language Model Ecosystem for Standard CPUs</title>
+  <title>SLMAgents 2.0: 10-Plane Pure-CPU Local AI Agent Harness &amp; 26 Specialized Agents</title>
   <link rel="stylesheet" href="style.css?v=18.0">
 
   <!-- Embedded High-Priority Showcase Styles -->
@@ -537,21 +549,27 @@
       <section class="hero">
         <div class="hero-badge">
             <span style="display:inline-block; width:8px; height:8px; background:#10b981; border-radius:50%; margin-right:6px; box-shadow:0 0 8px #10b981;"></span>
-            <span>100% CPU-Based AI Frameworks • Zero API Costs</span>
+            <span>SLMAgents 2.0 • 10-Plane Pure-CPU Agent Harness • Standalone OS Installers</span>
           </div>
-          <h1>Build Local AI Agent Workflows<br><span style="background: linear-gradient(135deg, #a78bfa 0%, #38bdf8 50%, #34d399 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">On Any Standard CPU</span></h1>
+          <h1>26 Specialized Local AI Agents on a<br><span style="background: linear-gradient(135deg, #4f46e5 0%, #0284c7 50%, #059669 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">10-Plane Pure-CPU Agent Harness</span></h1>
           <p>
-            Sub-billion parameter local agents engineered for speed, privacy, and zero network latency. Run offline multi-agent routing, RAG retrieval, SQL generation, and voice synthesis on Apple Silicon, Intel, or AMD CPUs.
+            Beyond single-model wrappers: <strong>SLMAgents 2.0</strong> pairs 26 domain-specialized agents with a deterministic <strong>10-Plane Pure-CPU Agent Harness (<code>slm_harness</code>)</strong> — featuring a <strong>&lt;35ms 4-Stage Cascade Router</strong>, <strong>Watermark LRU <code>MemoryArena</code></strong> (<code>lite</code> 2.6 GB / <code>balanced</code> 4.7 GB / <code>power</code> 8.2 GB), <strong>Hybrid CPU Execution</strong> (<code>llama.cpp</code> GGUF <code>Q4_K_M</code> + Quantized INT4/INT8 CPU), <strong>GBNF Grammar Decoding</strong>, <strong>Deterministic Self-Healing Verifiers</strong>, and <strong>Individual Standalone Installers for macOS, Windows, and Linux</strong>.
           </p>
           <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 1.25rem;">
             <button type="button" onclick="openDownloadModal()" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; background: #4f46e5; color: #ffffff; border: 1px solid #4338ca; border-radius: 30px; font-size: 0.94rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);">
               <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
               </svg>
-              Download Standalone Desktop App (v2.0)
+              Download Harness Installers (macOS / Win / Linux)
             </button>
             <a href="chat.html" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; background: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 30px; font-size: 0.94rem; font-weight: 700; text-decoration: none;">
               Open Web AI Studio &rarr;
+            </a>
+            <a href="#os-installers" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 30px; font-size: 0.94rem; font-weight: 700; text-decoration: none;">
+              📦 Individual OS Installers &amp; 10-Plane Spec
+            </a>
+            <a href="harness_blog.html" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; background: #f8fafc; color: #4f46e5; border: 1px solid #c7d2fe; border-radius: 30px; font-size: 0.92rem; font-weight: 700; text-decoration: none;">
+              📖 Read 2.0 Architecture Blog
             </a>
           </div>
       </section>
@@ -563,29 +581,136 @@
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
             </svg>
-            ONNX Runtime GenAI
+            10-Plane Pure-CPU Agent Harness
           </h3>
-          <p>Highly-optimized cross-platform CPU execution. Leverage hardware acceleration on Apple Silicon (ARM64), Intel, and AMD standard setups.</p>
+          <p>Replaces monolithic single-model wrappers with a 10-plane runtime (<code>slm_harness</code>): <strong>&lt;35ms 4-Stage Cascade Router</strong>, <strong>GBNF JSON-Schema Decoding</strong>, <strong>Deterministic Self-Healing Verifiers</strong> (AST, SQLite EXPLAIN, SymPy, Citations), and self-improving <code>.slm/skills/</code> procedural memory.</p>
         </div>
         <div class="feature-summary-card">
           <h3>
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
             </svg>
-            Shared Model Cache
+            Watermark LRU MemoryArena &amp; Hybrid CPU
           </h3>
-          <p>All framework agents share a single local cache folder (`~/.cache/slm_summarizer/`). Running all libraries requires only ~1.1 GB disk space.</p>
+          <p>Runs <code>llama.cpp</code> GGUF (<code>Q4_K_M</code>) + quantized INT4/INT8 CPU sessions inside a strict Watermark LRU <code>MemoryArena</code> with 3 hardware profiles: <strong><code>lite</code> (2.6 GB)</strong>, <strong><code>balanced</code> (4.7 GB)</strong>, and <strong><code>power</code> (8.2 GB)</strong> with P-core thread affinity.</p>
         </div>
         <div class="feature-summary-card">
           <h3>
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
             </svg>
-            Permissive & Open Source
+            Individual OS Installers &amp; Surfaces
           </h3>
-          <p>Built for privacy-first enterprise workflows. 100% offline edge inference with zero cloud data transmission and complete local data privacy.</p>
+          <p>Download standalone installers for <strong>macOS (<code>.dmg</code> &amp; <code>.pkg</code>)</strong>, <strong>Windows 10/11 (<code>.bat</code>)</strong>, and <strong>Linux (<code>.run</code>)</strong> — or download lightweight <strong>per-agent Harness installers</strong> for any of the 26 agents, plus <code>./slm</code> CLI TUI, OpenAI <code>/v1</code>, and MCP server.</p>
         </div>
       </div>
+
+      <!-- Standalone Harness Installers for All OSes + 10-Plane Architecture Section -->
+      <section id="os-installers" style="max-width: 1120px; margin: 0 auto 2.75rem auto; padding: 1.75rem; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 1.25rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem;">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 8px; background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; padding: 4px 12px; border-radius: 20px; font-size: 0.76rem; font-weight: 800; margin-bottom: 6px;">
+              <span>📦 ZERO-DEPENDENCY STANDALONE HARNESS INSTALLERS</span>
+            </div>
+            <h2 style="margin: 0; font-size: 1.55rem; color: #0f172a; font-weight: 800;">Individual Harness Installers for All Operating Systems</h2>
+            <p style="margin: 4px 0 0 0; font-size: 0.92rem; color: #475569;">
+              Download the full <strong>SLMAgents 2.0 Studio &amp; 10-Plane Harness</strong> for your OS below, or download a <strong>lightweight per-agent Harness installer</strong> on any of the 26 agent documentation pages. Zero pre-installed Python required.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 5px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; font-family: 'JetBrains Mono', monospace;">v2.0.0 • Pure-CPU</span>
+            <a href="harness_blog.html" style="font-size: 0.84rem; font-weight: 700; color: #4f46e5; text-decoration: none;">10-Plane Deep Dive &rarr;</a>
+          </div>
+        </div>
+
+        <!-- 4 Full OS Installers Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 1.5rem;">
+          <!-- macOS DMG -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 0.75rem; font-weight: 800; color: #4f46e5; background: #eef2ff; border: 1px solid #c7d2fe; padding: 2px 9px; border-radius: 12px;">🍎 macOS (.dmg)</span>
+                <span style="font-size: 0.74rem; color: #64748b; font-family: 'JetBrains Mono', monospace; font-weight: 700;">281 MB</span>
+              </div>
+              <h3 style="margin: 0 0 6px 0; font-size: 1.02rem; color: #0f172a; font-weight: 800;">macOS Disk Image</h3>
+              <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #475569; line-height: 1.45;">Apple Silicon (M1–M4) &amp; Intel • Drag to <code>/Applications</code> • Bundled Python 3.11 + C Runtimes + 10-Plane Harness.</p>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <a href="/api/installers/download/macos-dmg" download="SLMAgents-2.0-macOS-Installer.dmg" style="flex: 1; text-align: center; padding: 8px 10px; background: #4f46e5; color: #ffffff; border-radius: 8px; font-size: 0.82rem; font-weight: 700; text-decoration: none;">⬇ Download .dmg</a>
+              <a href="/api/installers/download/agent-macos?agent=harness" download="SLMAgents-2.0-CORE-Harness-macOS.command" title="Lightweight CLI Harness Installer (.command)" style="padding: 8px 10px; background: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.78rem; font-weight: 700; text-decoration: none;">CLI .command</a>
+            </div>
+          </div>
+
+          <!-- macOS PKG -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 0.75rem; font-weight: 800; color: #0f172a; background: #e2e8f0; padding: 2px 9px; border-radius: 12px;">🍎 macOS (.pkg)</span>
+                <span style="font-size: 0.74rem; color: #64748b; font-family: 'JetBrains Mono', monospace; font-weight: 700;">236 MB</span>
+              </div>
+              <h3 style="margin: 0 0 6px 0; font-size: 1.02rem; color: #0f172a; font-weight: 800;">macOS Wizard Package</h3>
+              <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #475569; line-height: 1.45;">Native macOS Installer Wizard • Installs directly to <code>/Applications/SLMAgents.app</code> and clears Gatekeeper quarantine.</p>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <a href="/api/installers/download/macos-pkg" download="SLMAgents-2.0-macOS-Installer.pkg" style="flex: 1; text-align: center; padding: 8px 10px; background: #0f172a; color: #ffffff; border-radius: 8px; font-size: 0.82rem; font-weight: 700; text-decoration: none;">⬇ Download .pkg</a>
+              <button type="button" onclick="installAndOpenMacApp(this)" style="padding: 8px 10px; background: #10b981; color: #ffffff; border: none; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">1-Click Open</button>
+            </div>
+          </div>
+
+          <!-- Windows BAT -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 0.75rem; font-weight: 800; color: #0284c7; background: #e0f2fe; border: 1px solid #bae6fd; padding: 2px 9px; border-radius: 12px;">🪟 Windows 10/11 (.bat)</span>
+                <span style="font-size: 0.74rem; color: #64748b; font-family: 'JetBrains Mono', monospace; font-weight: 700;">3.7 MB</span>
+              </div>
+              <h3 style="margin: 0 0 6px 0; font-size: 1.02rem; color: #0f172a; font-weight: 800;">Windows Standalone</h3>
+              <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #475569; line-height: 1.45;">Self-extracting 64-bit Windows installer • Auto-provisions Portable Python 3.11 + 10-Plane Harness + Desktop Shortcut.</p>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <a href="/api/installers/download/windows" download="SLMAgents-2.0-Windows-Installer.bat" style="flex: 1; text-align: center; padding: 8px 10px; background: #0284c7; color: #ffffff; border-radius: 8px; font-size: 0.82rem; font-weight: 700; text-decoration: none;">⬇ Download .bat</a>
+              <a href="/api/installers/download/agent-windows?agent=harness" download="SLMAgents-2.0-CORE-Harness-Windows.bat" title="Lightweight CLI Harness Installer (.bat)" style="padding: 8px 10px; background: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.78rem; font-weight: 700; text-decoration: none;">CLI .bat</a>
+            </div>
+          </div>
+
+          <!-- Linux RUN -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 0.75rem; font-weight: 800; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 2px 9px; border-radius: 12px;">🐧 Linux (.run)</span>
+                <span style="font-size: 0.74rem; color: #64748b; font-family: 'JetBrains Mono', monospace; font-weight: 700;">3.4 MB</span>
+              </div>
+              <h3 style="margin: 0 0 6px 0; font-size: 1.02rem; color: #0f172a; font-weight: 800;">Linux Self-Extracting</h3>
+              <p style="margin: 0 0 12px 0; font-size: 0.82rem; color: #475569; line-height: 1.45;">Ubuntu / Debian / Fedora (x86_64 &amp; ARM64) • Single-file executable <code>.run</code> binary with desktop &amp; CLI launcher.</p>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <a href="/api/installers/download/linux" download="SLMAgents-2.0-Linux-Installer.run" style="flex: 1; text-align: center; padding: 8px 10px; background: #059669; color: #ffffff; border-radius: 8px; font-size: 0.82rem; font-weight: 700; text-decoration: none;">⬇ Download .run</a>
+              <a href="/api/installers/download/agent-linux?agent=harness" download="SLMAgents-2.0-CORE-Harness-Linux.run" title="Lightweight CLI Harness Installer (.run)" style="padding: 8px 10px; background: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.78rem; font-weight: 700; text-decoration: none;">CLI .run</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 10-Plane Architecture Summary Grid -->
+        <div id="harness-architecture" style="background: #0f172a; border-radius: 14px; padding: 18px 20px; color: #f8fafc;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #34d399;"></span>
+              <strong style="font-size: 0.95rem; color: #ffffff;">Inside <code>slm_harness</code>: The 10-Plane Pure-CPU Architecture &amp; CLI Quickstart</strong>
+            </div>
+            <code style="font-size: 0.78rem; color: #38bdf8; background: #1e293b; padding: 4px 10px; border-radius: 6px;">./slm doctor &nbsp;|&nbsp; ./slm chat &nbsp;|&nbsp; ./slm ask "..." &nbsp;|&nbsp; ./slm serve</code>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 0.79rem; line-height: 1.45;">
+            <div style="background: #1e293b; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;"><strong style="color: #a78bfa;">Plane 1 • Execution Kernel</strong><br><span style="color: #cbd5e1;">Explicit State Machine (<code>INTAKE → ROUTE → EXECUTE → VERIFY</code>) &amp; loop guard</span></div>
+            <div style="background: #1e293b; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;"><strong style="color: #38bdf8;">Plane 2 • Hybrid CPU Runtime</strong><br><span style="color: #cbd5e1;"><code>llama.cpp</code> GGUF (<code>Q4_K_M</code>) + INT4/INT8 CPU &amp; GBNF JSON-Schema grammar</span></div>
+            <div style="background: #1e293b; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;"><strong style="color: #34d399;">Plane 3 • Context Compiler</strong><br><span style="color: #cbd5e1;">4-Tier Cache-Stable Prompt Prefix &amp; pointer-based Artifact Scratchpad</span></div>
+            <div style="background: #1e293b; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;"><strong style="color: #fbbf24;">Plane 4 • Hybrid Memory</strong><br><span style="color: #cbd5e1;">SQLite FTS5 BM25 + HNSW + RRF fusion, Blackboard &amp; branchable Session Tree</span></div>
+            <div style="background: #1e293b; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;"><strong style="color: #f472b6;">Plane 5 • MemoryArena</strong><br><span style="color: #cbd5e1;">Watermark LRU eviction across <code>lite</code> (2.6G), <code>balanced</code> (4.7G), <code>power</code> (8.2G)</span></div>
+            <div style="background: #1e293b; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;"><strong style="color: #60a5fa;">Plane 6 • &lt;35ms CascadeRouter</strong><br><span style="color: #cbd5e1;">4-stage calibrated router across all 26 agents + <code>.slm/skills/</code> loader</span></div>
+            <div style="background: #1e293b; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;"><strong style="color: #4ade80;">Plane 7 • Self-Healing Verifiers</strong><br><span style="color: #cbd5e1;">AST &amp; subprocess verifier, SQLite EXPLAIN, SymPy solver &amp; RAG citation check</span></div>
+            <div style="background: #1e293b; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;"><strong style="color: #f87171;">Planes 8–10 • Tools, Policy &amp; Trace</strong><br><span style="color: #cbd5e1;">Sandboxed tools, MCP bridge, capability policy, PII redaction &amp; JSONL traces</span></div>
+          </div>
+        </div>
+      </section>
 
       <!-- Live Interactive Execution Showcases -->
       <section class="showcase-section" id="showcases">
@@ -609,16 +734,16 @@
           <div class="showcase-chat-header">
             <div class="showcase-agent-pill">
               <span style="display:inline-block; width:8px; height:8px; background:#10b981; border-radius:50%; box-shadow:0 0 8px #10b981;"></span>
-              <span id="showcase-title">SLMCodeInterpreter • Live CPU Python Sandbox</span>
+              <span id="showcase-title">SLMCodeInterpreter • 10-Plane Harness (Plane 7 AST + Sandbox Verifier)</span>
             </div>
             <div class="showcase-telemetry-group">
               <div class="showcase-telemetry-badge cpu" id="telemetry-time-badge">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                <span id="telemetry-time-text">1.8s CPU</span>
+                <span id="telemetry-time-text">1.8s CPU • Route 0.4ms</span>
               </div>
               <div class="showcase-telemetry-badge" id="telemetry-ram-badge">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 18v2M10 18v2M14 18v2M18 18v2M6 4v2M10 4v2M14 4v2M18 4v2M9 10h6"></path></svg>
-                <span id="telemetry-ram-text">2746.8 MB Local Engine RAM</span>
+                <span id="telemetry-ram-text">MemoryArena: 2.7 GB / 4.7 GB (balanced)</span>
               </div>
               <button class="showcase-replay-btn" onclick="replayCurrentShowcase()">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
@@ -647,23 +772,23 @@
                   <div class="showcase-thought-acc-header">
                     <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #a78bfa; font-size: 0.82rem;">
                       <span style="display:inline-block; width:6px; height:6px; background:#10b981; border-radius:50%; box-shadow:0 0 6px #10b981;"></span>
-                      <span>Reasoning &amp; Routing...</span>
+                      <span>10-Plane Harness Kernel: INTAKE → ROUTE → EXECUTE → VERIFY</span>
                     </div>
                     <div style="font-size: 0.76rem; color: #38bdf8; font-family: 'JetBrains Mono', monospace; font-weight: 700;">1.8s</div>
                   </div>
                   <div class="showcase-thought-steps">
-                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Analyzing query &amp; extracting execution constraints...</span></div>
-                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Direct code interpretation &amp; algorithmic generation requested</span></div>
-                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Generating Python execution script with primality tests...</span></div>
-                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Executing script in local isolated Python subprocess on CPU...</span></div>
-                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Execution output captured (returncode: 0) &amp; verified</span></div>
+                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Plane 6 CascadeRouter: matched <code>slm_code_interpreter</code> in 0.4ms (Stage 1 signature)</span></div>
+                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Plane 5 MemoryArena: leased <code>coding</code> specialist slot under <code>balanced</code> profile</span></div>
+                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Plane 2 Hybrid CPU Runtime: synthesized Python script with primality test</span></div>
+                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Plane 7 Deterministic Verifier: passed <code>ast.parse()</code> &amp; isolated CPU subprocess sandbox</span></div>
+                    <div class="showcase-step-item"><span style="color:#10b981; font-weight:bold;">✓</span><span>Plane 10 Telemetry: execution verified (returncode: 0) &amp; logged to JSONL trace</span></div>
                   </div>
                 </div>
 
                 <!-- Generated Python Code Block with Header -->
                 <div class="showcase-code-container">
                   <div class="showcase-code-top">
-                    <span>Python 3.9 • CPU Subprocess</span>
+                    <span>Python 3.11 • Plane 7 AST &amp; Subprocess Verifier</span>
                     <span style="color: #34d399; font-weight: 700;">Zero Sandbox Escape</span>
                   </div>
                   <pre class="showcase-code-body"><code>def is_prime(n):
@@ -711,24 +836,24 @@ for idx, num in enumerate(fib, 1):
 
   <section class="frameworks-section" id="frameworks">
     <div class="section-header">
-        <h2 class="section-title">Open Source Local AI Frameworks for Python</h2>
-        <p class="section-subtitle">A collection of modular libraries designed to perform specialized agentic tasks using small models.</p>
+        <h2 class="section-title">Core Agent Frameworks Powered by the 10-Plane Harness</h2>
+        <p class="section-subtitle">Each library runs standalone or inside <code>slm_harness</code> with individual OS installers (macOS, Windows, Linux), GBNF grammar decoding, and deterministic verifiers.</p>
       </div>
       <div class="framework-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;">
         <!-- Orchestrator Card -->
         <div class="framework-card" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.2</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 6</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Orchestrator</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              A lightweight, local semantic router. Dynamically maps user queries to specialized sub-agents with JSON constraints and ReAct tool use.
+              4-Stage &lt;35ms Calibrated Cascade Router and Bounded Parallel DAG Scheduler. Maps queries across 26 agents with GBNF JSON constraints and ReAct tool loops.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="orchestrator.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="orchestrator.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -736,16 +861,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card rag" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.2</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 4 &amp; 7</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM RAG</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Local Retrieval-Augmented Generation library. Answers user questions offline using secure, CPU-optimized ONNX models and custom tools.
+              Hybrid SQLite FTS5 BM25 + HNSW vector retrieval with Reciprocal Rank Fusion, 350-token Context Distillation, and Plane 7 Citation Verification.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="rag.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="rag.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -753,16 +878,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card summarizer" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.2</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 3</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Summarizer</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Local CPU text summarizer agent. Supports Map-Reduce for large documents and an evaluator-corrector reflection loop.
+              Pure-CPU document &amp; transcript summarizer powered by Plane 3 Semantic Folding and an Evaluator-Optimizer reflection loop.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="summarizer.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="summarizer.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -770,16 +895,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card sql" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.0</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 7 SQL</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Text-to-SQL</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Translate natural language questions into database queries locally. Includes QLoRA adapter training workflows.
+              Translates natural language into SQL with Plane 7 deterministic <code>EXPLAIN QUERY PLAN</code> validation and automatic schema-error self-repair.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="sql.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="sql.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -787,16 +912,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card cli" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.0</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 8 &amp; 9</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM CLI Agent</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Lightweight shell execution and CLI automation companion. Translates queries to platform-specific scripts with sandbox safety.
+              Interactive terminal copilot (<code>./slm</code>) that translates natural language to safe bash/zsh/PowerShell scripts guarded by Plane 9 Policy Engine.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="cli.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="cli.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -804,16 +929,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card code-interpreter" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.0</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 7 AST</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Code Interpreter</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Secure local Python execution sandbox. Iteratively runs code blocks on CPU with automated self-correction tracebacks.
+              Sandboxed CPU Python execution with Plane 7 <code>ast.parse()</code> static verification, isolated subprocess bounds, and automated traceback self-repair.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="code_interpreter.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="code_interpreter.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -821,16 +946,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card git-copilot" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.0</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Harness</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Git Repo Manager</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Commit generation helper. Automatically reviews branch updates and structures beautiful conventional commit messages locally.
+              Local Git workflow automation via <code>slm_harness</code>. Reviews branch diffs, structures Conventional Commits, and resolves merge conflicts offline.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="git_repo_manager.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="git_repo_manager.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -838,16 +963,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card document-parser" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.0</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 3</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Document Parser</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Parse docx, txt, and PDF structures locally to extract semantic hierarchies and configurations matching strict JSON schemas.
+              Parses PDF, DOCX, XLSX, and TXT files into Plane 3 pointer-based Artifact Scratchpads and GBNF-validated JSON hierarchies.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="document_parser.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="document_parser.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -855,16 +980,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card vision-parser" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.0</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Vision Slot</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Vision Parser</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Offline chart, diagram, and whiteboard reader. Converts scanned infographics and drawings to structured text layouts.
+              Offline chart, diagram, and table OCR engine managed by Plane 5 <code>MemoryArena</code> (<code>vision</code> specialist slot) on CPU.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="vision_parser.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="vision_parser.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -872,16 +997,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card web-agent" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.0</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 8</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Web Agent</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Local browser automation and navigation companion. Crawls pages and maps visual DOM nodes to selectors autonomously.
+              Local browser automation companion with Plane 9 SSRF/egress guardrails. Plans Playwright actions and maps DOM selectors on CPU.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="web_agent.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="web_agent.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -889,16 +1014,16 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card web-scraper" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.0</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 2 GBNF</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Web Scraper</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              High-speed local parsing engine that converts raw HTML documents into structured schema JSON layouts.
+              High-speed DOM pruning and hybrid visual scraping engine that converts messy HTML into GBNF schema-constrained JSON layouts.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="web_scraper.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="web_scraper.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
 
@@ -906,16 +1031,33 @@ for idx, num in enumerate(fib, 1):
         <div class="framework-card search-orchestrator" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
           <div>
             <div class="framework-meta" style="margin-bottom: 12px;">
-              <span class="badge-cpu">CPU Only</span>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">v0.1.0</span>
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 8</span>
             </div>
             <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM Search Orchestrator</h3>
             <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
-              Off-grid query expansion and multi-step routing companion. Integrates with DuckDuckGo to aggregate search snippets locally.
+              Multi-query expansion and live web retrieval planner integrated with Plane 8 search tools and Plane 3 context folding.
             </p>
           </div>
           <div class="framework-actions" style="margin-top: auto;">
-            <a href="search_orchestrator.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Documentation</a>
+            <a href="search_orchestrator.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
+          </div>
+        </div>
+
+        <!-- JSON Cleaner Card -->
+        <div class="framework-card" style="grid-template-columns: 1fr; display: flex; flex-direction: column; justify-content: space-between; padding: 30px;">
+          <div>
+            <div class="framework-meta" style="margin-bottom: 12px;">
+              <span class="badge-cpu">10-Plane Harness</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">v2.0 • Plane 2 &amp; 7</span>
+            </div>
+            <h3 class="framework-title" style="font-size: 1.4rem; margin-bottom: 12px;">SLM JSON Cleaner</h3>
+            <p class="framework-description" style="font-size: 0.925rem; margin-bottom: 20px; line-height: 1.5; color: var(--text-secondary);">
+              RFC 8259 JSON repair and schema enforcement powered by Plane 2 GBNF grammar constraints and Plane 7 structural verifiers.
+            </p>
+          </div>
+          <div class="framework-actions" style="margin-top: auto;">
+            <a href="json_cleaner.html" class="btn btn-primary" style="width: 100%; padding: 10px 0; font-size: 0.9rem;">View Docs &amp; OS Installers</a>
           </div>
         </div>
       </div>
@@ -926,17 +1068,17 @@ for idx, num in enumerate(fib, 1):
   <!-- Complete Live Agent Catalog Section -->
   <section class="upcoming-section" id="agents">
     <div class="section-header">
-        <h2 class="section-title">Complete Multi-Agent Ecosystem</h2>
-        <p class="section-subtitle">Explore high-performance, secure, and 100% offline local SLM agents running with zero cloud latency.</p>
+        <h2 class="section-title">Complete 26-Agent Ecosystem on <code>slm_harness</code></h2>
+        <p class="section-subtitle">Every agent below is routed in &lt;35ms by Plane 6 (<code>CascadeRouter</code>), managed by Plane 5 (<code>MemoryArena</code>), and ships with individual standalone Harness installers for macOS, Windows, and Linux.</p>
       </div>
 
       <!-- Interactive Search & Filtering -->
       <div class="agent-search-container">
-        <input type="text" id="agent-search" class="agent-search-input" onkeyup="applyFilters()" placeholder="Search live agents...">
+        <input type="text" id="agent-search" class="agent-search-input" onkeyup="applyFilters()" placeholder="Search 26 specialized Harness agents...">
       </div>
 
       <div class="category-tabs">
-        <button class="category-tab-btn active" onclick="filterCategory(this, 'all')">All Agents</button>
+        <button class="category-tab-btn active" onclick="filterCategory(this, 'all')">All 26 Agents</button>
         <button class="category-tab-btn" onclick="filterCategory(this, 'dev')">Developer Tools</button>
         <button class="category-tab-btn" onclick="filterCategory(this, 'web')">Web &amp; Scraping</button>
         <button class="category-tab-btn" onclick="filterCategory(this, 'productivity')">Productivity</button>
@@ -947,213 +1089,213 @@ for idx, num in enumerate(fib, 1):
         <!-- Web & Scraping Category -->
         <div class="upcoming-card" data-category="web" onclick="location.href='web_agent.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-web" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #22d3ee;">Web &amp; Scraping</span>
+            <span class="agent-cat-tag badge-web" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #22d3ee;">Web &amp; Scraping • v2.0 Harness</span>
             <h3>SLM Web Agent</h3>
           </div>
-          <p>Automate multi-step browser tasks offline. Plans actions, selects locators, and navigates forms using Playwright on local CPU.</p>
+          <p>Automate multi-step browser tasks offline with Plane 9 SSRF guardrails. Plans actions, selects locators, and navigates forms using Playwright on CPU.</p>
         </div>
 
         <div class="upcoming-card" data-category="web" onclick="location.href='web_scraper.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-web" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #22d3ee;">Web &amp; Scraping</span>
+            <span class="agent-cat-tag badge-web" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #22d3ee;">Web &amp; Scraping • v2.0 Harness</span>
             <h3>SLM Web Scraper</h3>
           </div>
-          <p>High-speed local parsing engine that converts raw HTML documents into structured schema JSON layouts without cloud scrapers.</p>
+          <p>High-speed DOM pruning and hybrid visual scraping engine that converts messy HTML into GBNF schema-constrained JSON layouts offline.</p>
         </div>
 
         <div class="upcoming-card" data-category="web" onclick="location.href='search_orchestrator.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-web" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #22d3ee;">Web &amp; Scraping</span>
+            <span class="agent-cat-tag badge-web" style="background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); color: #22d3ee;">Web &amp; Scraping • v2.0 Harness</span>
             <h3>SLM Search Orchestrator</h3>
           </div>
-          <p>Off-grid query expansion and multi-step routing companion. Aggregates search snippets locally and distills clean answers.</p>
+          <p>Multi-angle query expansion and web retrieval companion integrated with Plane 8 search tools and Plane 3 context folding.</p>
         </div>
 
         <!-- Developer Tools Category -->
         <div class="upcoming-card" data-category="dev" onclick="location.href='orchestrator.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-dev">Developer Tools</span>
+            <span class="agent-cat-tag badge-dev">Developer Tools • v2.0 Harness</span>
             <h3>SLM Orchestrator</h3>
           </div>
-          <p>Autonomous meta-agent that inspects user queries, dynamically routes to local sub-agents, and sequences multi-step execution graphs.</p>
+          <p>Plane 6 &lt;35ms 4-Stage Calibrated Cascade Router and Bounded Parallel DAG Scheduler coordinating all 26 specialized local agents.</p>
         </div>
 
         <div class="upcoming-card" data-category="dev" onclick="location.href='sql.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-dev">Developer Tools</span>
+            <span class="agent-cat-tag badge-dev">Developer Tools • v2.0 Harness</span>
             <h3>SLM Text-to-SQL</h3>
           </div>
-          <p>Translates natural language questions into valid SQL queries against PostgreSQL, SQLite, and MySQL database schemas offline.</p>
+          <p>Translates natural language into SQL queries with Plane 7 deterministic SQLite <code>EXPLAIN QUERY PLAN</code> verification and schema self-repair.</p>
         </div>
 
         <div class="upcoming-card" data-category="dev" onclick="location.href='code_interpreter.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-dev">Developer Tools</span>
+            <span class="agent-cat-tag badge-dev">Developer Tools • v2.0 Harness</span>
             <h3>SLM Code Interpreter</h3>
           </div>
-          <p>Sandboxed Python execution environment for performing data analytics, plotting math charts, and evaluating algorithm logic.</p>
+          <p>Sandboxed Python execution environment with Plane 7 <code>ast.parse()</code> static checks, isolated CPU subprocess execution, and traceback self-healing.</p>
         </div>
 
         <div class="upcoming-card" data-category="dev" onclick="location.href='git_repo_manager.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-dev">Developer Tools</span>
+            <span class="agent-cat-tag badge-dev">Developer Tools • v2.0 Harness</span>
             <h3>SLM Git Repo Manager</h3>
           </div>
-          <p>Automates git commit generation, code review diff analysis, and branch conflict resolution offline on standard desktop hardware.</p>
+          <p>Automates Conventional Commit generation, git diff reviews, and branch conflict resolution via the 10-Plane Pure-CPU Harness.</p>
         </div>
 
         <div class="upcoming-card" data-category="dev" onclick="location.href='database_migrator.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-dev">Developer Tools</span>
+            <span class="agent-cat-tag badge-dev">Developer Tools • v2.0 Harness</span>
             <h3>SLM Database Migrator</h3>
           </div>
-          <p>Analyzes legacy database schemas and generates zero-downtime, CPU-optimized migrations and modern ORM model definitions offline.</p>
+          <p>Analyzes legacy SQL schemas and generates zero-downtime DDL migrations, rollback scripts, and modern ORM models validated by Plane 7 SQL verifiers.</p>
         </div>
 
         <!-- Productivity Category -->
         <div class="upcoming-card" data-category="productivity" onclick="location.href='summarizer.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM Summarizer</h3>
           </div>
-          <p>Condenses lengthy reports, legal documents, and research papers into concise bullet points offline using Map-Reduce chunking.</p>
+          <p>Condenses lengthy reports, legal documents, and research papers into grounded summaries using Plane 3 Semantic Folding and Evaluator-Optimizer loops.</p>
         </div>
 
         <div class="upcoming-card" data-category="productivity" onclick="location.href='rag.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM RAG</h3>
           </div>
-          <p>Answer questions from your own documents locally, privately, with zero API costs using quantized ONNX vector search models.</p>
+          <p>Answers questions from local documents using Plane 4 Hybrid SQLite FTS5 BM25 + HNSW RRF retrieval, 350-token distillation, and Plane 7 citation checks.</p>
         </div>
 
         <div class="upcoming-card" data-category="productivity" onclick="location.href='cli.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM CLI Agent</h3>
           </div>
-          <p>Terminal terminal assistant that translates natural language intentions into safe bash/zsh command line invocations offline.</p>
+          <p>Interactive terminal copilot (<code>./slm</code>) that translates natural language into safe bash/zsh/PowerShell commands verified by Plane 9 Policy Engine.</p>
         </div>
 
         <div class="upcoming-card" data-category="productivity" onclick="location.href='email_assistant.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM Email Assistant</h3>
           </div>
-          <p>Securely processes your incoming inbox streams. Auto-drafts contexts, filters spam, and extracts urgent action items on standard CPUs.</p>
+          <p>Processes inbox threads offline with Plane 9 PII redaction, auto-drafts executive replies, classifies priority, and extracts action items on CPU.</p>
         </div>
 
         <div class="upcoming-card" data-category="productivity" onclick="location.href='meeting_summarizer.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM Meeting Summarizer</h3>
           </div>
-          <p>Offline transcription post-processor. Distills meeting transcripts into action trackers, schedules, and bulleted logs with strict formatting rules.</p>
+          <p>Offline transcript post-processor that distills multi-speaker meetings into GBNF-validated action trackers, owners, deadlines, and executive minutes.</p>
         </div>
 
         <div class="upcoming-card" data-category="productivity" onclick="location.href='voice_agent.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM Voice Agent</h3>
           </div>
-          <p>Fast offline conversational companion combining local speech-to-text, edge neural reasoning, and lightweight CPU audio synthesis.</p>
+          <p>Offline conversational speech companion combining Plane 5 <code>stt</code> / <code>tts</code> specialist slots, local neural reasoning, and real-time barge-in.</p>
         </div>
 
         <div class="upcoming-card" data-category="productivity" onclick="location.href='memory_manager.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM Memory Manager</h3>
           </div>
-          <p>Manages long-term personal state and preference graphs. Learns and adapts to user query patterns locally without cloud synchronization.</p>
+          <p>Backed by Plane 4 Episodic &amp; Procedural Memory (<code>.slm/skills/</code>) and SQLite FTS5+HNSW state graphs for persistent offline user preferences.</p>
         </div>
 
         <div class="upcoming-card" data-category="productivity" onclick="location.href='task_planner.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM Task Planner</h3>
           </div>
-          <p>Autonomous goal decomposition system. Breaks complex tasks into prioritized action items and assigns them to specialized local sub-agents.</p>
+          <p>Autonomous goal decomposition engine integrated with Plane 6 <code>DAGScheduler</code> to break complex projects into verified multi-agent execution graphs.</p>
         </div>
 
         <div class="upcoming-card" data-category="productivity" onclick="location.href='pdf_chat.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM PDF Chat</h3>
           </div>
-          <p>Securely parses complex PDF documents. Assembles layouts, reads tables, and lets you chat with local legal contracts, research articles, or receipts.</p>
+          <p>Parses complex PDFs into Plane 3 Artifact Scratchpad pointers and Plane 4 FTS5+HNSW indexes for grounded Q&amp;A over contracts, papers, and manuals.</p>
         </div>
 
         <div class="upcoming-card" data-category="productivity" onclick="location.href='pkb_agent.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-prod">Productivity</span>
+            <span class="agent-cat-tag badge-prod">Productivity • v2.0 Harness</span>
             <h3>SLM PKB Agent</h3>
           </div>
-          <p>Local knowledge management assistant. Builds, links, and tags markdown documents in Obsidian, Notion, or Logseq vaults offline.</p>
+          <p>Personal Knowledge Base &amp; Zettelkasten engine backed by Plane 4 Hybrid Index and <code>WorkspaceIndexWatcher</code> for Obsidian/Markdown vaults.</p>
         </div>
 
         <!-- Data & Utilities Category -->
         <div class="upcoming-card" data-category="data" onclick="location.href='json_cleaner.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-data">Data &amp; Utilities</span>
+            <span class="agent-cat-tag badge-data">Data &amp; Utilities • v2.0 Harness</span>
             <h3>SLM JSON Cleaner</h3>
           </div>
-          <p>Real-time RFC 8259 syntax repair engine that normalizes corrupted webhooks, converts single quotes, strips comments, and standardizes snake_case keys.</p>
+          <p>RFC 8259 syntax repair and schema enforcement engine combining deterministic fast-path repair with Plane 2 GBNF grammar-constrained decoding.</p>
         </div>
 
         <div class="upcoming-card" data-category="data" onclick="location.href='document_parser.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-data">Data &amp; Utilities</span>
+            <span class="agent-cat-tag badge-data">Data &amp; Utilities • v2.0 Harness</span>
             <h3>SLM Document Parser</h3>
           </div>
-          <p>Universal multi-format parser supporting PDF, DOCX, XLSX, and TXT files with layout preservation, semantic chunking, and token metadata.</p>
+          <p>Multi-format document parser (PDF, DOCX, XLSX, TXT) with hybrid visual table OCR, semantic chunking, and Plane 3 Artifact Scratchpad integration.</p>
         </div>
 
         <div class="upcoming-card" data-category="data" onclick="location.href='vision_parser.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-data">Data &amp; Utilities</span>
+            <span class="agent-cat-tag badge-data">Data &amp; Utilities • v2.0 Harness</span>
             <h3>SLM Vision Parser</h3>
           </div>
-          <p>Local multimodal visual reasoning engine for chart transcription, diagram analysis, and image table extraction.</p>
+          <p>Local multimodal visual reasoning engine managed by Plane 5 <code>MemoryArena</code> (<code>vision</code> specialist slot) for chart, diagram, and table OCR.</p>
         </div>
 
         <div class="upcoming-card" data-category="data" onclick="location.href='data_analyst.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-data">Data &amp; Utilities</span>
+            <span class="agent-cat-tag badge-data">Data &amp; Utilities • v2.0 Harness</span>
             <h3>SLM Data Analyst</h3>
           </div>
-          <p>Domain-agnostic multi-sheet Excel & CSV statistical profiling engine that detects trends, aggregates data, and delivers direct analytical insights.</p>
+          <p>Multi-sheet Excel, Parquet, and CSV statistical profiling engine integrated with Plane 3 Tabular Scratchpads and Plane 7 verified Python analytics.</p>
         </div>
 
         <div class="upcoming-card" data-category="data" onclick="location.href='translation_hub.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-data">Data &amp; Utilities</span>
+            <span class="agent-cat-tag badge-data">Data &amp; Utilities • v2.0 Harness</span>
             <h3>SLM Translation Hub</h3>
           </div>
-          <p>Local neural multilingual translation hub supporting Indian & global languages while preserving Markdown formatting, error codes, and JSON keys.</p>
+          <p>Offline neural multilingual translation hub supporting Indian &amp; global languages while preserving Markdown, code blocks, and JSON keys via Plane 2.</p>
         </div>
 
         <div class="upcoming-card" data-category="data" onclick="location.href='math_agent.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-data">Data &amp; Utilities</span>
+            <span class="agent-cat-tag badge-data">Data &amp; Utilities • v2.0 Harness</span>
             <h3>SLM Math Agent</h3>
           </div>
-          <p>Specialized arithmetic reasoning model. Handles math formulations, algebraic simplifications, and steps through complex equations offline.</p>
+          <p>Hybrid symbolic + neural math solver combining Plane 7 deterministic SymPy/arithmetic verification with the <code>math</code> specialist model slot.</p>
         </div>
 
         <div class="upcoming-card" data-category="data" onclick="location.href='security_audit.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-data">Data &amp; Utilities</span>
+            <span class="agent-cat-tag badge-data">Data &amp; Utilities • v2.0 Harness</span>
             <h3>SLM Security Audit</h3>
           </div>
-          <p>Comprehensive application security auditor that scans code, SQL queries, and endpoints for CWE vulnerabilities, injection vectors, and PII leaks.</p>
+          <p>Static AST + neural security auditor paired with Plane 9 Policy &amp; Secret Redaction Engine to detect OWASP/CWE vulnerabilities and PII leaks offline.</p>
         </div>
 
         <div class="upcoming-card" data-category="data" onclick="location.href='embeddings_server.html'" style="cursor: pointer;">
           <div>
-            <span class="agent-cat-tag badge-data">Data &amp; Utilities</span>
+            <span class="agent-cat-tag badge-data">Data &amp; Utilities • v2.0 Harness</span>
             <h3>SLM Embeddings Server</h3>
           </div>
-          <p>Local CPU-optimized dense vector embedding engine providing normalized vector representations and live cosine similarity without document uploads.</p>
+          <p>Pinned 23 MB <code>bge-Micro-v2</code> INT8 CPU embedding engine inside Plane 5 <code>MemoryArena</code> serving <code>/v1/embeddings</code> and live cosine similarity.</p>
         </div>
       </div>
   </section>
@@ -1163,12 +1305,72 @@ for idx, num in enumerate(fib, 1):
     <div class="section-header">
       <div class="hero-badge" style="margin-bottom: 0.75rem;">
         <span style="display:inline-block; width:8px; height:8px; background:#6366f1; border-radius:50%; margin-right:6px; box-shadow:0 0 8px #6366f1;"></span>
-        <span>Technical Research &amp; Benchmarks</span>
+        <span>Technical Research &amp; Architecture Deep Dives</span>
       </div>
-      <h2 class="section-title">Blogs</h2>
-      <p class="section-subtitle">Real empirical ablations, CPU optimization breakdowns, and architectural guides from the SLMAgents team.</p>
+      <h2 class="section-title">Engineering Blogs &amp; Benchmarks</h2>
+      <p class="section-subtitle">Empirical ablations, 10-Plane Pure-CPU Harness architecture specs, and production case studies from the SLMAgents team.</p>
     </div>
 
+    <!-- NEW Featured Blog 1: SLMAgents 2.0 10-Plane Harness (November 2026) -->
+    <div class="blog-featured-card" style="background: #ffffff; border: 2px solid #c7d2fe; border-radius: 16px; padding: 28px; box-shadow: 0 12px 34px rgba(79,70,229,0.08); max-width: 960px; margin: 0 auto 24px auto; transition: transform 0.2s ease, box-shadow 0.2s ease;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span style="background: #4f46e5; color: #ffffff; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 20px;">NEW • v2.0 Architecture Release</span>
+          <span style="background: #ecfdf5; color: #065f46; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 20px;">10-Plane Pure-CPU Harness</span>
+          <span style="color: #64748b; font-size: 0.82rem;">15 min read • Full System Blueprint</span>
+        </div>
+        <span style="color: #4f46e5; font-size: 0.82rem; font-weight: 700; font-family: 'JetBrains Mono', monospace;">November 2026</span>
+      </div>
+
+      <h3 style="font-size: 1.4rem; color: #0f172a; margin-bottom: 10px; line-height: 1.35; font-weight: 800;">
+        <a href="harness_blog.html" style="color: #0f172a; text-decoration: none; transition: color 0.15s ease;">
+          SLMAgents 2.0: Building a 10-Plane Local AI Agent Harness at $0 Cost (That Beats Cloud Agent Wrappers on Reliability)
+        </a>
+      </h3>
+
+      <p style="color: #475569; font-size: 0.95rem; line-height: 1.6; margin-bottom: 18px;">
+        Why 0.8B–3B Small Language Models fail inside naive cloud-style agent loops — and how our 10-Plane Pure-CPU Agent Harness (<code>slm_harness</code>) achieves <strong>0.4ms–11ms routing</strong>, <strong>100% JSON schema validity via GBNF</strong>, <strong>deterministic AST/SQL/citation self-repair</strong>, and <strong>zero-dependency OS installers</strong> on a standard laptop CPU.
+      </p>
+
+      <div class="blog-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; background: #f8fafc; padding: 12px; border-radius: 10px; border: 1px solid #f1f5f9;">
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 800; color: #4f46e5; font-family: 'JetBrains Mono', monospace;">&lt;35ms</div>
+          <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">4-Stage Cascade Router</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 800; color: #059669; font-family: 'JetBrains Mono', monospace;">100%</div>
+          <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">GBNF Schema Validity</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 800; color: #0284c7; font-family: 'JetBrains Mono', monospace;">2.6–8.2 GB</div>
+          <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">Watermark LRU Arena</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 800; color: #7c3aed; font-family: 'JetBrains Mono', monospace;">26 Agents</div>
+          <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">macOS • Win • Linux</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 34px; height: 34px; border-radius: 50%; background: #4f46e5; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem;">
+            SP
+          </div>
+          <div>
+            <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b;">Suryaprakash C V</div>
+            <div style="font-size: 0.74rem; color: #64748b;">Creator, SLMAgents • Systems Architecture Deep-Dive</div>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <a href="harness_blog.html" class="btn btn-primary" style="padding: 8px 18px; font-size: 0.84rem; border-radius: 8px;">
+            Read 10-Plane Harness Blueprint &rarr;
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Featured Blog 2: Context Distillation for CPU RAG (August 2026) -->
     <div class="blog-featured-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px; box-shadow: 0 10px 30px rgba(15,23,42,0.06); max-width: 960px; margin: 0 auto; transition: transform 0.2s ease, box-shadow 0.2s ease;">
       <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -1236,15 +1438,15 @@ for idx, num in enumerate(fib, 1):
   <section class="cta-banner">
     <div class="container">
       <div class="cta-box">
-        <h2>Contribute to our Privacy-First AI Community</h2>
+        <h2>Deploy the 10-Plane Local AI Agent Harness Today</h2>
         <p>
-          SLM Agents is entirely open source. Join us in building efficient, local, private intelligence tools that run on standard computer hardware.
+          SLMAgents 2.0 is 100% open source under the MIT License. Download standalone OS installers for macOS, Windows, and Linux, or run <code>./slm chat</code> directly from source.
         </p>
         <div class="hero-ctas">
-          <a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_orchestrator" class="btn btn-primary" target="_blank">Orchestrator</a>
-          <a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_rag" class="btn btn-secondary" target="_blank">RAG</a>
-          <a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_summarizer" class="btn btn-secondary" target="_blank">Summarizer</a>
-          <a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_text_to_sql" class="btn btn-secondary" target="_blank">Text-to-SQL</a>
+          <button type="button" onclick="openDownloadModal()" class="btn btn-primary" style="cursor: pointer;">Download OS Installers (v2.0)</button>
+          <a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_harness" class="btn btn-secondary" target="_blank">10-Plane Harness Source</a>
+          <a href="harness_blog.html" class="btn btn-secondary">Architecture Blueprint</a>
+          <a href="playground.html" class="btn btn-secondary">Interactive Playground</a>
         </div>
       </div>
     </div>
@@ -1261,24 +1463,28 @@ for idx, num in enumerate(fib, 1):
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
               </svg>
             </div>
-            <span style="color: var(--text-primary);">SLM Agents</span>
+            <span style="color: var(--text-primary);">SLM Agents 2.0</span>
           </a>
-          <p>Open source developer community building lightweight, local CPU agentic AI frameworks.</p>
+          <p>10-Plane Pure-CPU Local AI Agent Harness &amp; 26 Specialized Agents with standalone installers for macOS, Windows, and Linux.</p>
         </div>
         <div class="footer-links">
-          <h4>Frameworks</h4>
+          <h4>Core Harness &amp; Agents</h4>
           <ul>
-            <li><a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_orchestrator" target="_blank">SLM Orchestrator</a></li>
-            <li><a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_rag" target="_blank">SLM RAG</a></li>
-            <li><a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_summarizer" target="_blank">SLM Summarizer</a></li>
-            <li><a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_text_to_sql" target="_blank">SLM Text-to-SQL</a></li>
+            <li><a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_harness" target="_blank">10-Plane Harness (<code>slm_harness</code>)</a></li>
+            <li><a href="orchestrator.html">SLM Orchestrator</a></li>
+            <li><a href="rag.html">SLM RAG</a></li>
+            <li><a href="sql.html">SLM Text-to-SQL</a></li>
+            <li><a href="code_interpreter.html">SLM Code Interpreter</a></li>
           </ul>
         </div>
         <div class="footer-links">
-          <h4>Resources</h4>
+          <h4>Resources &amp; Installers</h4>
           <ul>
-            <li><a href="#agents">Live Agent Catalog</a></li>
-            <li><a href="https://github.com/t00114218-stack" target="_blank">Developer Profile</a></li>
+            <li><a href="#os-installers">Standalone OS Installers</a></li>
+            <li><a href="#agents">26-Agent Ecosystem</a></li>
+            <li><a href="harness_blog.html">10-Plane Harness Blog</a></li>
+            <li><a href="blogs.html">CPU RAG Distillation Study</a></li>
+            <li><a href="https://github.com/t00114218-stack/SLMAgents" target="_blank">GitHub Monorepo</a></li>
           </ul>
         </div>
       </div>
@@ -1310,17 +1516,17 @@ for idx, num in enumerate(fib, 1):
     </div>
   </div>
 
-  <!-- Standalone Desktop App Download Modal -->
+  <!-- Standalone Desktop App & Individual Agent Harness Download Modal -->
   <div class="agent-modal" id="download-app-modal" onclick="if(event.target===this)closeDownloadModal()">
-    <div class="modal-content" style="max-width: 680px;">
+    <div class="modal-content" style="max-width: 720px;">
       <div class="modal-header" style="border-bottom: 1px solid #e2e8f0; padding-bottom: 14px;">
         <div>
           <h3 style="margin: 0; color: #0f172a; font-size: 1.25rem; display: flex; align-items: center; gap: 10px;">
             <img src="assets/slm-installer-icon.png" alt="SLMAgents Installer" width="32" height="32" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(79,70,229,0.25);">
-            Download SLMAgents 2.0 Standalone Desktop App
+            Download SLMAgents 2.0 Harness Installers (All OSes)
           </h3>
           <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #64748b;">
-            Zero pre-installed Python required • Auto-downloads quantized CPU weights from Hugging Face Hub on first launch
+            Zero pre-installed Python required • Includes 10-Plane Pure-CPU Harness (<code>slm_harness</code>) • Auto-downloads quantized CPU weights on first launch
           </p>
         </div>
         <button class="modal-close" onclick="closeDownloadModal()">&times;</button>
@@ -1332,9 +1538,9 @@ for idx, num in enumerate(fib, 1):
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <strong style="color: #0f172a; font-size: 0.96rem;">macOS Standalone Disk Image (.dmg)</strong>
-                <span style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 277 MB</span>
+                <span style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 281 MB</span>
               </div>
-              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Apple Silicon &amp; Intel • Drag to /Applications • Bundled Python 3.11 + C Runtimes</div>
+              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Apple Silicon &amp; Intel • Drag to /Applications • Bundled Python 3.11 + C Runtimes + 10-Plane Harness</div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
               <button type="button" onclick="installAndOpenMacApp(this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; background: #10b981; color: #ffffff; border: none; border-radius: 8px; font-size: 0.84rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
@@ -1352,7 +1558,7 @@ for idx, num in enumerate(fib, 1):
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <strong style="color: #0f172a; font-size: 0.96rem;">macOS Wizard Installer (.pkg)</strong>
-                <span style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 234 MB</span>
+                <span style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 236 MB</span>
               </div>
               <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Native macOS Installer Wizard • Installs directly to /Applications/SLMAgents.app</div>
             </div>
@@ -1367,9 +1573,9 @@ for idx, num in enumerate(fib, 1):
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <strong style="color: #0f172a; font-size: 0.96rem;">Windows 10 / 11 Standalone Installer (.bat)</strong>
-                <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 2.8 MB</span>
+                <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 3.7 MB</span>
               </div>
-              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">64-bit Windows • Self-extracting • Auto-provisions Portable Python 3.11 + Desktop Shortcut</div>
+              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">64-bit Windows • Self-extracting • Auto-provisions Portable Python 3.11 + 10-Plane Harness + Shortcut</div>
             </div>
             <a href="/api/installers/download/windows" download="SLMAgents-2.0-Windows-Installer.bat" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: #4f46e5; color: #ffffff; border-radius: 8px; font-size: 0.84rem; font-weight: 700; text-decoration: none; white-space: nowrap;">
               <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
@@ -1382,7 +1588,7 @@ for idx, num in enumerate(fib, 1):
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <strong style="color: #0f172a; font-size: 0.96rem;">Linux Self-Extracting Installer (.run)</strong>
-                <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 2.5 MB</span>
+                <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 3.4 MB</span>
               </div>
               <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Ubuntu / Debian / Fedora (x86_64 &amp; ARM64) • Single-file standalone .run binary</div>
             </div>
@@ -1430,6 +1636,6 @@ for idx, num in enumerate(fib, 1):
       }
     }
   </script>
-  <script src="app.js?v=53.0"></script>
+  <script src="app.js?v=54.0"></script>
 </body>
 </html>
