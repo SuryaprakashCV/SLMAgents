@@ -273,7 +273,7 @@ def run_desktop_app(
 
     # Start or attach to local server immediately (non-blocking)
     selected_port, already_alive = start_or_attach_server(host, port)
-    studio_url = f"http://{host}:{selected_port}/chat.html"
+    studio_url = f"http://{host}:{selected_port}/chat.html?desktop=1"
 
     # Kick off non-blocking background model verification
     ensure_models_bootstrapped_async(models_dir=models_dir, profile=active_profile, skip_download=skip_download)
