@@ -139,9 +139,69 @@
       <nav>
         <ul>
           <li><a href="index.html">Home</a></li>
+          <li class="dropdown">
+            <a class="dropdown-trigger">
+              Docs
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </a>
+            <div class="dropdown-content">
+              <div>
+                <div class="mega-col-title">Productivity</div>
+                <div class="mega-col-list">
+                  <a href="rag.html">📚 SLM RAG</a>
+                  <a href="summarizer.html">📝 Summarizer</a>
+                  <a href="cli.html">💻 CLI Agent</a>
+                  <a href="email_assistant.html">📧 Email Assistant</a>
+                  <a href="meeting_summarizer.html">🎙️ Meeting Summarizer</a>
+                  <a href="memory_manager.html">🧠 Memory Manager</a>
+                  <a href="task_planner.html">📋 Task Planner</a>
+                  <a href="pdf_chat.html">📑 PDF Chat</a>
+                  <a href="pkb_agent.html">🔗 PKB Agent</a>
+                  <a href="voice_agent.html">🗣️ Voice Agent</a>
+                </div>
+              </div>
+              <div>
+                <div class="mega-col-title">Developer Tools</div>
+                <div class="mega-col-list">
+                  <a href="orchestrator.html">🎯 Orchestrator</a>
+                  <a href="sql.html">📊 Text-to-SQL</a>
+                  <a href="code_interpreter.html">⚡ Code Interpreter</a>
+                  <a href="git_repo_manager.html">🐙 Git Repo Manager</a>
+                  <a href="database_migrator.html">🗄️ Database Migrator</a>
+                </div>
+              </div>
+              <div>
+                <div class="mega-col-title">Web &amp; Scraping</div>
+                <div class="mega-col-list">
+                  <a href="web_agent.html">🌐 Web Agent</a>
+                  <a href="web_scraper.html">🕷️ Web Scraper</a>
+                  <a href="search_orchestrator.html">🔎 Search Orchestrator</a>
+                </div>
+              </div>
+              <div>
+                <div class="mega-col-title">Data &amp; Utilities</div>
+                <div class="mega-col-list">
+                  <a href="json_cleaner.html">🧹 JSON Cleaner</a>
+                  <a href="document_parser.html">📄 Document Parser</a>
+                  <a href="vision_parser.html">👁️ Vision Parser</a>
+                  <a href="data_analyst.html">📈 Data Analyst</a>
+                  <a href="translation_hub.html">🌐 Translation Hub</a>
+                  <a href="math_agent.html">🧮 Math Agent</a>
+                  <a href="security_audit.html">🛡️ Security Audit</a>
+                  <a href="embeddings_server.html">🔢 Embeddings Server</a>
+                </div>
+              </div>
+            </div>
+          </li>
           <li><a href="chat.html">Chat Studio</a></li>
           <li><a href="playground.html">Playground</a></li>
           <li><a href="blogs.html" class="active">Blogs</a></li>
+          <li>
+            <button onclick="openDownloadModal()" style="background: linear-gradient(135deg, #4f46e5, #0284c7); color: #ffffff; border: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(79,70,229,0.25);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download App
+            </button>
+          </li>
           <li>
             <a href="https://github.com/t00114218-stack/SLMAgents" target="_blank" class="btn-github-nav">GitHub</a>
           </li>
@@ -293,11 +353,22 @@ cat broken.json | ./slm ask "Extract clean record" --schema '{"type":"object","p
 # 6. Expose SLMAgents Pure-CPU Harness as a stdio MCP Server
 ./slm mcp-serve</code></pre>
 
+      <h2>6. Standalone OS Harness Installers (macOS, Windows, Linux)</h2>
+      <p>In addition to running <code>./slm</code> from source, SLMAgents 2.0 ships standalone self-contained installers for every operating system—both for the full 26-agent studio and as lightweight per-agent harness installers:</p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 16px 0 24px 0;">
+        <a href="/api/installers/download/macos-dmg" style="padding: 12px 14px; border-radius: 10px; border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-weight: 700; font-size: 0.85rem; text-decoration: none; display: block;">🍎 macOS .dmg (281 MB)<div style="font-size: 0.75rem; font-weight: 500; color: #6366f1; margin-top: 2px;">Drag-and-drop .app bundle</div></a>
+        <a href="/api/installers/download/macos-pkg" style="padding: 12px 14px; border-radius: 10px; border: 1px solid #cbd5e1; background: #f8fafc; color: #0f172a; font-weight: 700; font-size: 0.85rem; text-decoration: none; display: block;">📦 macOS .pkg (236 MB)<div style="font-size: 0.75rem; font-weight: 500; color: #64748b; margin-top: 2px;">Native macOS wizard</div></a>
+        <a href="/api/installers/download/windows" style="padding: 12px 14px; border-radius: 10px; border: 1px solid #bae6fd; background: #f0f9ff; color: #0369a1; font-weight: 700; font-size: 0.85rem; text-decoration: none; display: block;">🪟 Windows .bat (3.7 MB)<div style="font-size: 0.75rem; font-weight: 500; color: #0284c7; margin-top: 2px;">Self-extracting + Python 3.11</div></a>
+        <a href="/api/installers/download/linux" style="padding: 12px 14px; border-radius: 10px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #047857; font-weight: 700; font-size: 0.85rem; text-decoration: none; display: block;">🐧 Linux .run (3.4 MB)<div style="font-size: 0.75rem; font-weight: 500; color: #059669; margin-top: 2px;">Self-extracting + XDG entry</div></a>
+      </div>
+
       <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; display: flex; gap: 12px; flex-wrap: wrap;">
-        <a href="chat.html" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px; text-decoration: none;">Launch Offline Web AI Studio</a>
+        <button onclick="openDownloadModal()" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;">Download OS Installers</button>
+        <a href="chat.html" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; text-decoration: none;">Launch Offline Web AI Studio</a>
         <a href="https://github.com/t00114218-stack/SLMAgents/tree/main/slm_harness" target="_blank" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; text-decoration: none;">Explore slm_harness on GitHub</a>
       </div>
     </div>
   </main>
+  <script src="app.js?v=54.0"></script>
 </body>
 </html>

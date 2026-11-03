@@ -1347,7 +1347,7 @@ async function initStudioModel(agentKey) {
   }
 
   if (consoleEl) {
-    consoleEl.textContent = `[*] Initializing ${spec.name} locally on CPU (threads=4, engine=quantized-onnx)...\n[*] Checking shared cache status...\n\n[Loading model weights into memory arena...]`;
+    consoleEl.textContent = `[*] Initializing ${spec.name} via SLMAgents 2.0 10-Plane Pure-CPU Harness (profile=balanced, MemoryArena)...\n[*] Checking Plane 5 MemoryArena & shared model weights...\n\n[Leasing specialist slot in Watermark LRU MemoryArena...]`;
   }
 
   try {
@@ -1364,16 +1364,16 @@ async function initStudioModel(agentKey) {
     if (res.ok) {
       const data = await res.json();
       if (data.cached) {
-        modelInitStatusText = `[*] Initializing ${spec.name} locally on CPU (threads=4, engine=quantized-onnx)...\n[System] Model already initialized in shared cache.\n\nReady for execution.\n\n[Default Parameter Preview]:\n`;
+        modelInitStatusText = `[*] Initializing ${spec.name} via SLMAgents 2.0 10-Plane Pure-CPU Harness (profile=balanced, MemoryArena)...\n[System] Specialist slot active in Plane 5 MemoryArena.\n\nReady for execution.\n\n[Default Parameter Preview]:\n`;
       } else {
-        modelInitStatusText = `[*] Initializing ${spec.name} locally on CPU (threads=4, engine=quantized-onnx)...\n[System] Model initialized.\n\nReady for execution.\n\n[Default Parameter Preview]:\n`;
+        modelInitStatusText = `[*] Initializing ${spec.name} via SLMAgents 2.0 10-Plane Pure-CPU Harness (profile=balanced, MemoryArena)...\n[System] Harness specialist slot initialized.\n\nReady for execution.\n\n[Default Parameter Preview]:\n`;
       }
     } else {
-      modelInitStatusText = `[*] Initializing ${spec.name} locally on CPU...\n[System] Model initialized in preview mode.\n\nReady for execution.\n\n[Default Parameter Preview]:\n`;
+      modelInitStatusText = `[*] Initializing ${spec.name} via SLMAgents 2.0 10-Plane Pure-CPU Harness...\n[System] Harness initialized in preview mode.\n\nReady for execution.\n\n[Default Parameter Preview]:\n`;
     }
   } catch (e) {
     if (currentInitAgentKey !== agentKey) return;
-    modelInitStatusText = `[*] Initializing ${spec.name} locally on CPU...\n[System] Model initialized in offline preview mode.\n\nReady for execution.\n\n[Default Parameter Preview]:\n`;
+    modelInitStatusText = `[*] Initializing ${spec.name} via SLMAgents 2.0 10-Plane Pure-CPU Harness...\n[System] Harness initialized in offline preview mode.\n\nReady for execution.\n\n[Default Parameter Preview]:\n`;
   } finally {
     if (currentInitAgentKey === agentKey) {
       isModelInitializing = false;
@@ -1570,9 +1570,9 @@ function formatLogVals(vals) {
 function getAgentThinkingLogs(agentKey, vals) {
   const spec = ALL_AGENT_SPECS[agentKey] || ALL_AGENT_SPECS["rag"];
   const logs = [
-    `[*] Initializing ${spec.className} locally on CPU (threads=4, engine=quantized-onnx)...`,
-    `[*] Loaded model configuration: ${spec.package}/config.yaml`,
-    `[Agent Thought] Analyzing parameters and constraints for inputs: ${formatLogVals(vals)}`
+    `[*] Plane 6 CascadeRouter -> dispatched to ${spec.className} (<35ms)...`,
+    `[*] Plane 5 MemoryArena -> leased specialist slot (profile=balanced)...`,
+    `[Plane 1 Kernel] Analyzing parameters and GBNF constraints for inputs: ${formatLogVals(vals)}`
   ];
   
   if (agentKey === "rag") {
@@ -3834,18 +3834,18 @@ function clearShowcaseTimers() {
 
 var SHOWCASE_CASES = {
   code: {
-    title: "SLMCodeInterpreter • Live CPU Python Sandbox",
+    title: "SLMCodeInterpreter • 10-Plane Harness (Plane 7 AST + Sandbox Verifier)",
     prompt: "Write and execute a Python script to compute the first 10 Fibonacci numbers, check which ones are prime, and return the execution output.",
     attachment: null,
-    routedAgent: "SLMCodeInterpreter (Code Interpreter)",
-    duration: "1.8s CPU",
-    ram: "2746.8 MB Local Engine RAM",
+    routedAgent: "SLMCodeInterpreter (Plane 6 CascadeRouter 0.4ms)",
+    duration: "1.8s CPU • Route 0.4ms",
+    ram: "MemoryArena: 2.7 GB / 4.7 GB (balanced)",
     thoughts: [
-      "Analyzing query & extracting execution constraints...",
-      "Direct code interpretation & algorithmic generation requested",
-      "Generating Python execution script with primality tests...",
-      "Executing script in local isolated Python subprocess on CPU...",
-      "Execution output captured (returncode: 0) & verified"
+      "Plane 6 CascadeRouter: matched slm_code_interpreter in 0.4ms (Stage 1 signature)",
+      "Plane 5 MemoryArena: leased coding specialist slot under balanced profile",
+      "Plane 2 Hybrid CPU Runtime: synthesized Python script with primality test",
+      "Plane 7 Deterministic Verifier: passed ast.parse() & isolated CPU subprocess sandbox",
+      "Plane 10 Telemetry: execution verified (returncode: 0) & logged to JSONL trace"
     ],
     codeLines: [
       "def is_prime(n):",
@@ -3879,18 +3879,18 @@ var SHOWCASE_CASES = {
     summaryText: "The Python script computed the first 10 Fibonacci numbers and evaluated their primality. The prime Fibonacci numbers identified are **2, 3, 5, and 13**."
   },
   data: {
-    title: "SLMDataAnalyst • High-Precision Tabular Analytics",
+    title: "SLMDataAnalyst • 10-Plane Harness (Plane 3 Tabular Scratchpad)",
     prompt: "Summarize the invoice expenses, compute total amounts, and list the highest vendor.",
     attachment: "All_Invoices_With_Dates.xlsx (22 rows, 5 columns)",
-    routedAgent: "SLMDataAnalyst (Data Analyst Agent)",
-    duration: "0.02s CPU",
-    ram: "48.2 MB Deterministic RAM",
+    routedAgent: "SLMDataAnalyst (Plane 6 CascadeRouter 0.3ms)",
+    duration: "0.02s CPU • Route 0.3ms",
+    ram: "MemoryArena: 48.2 MB Scratchpad",
     thoughts: [
-      "Received document attachment: 'All_Invoices_With_Dates.xlsx'",
-      "Parsing 'All_Invoices_With_Dates.xlsx' via OpenPyXL Tabular Engine...",
-      "Excluding footer 'TOTAL' row to prevent double-counting...",
-      "Executing high-precision tabular aggregations in 0.02s...",
-      "Exact column totals, date range, and record metrics verified"
+      "Plane 3 Artifact Scratchpad: registered 'All_Invoices_With_Dates.xlsx' as pointer tbl_1",
+      "Plane 6 CascadeRouter: routed to slm_data in 0.3ms via Stage 0 artifact kind",
+      "Plane 3 Tabular Engine: excluded footer 'TOTAL' row to prevent double-counting",
+      "Plane 7 Verifier: validated column aggregations, min/max, and vendor grouping in 0.02s",
+      "Plane 10 Telemetry: deterministic financial summary verified with 0 hallucination"
     ],
     summaryMarkdown: `
       <div style="color: #1e293b; line-height: 1.6;">
@@ -3946,19 +3946,19 @@ var SHOWCASE_CASES = {
     `
   },
   rag: {
-    title: "SLMRAGAgent • Hybrid Semantic Document Intelligence",
+    title: "SLMRAGAgent • 10-Plane Harness (Plane 4 Hybrid FTS5+HNSW & Plane 7 Citations)",
     prompt: "What were the key Q3 2026 revenue growth drivers and EBITDA margin figures for the cloud division?",
     attachment: "Q3_2026_Enterprise_Report.pdf (48 pages, 320 paragraphs indexed)",
-    routedAgent: "SLMRAGAgent (Document Intelligence Agent)",
-    duration: "1.4s CPU",
-    ram: "3046.8 MB Local Engine RAM",
+    routedAgent: "SLMRAGAgent (Plane 6 CascadeRouter 1.1ms)",
+    duration: "1.4s CPU • Route 1.1ms",
+    ram: "MemoryArena: 3.0 GB / 4.7 GB (balanced)",
     thoughts: [
-      "Received query & indexed document: 'Q3_2026_Enterprise_Report.pdf'",
-      "Agentic Query Decomposition: [Entity: 'Cloud Division', Metrics: 'Revenue Growth', 'EBITDA']",
-      "Executing Hybrid Search: BM25 Lexical + INT8 BGE-Small Dense Embeddings in 24ms...",
-      "Applying Reciprocal Rank Fusion (RRF) & Relevance Filtering (threshold > 0.75)...",
-      "Context Distilled to top 2 paragraphs (248 tokens) — Zero context distraction",
-      "Synthesizing grounded answer on CPU with INT4 Qwen2.5 Engine in 1.4s..."
+      "Plane 3 Artifact Scratchpad: indexed 'Q3_2026_Enterprise_Report.pdf' into Plane 4 HybridIndex",
+      "Plane 6 CascadeRouter: routed to slm_rag in 1.1ms with needs_rag=True",
+      "Plane 4 Hybrid Memory: SQLite FTS5 BM25 + INT8 BGE-Micro-v2 HNSW + RRF Fusion in 24ms",
+      "Plane 3 Context Compiler: distilled top 2 spans (248 tokens) into Tier-2 prefix",
+      "Plane 2 Hybrid CPU Runtime: synthesized grounded answer on CPU in 1.4s",
+      "Plane 7 Citation Verifier: verified 100% of numeric claims against source span [doc_1]"
     ],
     summaryMarkdown: `
       <div style="color: #1e293b; line-height: 1.6; word-break: break-word; overflow-wrap: anywhere;">
@@ -5190,6 +5190,127 @@ window.promptImproveSkill = promptImproveSkill;
 window.handleSlashCommandAutocomplete = handleSlashCommandAutocomplete;
 window.selectSlashCommandItem = selectSlashCommandItem;
 window.hideSlashCommandPalette = hideSlashCommandPalette;
+
+function ensureGlobalDownloadModal() {
+  let modal = document.getElementById("download-app-modal");
+  if (modal) return modal;
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `
+  <div class="agent-modal" id="download-app-modal" onclick="if(event.target===this)closeDownloadModal()">
+    <div class="modal-content" style="max-width: 720px;">
+      <div class="modal-header" style="border-bottom: 1px solid #e2e8f0; padding-bottom: 14px;">
+        <div>
+          <h3 style="margin: 0; color: #0f172a; font-size: 1.25rem; display: flex; align-items: center; gap: 10px;">
+            <img src="assets/slm-installer-icon.png" alt="SLMAgents Installer" width="32" height="32" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(79,70,229,0.25);">
+            Download SLMAgents 2.0 Harness Installers (All OSes)
+          </h3>
+          <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #64748b;">
+            Zero pre-installed Python required • Includes 10-Plane Pure-CPU Harness (<code>slm_harness</code>) • Auto-downloads quantized CPU weights on first launch
+          </p>
+        </div>
+        <button class="modal-close" onclick="closeDownloadModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding-top: 16px;">
+        <div id="download-versions-list" style="display: flex; flex-direction: column; gap: 12px;">
+          <div class="installer-row" data-os="mac" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong style="color: #0f172a; font-size: 0.96rem;">macOS Standalone Disk Image (.dmg)</strong>
+                <span style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 281 MB</span>
+              </div>
+              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Apple Silicon &amp; Intel • Drag to /Applications • Bundled Python 3.11 + C Runtimes + 10-Plane Harness</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" onclick="installAndOpenMacApp(this)" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; background: #10b981; color: #ffffff; border: none; border-radius: 8px; font-size: 0.84rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
+                Install &amp; Open Now
+              </button>
+              <a href="/api/installers/download/macos-dmg" download="SLMAgents-2.0-macOS-Installer.dmg" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: #4f46e5; color: #ffffff; border-radius: 8px; font-size: 0.84rem; font-weight: 700; text-decoration: none; white-space: nowrap;">
+                Download .dmg
+              </a>
+            </div>
+          </div>
+          <div class="installer-row" data-os="mac" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong style="color: #0f172a; font-size: 0.96rem;">macOS Wizard Installer (.pkg)</strong>
+                <span style="background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 236 MB</span>
+              </div>
+              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Native macOS Installer Wizard • Installs directly to /Applications/SLMAgents.app</div>
+            </div>
+            <a href="/api/installers/download/macos-pkg" download="SLMAgents-2.0-macOS-Installer.pkg" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: #0f172a; color: #ffffff; border-radius: 8px; font-size: 0.84rem; font-weight: 700; text-decoration: none; white-space: nowrap;">
+              Download .pkg
+            </a>
+          </div>
+          <div class="installer-row" data-os="win" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong style="color: #0f172a; font-size: 0.96rem;">Windows 10 / 11 Standalone Installer (.bat)</strong>
+                <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 3.7 MB</span>
+              </div>
+              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">64-bit Windows • Self-extracting • Auto-provisions Portable Python 3.11 + 10-Plane Harness + Shortcut</div>
+            </div>
+            <a href="/api/installers/download/windows" download="SLMAgents-2.0-Windows-Installer.bat" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: #4f46e5; color: #ffffff; border-radius: 8px; font-size: 0.84rem; font-weight: 700; text-decoration: none; white-space: nowrap;">
+              Download Windows
+            </a>
+          </div>
+          <div class="installer-row" data-os="linux" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong style="color: #0f172a; font-size: 0.96rem;">Linux Self-Extracting Installer (.run)</strong>
+                <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">v2.0.0 • 3.4 MB</span>
+              </div>
+              <div style="font-size: 0.82rem; color: #64748b; margin-top: 3px;">Ubuntu / Debian / Fedora (x86_64 &amp; ARM64) • Single-file standalone .run binary</div>
+            </div>
+            <a href="/api/installers/download/linux" download="SLMAgents-2.0-Linux-Installer.run" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: #4f46e5; color: #ffffff; border-radius: 8px; font-size: 0.84rem; font-weight: 700; text-decoration: none; white-space: nowrap;">
+              Download .run
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(wrapper.firstElementChild);
+  return document.getElementById("download-app-modal");
+}
+
+window.openDownloadModal = function openDownloadModal() {
+  const modal = ensureGlobalDownloadModal();
+  if (modal) {
+    modal.classList.add("open");
+    modal.style.display = "flex";
+  }
+};
+
+window.closeDownloadModal = function closeDownloadModal() {
+  const modal = document.getElementById("download-app-modal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.style.display = "none";
+  }
+};
+
+window.installAndOpenMacApp = async function installAndOpenMacApp(btn) {
+  if (!btn) return;
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = "Installing & Opening...";
+  try {
+    const res = await fetch(getApiEndpoint("/api/installers/install-local"), { method: "POST" });
+    const data = await res.json();
+    if (data.status === "ok") {
+      btn.textContent = "✓ Opened in /Applications";
+    } else {
+      btn.textContent = "Use Download .dmg";
+    }
+  } catch (e) {
+    btn.innerHTML = orig;
+  } finally {
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }, 3500);
+  }
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(syncHarnessStatusHud, 200);

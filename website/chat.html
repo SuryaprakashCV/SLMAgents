@@ -209,6 +209,10 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 15V9a2 2 0 0 0-2-2H9"></path><line x1="6" y1="9" x2="6" y2="15"></line></svg>
             <span>Fork</span>
           </button>
+          <button type="button" class="btn-harness-top" onclick="syncCentralRepoUpdate(this)" id="btn-sync-central-repo" title="Pull latest code &amp; skill updates from Central GitHub Repo (SuryaprakashCV/SLMAgents)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            <span id="btn-sync-central-label">Sync Repo</span>
+          </button>
           <button type="button" class="btn-harness-top" onclick="openSkillsRepoModal()" id="btn-top-skills-repo" title="Open Local Skill Repository (.slm/skills/) &amp; AI Skill Creator">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
             <span>Skills Repo</span>
@@ -621,7 +625,48 @@
           brand.onclick = function(e) { e.preventDefault(); if (typeof createNewChatSession === 'function') createNewChatSession(); };
         }
       }
+      // Check Central Repo OTA Update Status on startup
+      fetch('/api/system/update/status').then(function(r) { return r.json(); }).then(function(info) {
+        var btn = document.getElementById('btn-sync-central-repo');
+        var lbl = document.getElementById('btn-sync-central-label');
+        if (btn && lbl && info && info.update_available) {
+          btn.style.borderColor = '#10b981';
+          btn.style.color = '#059669';
+          btn.style.background = '#ecfdf5';
+          lbl.textContent = 'Update Ready (' + (info.remote_sha || 'new') + ')';
+          btn.title = 'New update on Central Repo: ' + (info.latest_commit_message || '');
+        }
+      }).catch(function() {});
     })();
+
+    async function syncCentralRepoUpdate(btn) {
+      var lbl = document.getElementById('btn-sync-central-label');
+      if (!lbl) return;
+      var orig = lbl.textContent;
+      btn.disabled = true;
+      lbl.textContent = 'Syncing...';
+      try {
+        var res = await fetch('/api/system/update/pull', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ force: true })
+        });
+        var data = await res.json();
+        if (data.status === 'ok') {
+          lbl.textContent = '✓ Synced (' + (data.remote_sha || 'latest') + ')';
+          btn.style.borderColor = '#10b981';
+          btn.style.color = '#059669';
+          btn.style.background = '#ecfdf5';
+          if (typeof fetchHarnessSkills === 'function') fetchHarnessSkills();
+        } else {
+          lbl.textContent = 'Offline';
+        }
+      } catch (e) {
+        lbl.textContent = orig;
+      } finally {
+        setTimeout(function() { btn.disabled = false; }, 2000);
+      }
+    }
   </script>
   <script src="app.js?v=96.0"></script>
 </body>

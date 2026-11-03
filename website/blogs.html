@@ -186,9 +186,69 @@
       <nav>
         <ul>
           <li><a href="index.html">Home</a></li>
+          <li class="dropdown">
+            <a class="dropdown-trigger">
+              Docs
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </a>
+            <div class="dropdown-content">
+              <div>
+                <div class="mega-col-title">Productivity</div>
+                <div class="mega-col-list">
+                  <a href="rag.html">📚 SLM RAG</a>
+                  <a href="summarizer.html">📝 Summarizer</a>
+                  <a href="cli.html">💻 CLI Agent</a>
+                  <a href="email_assistant.html">📧 Email Assistant</a>
+                  <a href="meeting_summarizer.html">🎙️ Meeting Summarizer</a>
+                  <a href="memory_manager.html">🧠 Memory Manager</a>
+                  <a href="task_planner.html">📋 Task Planner</a>
+                  <a href="pdf_chat.html">📑 PDF Chat</a>
+                  <a href="pkb_agent.html">🔗 PKB Agent</a>
+                  <a href="voice_agent.html">🗣️ Voice Agent</a>
+                </div>
+              </div>
+              <div>
+                <div class="mega-col-title">Developer Tools</div>
+                <div class="mega-col-list">
+                  <a href="orchestrator.html">🎯 Orchestrator</a>
+                  <a href="sql.html">📊 Text-to-SQL</a>
+                  <a href="code_interpreter.html">⚡ Code Interpreter</a>
+                  <a href="git_repo_manager.html">🐙 Git Repo Manager</a>
+                  <a href="database_migrator.html">🗄️ Database Migrator</a>
+                </div>
+              </div>
+              <div>
+                <div class="mega-col-title">Web &amp; Scraping</div>
+                <div class="mega-col-list">
+                  <a href="web_agent.html">🌐 Web Agent</a>
+                  <a href="web_scraper.html">🕷️ Web Scraper</a>
+                  <a href="search_orchestrator.html">🔎 Search Orchestrator</a>
+                </div>
+              </div>
+              <div>
+                <div class="mega-col-title">Data &amp; Utilities</div>
+                <div class="mega-col-list">
+                  <a href="json_cleaner.html">🧹 JSON Cleaner</a>
+                  <a href="document_parser.html">📄 Document Parser</a>
+                  <a href="vision_parser.html">👁️ Vision Parser</a>
+                  <a href="data_analyst.html">📈 Data Analyst</a>
+                  <a href="translation_hub.html">🌐 Translation Hub</a>
+                  <a href="math_agent.html">🧮 Math Agent</a>
+                  <a href="security_audit.html">🛡️ Security Audit</a>
+                  <a href="embeddings_server.html">🔢 Embeddings Server</a>
+                </div>
+              </div>
+            </div>
+          </li>
           <li><a href="chat.html">Chat Studio</a></li>
           <li><a href="playground.html">Playground</a></li>
           <li><a href="blogs.html" class="active">Blogs</a></li>
+          <li>
+            <button onclick="openDownloadModal()" style="background: linear-gradient(135deg, #4f46e5, #0284c7); color: #ffffff; border: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(79,70,229,0.25);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download App
+            </button>
+          </li>
           <li>
             <a href="https://github.com/t00114218-stack/SLMAgents" target="_blank" class="btn-github-nav">
               <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -368,6 +428,6 @@
     </main>
   </div>
 
-  <script src="app.js?v=53.0"></script>
+  <script src="app.js?v=54.0"></script>
 </body>
 </html>

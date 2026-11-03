@@ -808,6 +808,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # mcp-serve
     sub.add_parser("mcp-serve", help="Expose SLMAgents CPU Harness over stdio Model Context Protocol")
 
+    # update
+    p_upd = sub.add_parser("update", help="Pull latest code, UI & skills from the central GitHub repository")
+    p_upd.add_argument("--check", action="store_true", help="Only check if an update is available")
+    p_upd.add_argument("--force", action="store_true", help="Force re-sync from central repository")
+
+    # push
+    p_push = sub.add_parser("push", help="Commit and push updates to the central GitHub repository for all Desktop Apps")
+    p_push.add_argument("message", nargs="*", help="Commit message")
+
     parsed = parser.parse_args(args_list)
 
     cfg = get_config()
@@ -869,6 +878,32 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             profile=parsed.profile,
             skip_download=parsed.skip_download,
         )
+    if cmd == "update":
+        from ..updater import check_for_updates, pull_central_update
+
+        if parsed.check:
+            res = check_for_updates(repo_dir=cfg.workspace_dir)
+        else:
+            res = pull_central_update(repo_dir=cfg.workspace_dir, force=parsed.force)
+        print(json.dumps(res, indent=2))
+        return 0
+    if cmd == "push":
+        import subprocess
+        from ..updater import DEFAULT_CENTRAL_BRANCH
+
+        msg = " ".join(parsed.message).strip() or "chore(sync): push central repo update & skills"
+        subprocess.run(
+            ["git", "add", "slm_harness", "website", "main.py", "desktop_app.py", "scripts", ".slm/skills"],
+            cwd=cfg.workspace_dir,
+            check=False,
+        )
+        diff_res = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=cfg.workspace_dir)
+        if diff_res.returncode != 0:
+            subprocess.run(["git", "commit", "-m", msg], cwd=cfg.workspace_dir, check=True)
+        subprocess.run(["git", "push", "github", DEFAULT_CENTRAL_BRANCH], cwd=cfg.workspace_dir, check=True)
+        sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=cfg.workspace_dir, text=True).strip()
+        print(f"✅ Pushed commit {sha} to central repo (github/{DEFAULT_CENTRAL_BRANCH}). All Desktop Apps will receive this update.")
+        return 0
 
     return 0
 

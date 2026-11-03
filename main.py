@@ -395,6 +395,8 @@ class ChatAttachment(BaseModel):
     data: str = ""  # base64 data URL or raw text
     size: int = 0
 
+from typing import Optional
+
 class ChatRequest(BaseModel):
     session_id: str = "default_session"
     req_id: str = ""
@@ -408,7 +410,7 @@ class ChatRequest(BaseModel):
     design_tone: str = ""
     active_skills: list[str] = []
     forced_mode: str = ""
-    json_schema: dict | None = None
+    json_schema: Optional[dict] = None
     max_tokens: int = 2400
 
 from slm_memory import SLMMemoryManager
@@ -3428,7 +3430,228 @@ async def root():
     return FileResponse(os.path.join(website_path, "chat.html"))
 
 
-def _resolve_installer_catalog():
+AGENT_SLUG_TO_FOLDER = {
+    "rag": "slm_rag",
+    "slm_rag": "slm_rag",
+    "summarizer": "slm_summarizer",
+    "slm_summarizer": "slm_summarizer",
+    "sql": "slm_text_to_sql",
+    "text_to_sql": "slm_text_to_sql",
+    "slm_text_to_sql": "slm_text_to_sql",
+    "cli": "slm_cli_agent",
+    "cli_agent": "slm_cli_agent",
+    "slm_cli_agent": "slm_cli_agent",
+    "code_interpreter": "slm_code_interpreter",
+    "slm_code_interpreter": "slm_code_interpreter",
+    "git_repo_manager": "slm_git_repo_manager",
+    "slm_git_repo_manager": "slm_git_repo_manager",
+    "json_cleaner": "slm_json_cleaner",
+    "slm_json_cleaner": "slm_json_cleaner",
+    "document_parser": "slm_document_parser",
+    "slm_document_parser": "slm_document_parser",
+    "vision_parser": "slm_vision_parser",
+    "slm_vision_parser": "slm_vision_parser",
+    "web_agent": "slm_web_agent",
+    "slm_web_agent": "slm_web_agent",
+    "web_scraper": "slm_web_scraper",
+    "slm_web_scraper": "slm_web_scraper",
+    "search_orchestrator": "slm_search_orchestrator",
+    "slm_search_orchestrator": "slm_search_orchestrator",
+    "data_analyst": "slm_data",
+    "slm_data": "slm_data",
+    "database_migrator": "slm_db_migration",
+    "slm_db_migration": "slm_db_migration",
+    "email_assistant": "slm_email",
+    "slm_email": "slm_email",
+    "embeddings_server": "slm_embeddings",
+    "slm_embeddings": "slm_embeddings",
+    "math_agent": "slm_math",
+    "slm_math": "slm_math",
+    "meeting_summarizer": "slm_meeting",
+    "slm_meeting": "slm_meeting",
+    "memory_manager": "slm_memory",
+    "slm_memory": "slm_memory",
+    "orchestrator": "slm_orchestrator",
+    "slm_orchestrator": "slm_orchestrator",
+    "pdf_chat": "slm_pdf",
+    "slm_pdf": "slm_pdf",
+    "pkb_agent": "slm_pkb",
+    "slm_pkb": "slm_pkb",
+    "security_audit": "slm_security",
+    "slm_security": "slm_security",
+    "task_planner": "slm_task_planner",
+    "slm_task_planner": "slm_task_planner",
+    "translation_hub": "slm_translation",
+    "slm_translation": "slm_translation",
+    "voice_agent": "slm_voice",
+    "slm_voice": "slm_voice",
+    "harness": "slm_harness",
+    "slm_harness": "slm_harness",
+}
+
+
+def _build_individual_agent_harness_installer(agent_slug: str, os_target: str) -> tuple:
+    """
+    Builds (or serves from cache) a standalone self-extracting 10-Plane Harness installer
+    scoped to `slm_harness` + a specific specialist agent (`slm_<agent>`) for macOS, Windows, or Linux.
+    Returns `(file_path, download_filename, media_type)`.
+    """
+    import io
+    import stat
+    import tarfile
+    import zipfile
+
+    clean_slug = re.sub(r"[^a-z0-9_]", "", (agent_slug or "harness").lower().replace("-", "_"))
+    agent_folder = AGENT_SLUG_TO_FOLDER.get(clean_slug, "slm_harness")
+    agent_label = agent_folder.replace("slm_", "").replace("_", "-").upper() if agent_folder != "slm_harness" else "CORE"
+
+    cache_dir = os.path.join(BASE_DIR, "dist", "agent_installers")
+    os.makedirs(cache_dir, exist_ok=True)
+
+    include_dirs = ["slm_harness"]
+    if agent_folder != "slm_harness" and os.path.isdir(os.path.join(BASE_DIR, agent_folder)):
+        include_dirs.append(agent_folder)
+    include_files = ["slm", "download_models.py", "requirements.txt"]
+
+    def _iter_agent_files():
+        for fn in include_files:
+            abs_f = os.path.join(BASE_DIR, fn)
+            if os.path.isfile(abs_f):
+                yield abs_f, fn
+        for d in include_dirs:
+            abs_d = os.path.join(BASE_DIR, d)
+            if not os.path.isdir(abs_d):
+                continue
+            for root, dirs, files in os.walk(abs_d):
+                dirs[:] = [x for x in dirs if x not in {"__pycache__", ".git", ".venv", "build", "dist"} and not x.endswith(".egg-info")]
+                for f in files:
+                    if f.endswith((".pyc", ".pyo", ".DS_Store", ".log")):
+                        continue
+                    full_p = os.path.join(root, f)
+                    rel_p = os.path.relpath(full_p, BASE_DIR)
+                    yield full_p, rel_p
+
+    norm_os = os_target.lower()
+    if norm_os in ("windows", "win", "bat", "agent-windows"):
+        filename = f"SLMAgents-2.0-{agent_label}-Harness-Windows.bat"
+        out_path = os.path.join(cache_dir, filename)
+        if not os.path.isfile(out_path):
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                for abs_p, rel_p in _iter_agent_files():
+                    zf.write(abs_p, arcname=rel_p)
+            b64_payload = base64.b64encode(buf.getvalue()).decode("ascii")
+            pkg_install_cmd = f"& $pyExe -m pip install -e (Join-Path $appDir '{agent_folder}'); " if agent_folder != "slm_harness" else ""
+            bat_content = f"""@echo off
+REM ============================================================================
+REM SLMAgents 2.0 — Individual 10-Plane Harness Installer ({agent_folder}) for Windows
+REM Bundles slm_harness + {agent_folder} + portable Python 3.11 runtime
+REM ============================================================================
+setlocal
+echo ==================================================================
+echo   SLMAgents 2.0 — 10-Plane Harness Installer [{agent_folder}]
+echo   Target: %LOCALAPPDATA%\\SLMAgents\\harness_{agent_folder}
+echo ==================================================================
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$ErrorActionPreference = 'Stop'; ^
+   $installDir = Join-Path $env:LOCALAPPDATA 'SLMAgents\\harness_{agent_folder}'; ^
+   $appDir = Join-Path $installDir 'src'; ^
+   $pyDir = Join-Path $env:LOCALAPPDATA 'SLMAgents\\python_runtime'; ^
+   New-Item -ItemType Directory -Force -Path $appDir | Out-Null; ^
+   Write-Host '[1/3] Extracting 10-Plane Harness + {agent_folder}...'; ^
+   $lines = Get-Content -LiteralPath '%~f0'; ^
+   $idx = [Array]::IndexOf($lines, '::SLM_AGENT_ZIP_PAYLOAD::') + 1; ^
+   $b64 = $lines[$idx..($lines.Length - 1)] -join ''; ^
+   $zipPath = Join-Path $installDir 'payload.zip'; ^
+   [IO.File]::WriteAllBytes($zipPath, [Convert]::FromBase64String($b64)); ^
+   Expand-Archive -LiteralPath $zipPath -DestinationPath $appDir -Force; ^
+   Remove-Item $zipPath -Force; ^
+   $pyExe = Join-Path $pyDir 'python\\python.exe'; ^
+   if (-not (Test-Path $pyExe)) {{ ^
+     Write-Host '[2/3] Provisioning standalone portable Python 3.11 runtime...'; ^
+     $pyTar = Join-Path $installDir 'py_standalone.tar.gz'; ^
+     $url = 'https://github.com/indygreg/python-build-standalone/releases/download/20240814/cpython-3.11.9+20240814-x86_64-pc-windows-msvc-install_only.tar.gz'; ^
+     Invoke-WebRequest -Uri $url -OutFile $pyTar; ^
+     New-Item -ItemType Directory -Force -Path $pyDir | Out-Null; ^
+     tar -xzf $pyTar -C $pyDir; ^
+     Remove-Item $pyTar -Force; ^
+   }}; ^
+   Write-Host '[3/3] Installing {agent_folder} into 10-Plane Harness...'; ^
+   & $pyExe -m pip install --upgrade pip; ^
+   {pkg_install_cmd}^
+   Write-Host 'Ready! Launching SLMAgents 10-Plane Harness doctor check...'; ^
+   $env:PYTHONPATH = $appDir; ^
+   & $pyExe -m slm_harness.surfaces.cli_tui doctor"
+exit /b 0
+::SLM_AGENT_ZIP_PAYLOAD::
+{b64_payload}
+"""
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(bat_content)
+        return out_path, filename, "application/octet-stream"
+
+    is_mac = norm_os in ("macos", "mac", "darwin", "command", "agent-macos", "macos-command")
+    ext = "command" if is_mac else "run"
+    os_title = "macOS" if is_mac else "Linux"
+    filename = f"SLMAgents-2.0-{agent_label}-Harness-{os_title}.{ext}"
+    out_path = os.path.join(cache_dir, filename)
+    if not os.path.isfile(out_path):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+            for abs_p, rel_p in _iter_agent_files():
+                tf.add(abs_p, arcname=rel_p)
+        b64_payload = base64.b64encode(buf.getvalue()).decode("ascii")
+        editable_line = f'"${{INSTALL_DIR}}/venv/bin/python" -m pip install -e "${{INSTALL_DIR}}/src/{agent_folder}" || true' if agent_folder != "slm_harness" else ""
+        sh_content = f"""#!/usr/bin/env bash
+# SLMAgents 2.0 — Individual 10-Plane Harness Installer ({agent_folder}) for {os_title}
+set -e
+
+INSTALL_DIR="${{HOME}}/.slm_harness/agents/{agent_folder}"
+BIN_DIR="${{HOME}}/.local/bin"
+
+echo "=================================================================="
+echo "  SLMAgents 2.0 — 10-Plane Pure-CPU Harness Installer [{agent_folder}]"
+echo "  OS: {os_title} | Target: ${{INSTALL_DIR}}"
+echo "=================================================================="
+
+mkdir -p "${{INSTALL_DIR}}/src" "${{BIN_DIR}}"
+
+echo "[1/3] Extracting slm_harness + {agent_folder} package..."
+PAYLOAD_LINE=$(awk '/^__SLM_AGENT_PAYLOAD_BELOW__/ {{print NR + 1; exit 0; }}' "$0")
+tail -n +${{PAYLOAD_LINE}} "$0" | base64 -d | tar -xz -C "${{INSTALL_DIR}}/src"
+chmod +x "${{INSTALL_DIR}}/src/slm" 2>/dev/null || true
+
+echo "[2/3] Provisioning isolated Python environment..."
+if [ ! -x "${{INSTALL_DIR}}/venv/bin/python" ]; then
+    python3 -m venv "${{INSTALL_DIR}}/venv"
+    "${{INSTALL_DIR}}/venv/bin/python" -m pip install --upgrade pip
+fi
+{editable_line}
+
+echo "[3/3] Linking './slm' CLI launcher into ${{BIN_DIR}}/slm..."
+cat > "${{BIN_DIR}}/slm" <<'EOF'
+#!/usr/bin/env bash
+export PYTHONPATH="${{HOME}}/.slm_harness/agents/{agent_folder}/src:${{PYTHONPATH:-}}"
+exec "${{HOME}}/.slm_harness/agents/{agent_folder}/venv/bin/python" -m slm_harness.surfaces.cli_tui "$@"
+EOF
+chmod +x "${{BIN_DIR}}/slm"
+
+echo "=================================================================="
+echo "  Installed slm_harness + {agent_folder}!"
+echo "  Run: ${{BIN_DIR}}/slm chat  OR  ${{BIN_DIR}}/slm ask 'Your prompt'"
+echo "=================================================================="
+"${{BIN_DIR}}/slm" doctor || true
+exit 0
+__SLM_AGENT_PAYLOAD_BELOW__
+{b64_payload}
+"""
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(sh_content)
+        os.chmod(out_path, os.stat(out_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return out_path, filename, "application/x-sh"
+
+
+def _resolve_installer_catalog(agent_slug: str = ""):
     dist_dir = os.path.join(BASE_DIR, "dist")
     items = [
         {
@@ -3481,18 +3704,56 @@ def _resolve_installer_catalog():
                 "download_url": f"/api/installers/download/{item['id']}",
             }
         )
+    if agent_slug:
+        for os_key, os_name, ext_label in [
+            ("agent-macos", "macOS", ".command"),
+            ("agent-windows", "Windows", ".bat"),
+            ("agent-linux", "Linux", ".run"),
+        ]:
+            p, fn, mt = _build_individual_agent_harness_installer(agent_slug, os_key)
+            sz_mb = round(os.path.getsize(p) / (1024 * 1024), 2) if os.path.isfile(p) else 0.4
+            result.append(
+                {
+                    "id": os_key,
+                    "os": os_name,
+                    "title": f"{os_name} Individual Agent + Harness Installer ({ext_label})",
+                    "subtitle": f"Bundles slm_harness + {AGENT_SLUG_TO_FOLDER.get(agent_slug, agent_slug)} + ./slm CLI",
+                    "filename": fn,
+                    "version": "2.0.0",
+                    "media_type": mt,
+                    "available": True,
+                    "size_mb": sz_mb,
+                    "download_url": f"/api/installers/download/{os_key}?agent={agent_slug}",
+                }
+            )
     return result
 
 
 @app.get("/api/installers")
-async def list_desktop_installers():
-    return {"version": "2.0.0", "installers": _resolve_installer_catalog()}
+async def list_desktop_installers(agent: str = ""):
+    return {
+        "version": "2.0.0",
+        "agent": agent or None,
+        "supported_agents": sorted(AGENT_SLUG_TO_FOLDER.keys()),
+        "installers": _resolve_installer_catalog(agent),
+    }
 
 
 @app.get("/api/installers/download/{target_id}")
-async def download_desktop_installer(target_id: str):
+async def download_desktop_installer(target_id: str, agent: str = ""):
     dist_dir = os.path.join(BASE_DIR, "dist")
     os.makedirs(dist_dir, exist_ok=True)
+
+    # Support individual per-agent harness installers for macOS (.command), Windows (.bat), and Linux (.run)
+    if target_id in ("agent-macos", "agent-windows", "agent-linux", "macos") or (agent and target_id in ("macos", "windows", "linux")):
+        file_path, dl_filename, media_type = _build_individual_agent_harness_installer(agent or "harness", target_id)
+        return FileResponse(
+            file_path,
+            media_type=media_type,
+            filename=dl_filename,
+            headers={"Content-Disposition": f'attachment; filename="{dl_filename}"'},
+        )
+
     catalog = {entry["id"]: entry for entry in _resolve_installer_catalog()}
     entry = catalog.get(target_id)
     if not entry:
@@ -3563,6 +3824,67 @@ async def install_and_launch_local_desktop_app():
             subprocess.Popen(["open", target_app])
             return {"status": "ok", "installed_to": target_app}
         return {"status": "error", "message": "dist/SLMAgents.app not found."}
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
+
+
+@app.get("/api/system/update/status")
+async def get_central_update_status():
+    from slm_harness.updater import check_for_updates
+
+    return check_for_updates(repo_dir=BASE_DIR)
+
+
+@app.post("/api/system/update/pull")
+async def pull_central_repo_update(request: Request):
+    from slm_harness.updater import pull_central_update
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    force = bool(body.get("force", True))
+    return pull_central_update(repo_dir=BASE_DIR, force=force)
+
+
+@app.post("/api/system/update/push")
+async def push_central_repo_update(request: Request):
+    """Commits and pushes tracked code & `.slm/skills/` updates to the central GitHub repository (`SuryaprakashCV/SLMAgents`)."""
+    import subprocess
+    from slm_harness.updater import DEFAULT_CENTRAL_BRANCH
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    commit_msg = (body.get("message") or "chore(sync): push central repo update & skills").strip()
+    try:
+        subprocess.run(
+            ["git", "add", "slm_harness", "website", "main.py", "desktop_app.py", "scripts", ".slm/skills"],
+            cwd=BASE_DIR,
+            check=False,
+        )
+        diff_res = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=BASE_DIR)
+        if diff_res.returncode != 0:
+            subprocess.run(["git", "commit", "-m", commit_msg], cwd=BASE_DIR, check=True)
+        push_out = subprocess.run(
+            ["git", "push", "github", DEFAULT_CENTRAL_BRANCH],
+            cwd=BASE_DIR,
+            capture_output=True,
+            text=True,
+            timeout=25.0,
+        )
+        sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=BASE_DIR, text=True).strip()
+        if push_out.returncode == 0:
+            return {
+                "status": "ok",
+                "pushed_sha": sha,
+                "branch": DEFAULT_CENTRAL_BRANCH,
+                "message": f"Pushed commit {sha} to central repo ({DEFAULT_CENTRAL_BRANCH}). All Desktop Apps can now pull this update.",
+            }
+        return {"status": "error", "message": push_out.stderr.strip() or push_out.stdout.strip()}
     except Exception as exc:
         return {"status": "error", "message": str(exc)}
 

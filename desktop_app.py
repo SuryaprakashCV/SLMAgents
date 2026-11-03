@@ -23,10 +23,15 @@ import urllib.request
 import webbrowser
 from typing import Optional
 
+CENTRAL_SYNC_DIR = os.path.expanduser("~/.slm_harness/central_sync")
 REPO_ROOT = (
-    os.path.abspath(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))))
-    if getattr(sys, "frozen", False)
-    else os.path.dirname(os.path.abspath(__file__))
+    CENTRAL_SYNC_DIR
+    if getattr(sys, "frozen", False) and os.path.isfile(os.path.join(CENTRAL_SYNC_DIR, "main.py"))
+    else (
+        os.path.abspath(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))))
+        if getattr(sys, "frozen", False)
+        else os.path.dirname(os.path.abspath(__file__))
+    )
 )
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
@@ -275,8 +280,13 @@ def run_desktop_app(
     selected_port, already_alive = start_or_attach_server(host, port)
     studio_url = f"http://{host}:{selected_port}/chat.html?desktop=1"
 
-    # Kick off non-blocking background model verification
+    # Kick off non-blocking background model verification & Central Repo OTA sync
     ensure_models_bootstrapped_async(models_dir=models_dir, profile=active_profile, skip_download=skip_download)
+    threading.Thread(
+        target=lambda: __import__("slm_harness.updater", fromlist=["activate_central_sync_overlay"]).activate_central_sync_overlay(),
+        daemon=True,
+        name="slm-ota-sync",
+    ).start()
 
     if headless_open_only:
         deadline = time.time() + 15.0

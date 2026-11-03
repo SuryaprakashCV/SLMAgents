@@ -3,27 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Interactive web sandbox to test and benchmark local SLM agents side-by-side with live telemetry, CPU footprint metrics, and instant inference.">
+  <meta name="description" content="Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry, Watermark LRU MemoryArena metrics, and standalone OS harness installers.">
   
   <link rel="canonical" href="https://www.slmagents.ai/playground.html">
-  <title>Interactive Multi-Agent Studio & Playground | SLMAgents</title>
-  <link rel="stylesheet" href="style.css?v=2.1">
+  <title>Interactive 10-Plane Agent Harness Studio &amp; Playground | SLMAgents 2.0</title>
+  <link rel="stylesheet" href="style.css?v=54.0">
   <!-- OpenGraph / Social Meta Tags -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.slmagents.ai/playground.html">
-  <meta property="og:title" content="Interactive Multi-Agent Studio & Playground | SLMAgents">
-  <meta property="og:description" content="Interactive web sandbox to test and benchmark local SLM agents side-by-side with live telemetry, CPU footprint metrics, and instant inference.">
+  <meta property="og:title" content="Interactive 10-Plane Agent Harness Studio &amp; Playground | SLMAgents 2.0">
+  <meta property="og:description" content="Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry and standalone OS harness installers.">
   <meta property="og:site_name" content="SLMAgents">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Interactive Multi-Agent Studio & Playground | SLMAgents">
-  <meta name="twitter:description" content="Interactive web sandbox to test and benchmark local SLM agents side-by-side with live telemetry, CPU footprint metrics, and instant inference.">
+  <meta name="twitter:title" content="Interactive 10-Plane Agent Harness Studio &amp; Playground | SLMAgents 2.0">
+  <meta name="twitter:description" content="Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry and standalone OS harness installers.">
   <!-- Structured Data / Schema Markup -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "TechArticle",
-    "headline": "Interactive Multi-Agent Studio & Playground | SLMAgents",
-    "description": "Interactive web sandbox to test and benchmark local SLM agents side-by-side with live telemetry, CPU footprint metrics, and instant inference.",
+    "headline": "Interactive 10-Plane Agent Harness Studio & Playground | SLMAgents 2.0",
+    "description": "Interactive web sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry and standalone OS harness installers.",
     "url": "https://www.slmagents.ai/playground.html",
     "mainEntityOfPage": "https://www.slmagents.ai/playground.html",
     "articleSection": "Playground",
@@ -114,28 +114,48 @@
                 </div>
               </div>
             </div>
+          </li>
           <li><a href="chat.html">Chat Studio</a></li>
-          <li><a href="playground.html" class="active" style="color: #818cf8; font-weight: 700;">⚡ Playground</a></li>
+          <li><a href="playground.html" class="active" style="color: #4f46e5; font-weight: 700;">⚡ Playground</a></li>
           <li><a href="blogs.html">Blogs</a></li>
+          <li>
+            <button onclick="openDownloadModal()" style="background: linear-gradient(135deg, #4f46e5, #0284c7); color: #ffffff; border: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(79,70,229,0.25);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download App
+            </button>
+          </li>
           <li><a href="https://github.com/t00114218-stack/SLMAgents" class="btn-github-nav" target="_blank">
             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
               <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/>
             </svg>
             <span>GitHub</span>
           </a></li>
-          <li><a href="https://huggingface.co/spaces/spcv/slm-agents" class="btn-hf-nav" target="_blank">🤗 HF Space</a></li>
         </ul>
       </nav>
     </div>
   </header>
 
   <!-- Interactive Multi-Agent Playground / Studio -->
-  <section class="studio-section" id="studio" style="border-top: 1px solid rgba(0, 0, 0, 0.05); padding: 80px 0; background: #f8fafc;">
+  <section class="studio-section" id="studio" style="border-top: 1px solid rgba(0, 0, 0, 0.05); padding: 60px 0 80px 0; background: #f8fafc;">
     <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 20px;">
-      <div class="section-header" style="text-align: center; margin-bottom: 3rem;">
-        <div class="badge-pill" style="display: inline-block; margin-bottom: 0.75rem; background: #e0f2fe; color: #0284c7; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; border: 1px solid #bae6fd;">🎮 Live Interactive Sandbox</div>
-        <h2 class="section-title" style="font-size: 2.25rem; color: #0f172a; font-weight: 800; margin-bottom: 0.5rem;">Interactive Multi-Agent Studio</h2>
-        <p class="section-subtitle" style="font-size: 1.05rem; color: #475569; max-width: 700px; margin: 0 auto;">Experience real-time CPU-optimized model execution. Select specialized agents, customize inputs, and execute or generate unit tests live.</p>
+      <div class="section-header" style="text-align: center; margin-bottom: 2rem;">
+        <div class="badge-pill" style="display: inline-block; margin-bottom: 0.75rem; background: #e0e7ff; color: #4338ca; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; border: 1px solid #c7d2fe;">🎮 Live 10-Plane Pure-CPU Agent Harness Sandbox</div>
+        <h1 class="section-title" style="font-size: 2.25rem; color: #0f172a; font-weight: 800; margin-bottom: 0.5rem;">Interactive Multi-Agent Harness Studio</h1>
+        <p class="section-subtitle" style="font-size: 1.02rem; color: #475569; max-width: 780px; margin: 0 auto;">Execute any of the 26 specialized agents through the <strong>SLMAgents 2.0 10-Plane Pure-CPU Harness (<code>slm_harness</code>)</strong>—powered by hybrid <code>llama.cpp</code> GGUF (<code>Q4_K_M</code>) + Quantized INT4/INT8 CPU models, <code>&lt;35ms</code> Cascade Routing, Watermark LRU <code>MemoryArena</code>, and deterministic self-healing verifiers.</p>
+      </div>
+
+      <!-- Standalone OS Harness Installer Bar -->
+      <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px 20px; margin-bottom: 28px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; box-shadow: 0 4px 14px rgba(15,23,42,0.04);">
+        <div>
+          <div style="font-weight: 800; color: #0f172a; font-size: 0.95rem;">📦 Download Standalone 10-Plane Harness Installers (All OSes)</div>
+          <div style="font-size: 0.82rem; color: #64748b;">Install the full 26-agent studio or download an individual standalone harness installer for the selected agent below.</div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+          <a id="pg-agent-mac-dl" href="/api/installers/download/agent-macos?agent=rag" style="padding: 8px 12px; border-radius: 8px; background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca; font-weight: 700; font-size: 0.8rem; text-decoration: none;">🍎 Selected Agent macOS (.command)</a>
+          <a id="pg-agent-win-dl" href="/api/installers/download/agent-windows?agent=rag" style="padding: 8px 12px; border-radius: 8px; background: #f0f9ff; border: 1px solid #bae6fd; color: #0369a1; font-weight: 700; font-size: 0.8rem; text-decoration: none;">🪟 Selected Agent Windows (.bat)</a>
+          <a id="pg-agent-lin-dl" href="/api/installers/download/agent-linux?agent=rag" style="padding: 8px 12px; border-radius: 8px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; font-weight: 700; font-size: 0.8rem; text-decoration: none;">🐧 Selected Agent Linux (.run)</a>
+          <button onclick="openDownloadModal()" style="padding: 8px 14px; border-radius: 8px; background: #0f172a; color: #ffffff; border: none; font-weight: 700; font-size: 0.8rem; cursor: pointer;">Full Suite OS Installers (.dmg / .pkg / .bat / .run)</button>
+        </div>
       </div>
 
       <div class="studio-grid" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 40px; margin-top: 40px; text-align: left;">
@@ -212,12 +232,30 @@
   </section>
 
   <!-- Footer -->
-  <footer style="background: #0b0f19; border-top: 1px solid #1e293b; padding: 40px 0; color: #475569; text-align: center; font-size: 0.9rem;">
+  <footer style="background: #0b0f19; border-top: 1px solid #1e293b; padding: 40px 0; color: #94a3b8; text-align: center; font-size: 0.9rem;">
     <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 20px;">
-      <p style="margin: 0 0 10px 0;">© 2026 SLM Agents. Built with ONNX Runtime GenAI. Open-source under MIT License.</p>
+      <p style="margin: 0 0 10px 0;">© 2026 SLM Agents. Powered by the 10-Plane Pure-CPU Agent Harness (<code>slm_harness</code> • <code>llama.cpp</code> GGUF + Quantized INT4/INT8 CPU). Open-source under MIT License.</p>
     </div>
   </footer>
 
-  <script src="app.js?v=21.0"></script>
+  <script src="app.js?v=54.0"></script>
+  <script>
+    (function() {
+      const sel = document.getElementById('studio-agent-select');
+      function syncPgDownloadLinks(val) {
+        const slug = val === 'voice' ? 'voice_agent' : val;
+        const m = document.getElementById('pg-agent-mac-dl');
+        const w = document.getElementById('pg-agent-win-dl');
+        const l = document.getElementById('pg-agent-lin-dl');
+        if (m) m.href = '/api/installers/download/agent-macos?agent=' + encodeURIComponent(slug);
+        if (w) w.href = '/api/installers/download/agent-windows?agent=' + encodeURIComponent(slug);
+        if (l) l.href = '/api/installers/download/agent-linux?agent=' + encodeURIComponent(slug);
+      }
+      if (sel) {
+        sel.addEventListener('change', function() { syncPgDownloadLinks(this.value); });
+        syncPgDownloadLinks(sel.value);
+      }
+    })();
+  </script>
 </body>
 </html>
