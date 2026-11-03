@@ -44,6 +44,7 @@ from ..tools.file_exporter import (
     is_direct_download_followup,
     rewrite_and_materialize_downloads,
 )
+from ..tools.machine_control import MachineControlEngine, detect_machine_control_intent
 from ..tools.web_search_engine import (
     build_smart_web_query,
     live_web_search,
@@ -259,6 +260,44 @@ class TurnStateMachine:
                     + "\n".join(f"{idx}. **{opt}**" for idx, opt in enumerate(options, 1))
                 ),
                 "plan_context": "",
+            }
+
+        # Check if this is a Machine / OS Control request
+        machine_intent = detect_machine_control_intent(q_clean)
+        if machine_intent:
+            steps = [
+                {
+                    "node_id": "plan_1",
+                    "agent": "slm_cli_agent",
+                    "instruction": "Detect host OS (macOS Darwin / Windows NT / Linux POSIX), shell & GUI environment",
+                    "depends_on": [],
+                },
+                {
+                    "node_id": "plan_2",
+                    "agent": primary_agent,
+                    "instruction": f"Synthesize OS-native commands & screen/file workflow for: {q_clean[:85]}",
+                    "depends_on": ["plan_1"],
+                },
+                {
+                    "node_id": "plan_3",
+                    "agent": primary_agent,
+                    "instruction": "Execute machine task in governed sandbox with live thought telemetry",
+                    "depends_on": ["plan_2"],
+                },
+                {
+                    "node_id": "plan_4",
+                    "agent": primary_agent,
+                    "instruction": "Verify machine state, SHA-256 checksums, and downloadable output artifacts",
+                    "depends_on": ["plan_3"],
+                },
+            ]
+            return {
+                "needs_blocking_clarification": False,
+                "question": "",
+                "options": [],
+                "steps": steps,
+                "plan_markdown": "",
+                "plan_context": f"Execute OS & Machine Control workflow ({machine_intent}) with step-by-step thought process.",
             }
 
         # When the user's request is clear, plan internally and answer naturally in one pass without asking redundant options
@@ -605,6 +644,7 @@ class TurnStateMachine:
                 run_web = (
                     not _is_skill_only
                     and not _is_fast_export_turn
+                    and not detect_machine_control_intent(user_query)
                     and route_dec.primary_agent != "slm_math"
                     and (
                         explicit_live_url_or_web
@@ -863,6 +903,8 @@ class TurnStateMachine:
                 and bool(created_skill_card)
                 and not also_run_task
             )
+            machine_intent_now = detect_machine_control_intent(user_query) if json_schema is None else None
+            is_machine_control_turn = bool(machine_intent_now) and not is_pure_skill_mutation_turn
 
             if is_pure_skill_mutation_turn:
                 final_text = created_skill_card
@@ -872,6 +914,33 @@ class TurnStateMachine:
                 ttft_ms = 9.0
                 tok_per_sec = 220.0
                 self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent="slm_skill_architect")
+
+            elif is_machine_control_turn:
+                mc_engine = MachineControlEngine(workspace_dir=self.config.workspace_dir)
+
+                def _on_machine_thought(agent_lbl: str, thought_msg: str) -> None:
+                    self.bus.emit(
+                        EventType.STEP_COMPLETED,
+                        rid,
+                        session_id,
+                        agent=agent_lbl or route_dec.primary_agent,
+                        message=thought_msg,
+                    )
+
+                with tracer.span(rid, f"machine_control:{machine_intent_now}", "tool", parent_id=root_span.span_id):
+                    mc_out = mc_engine.execute_from_query(
+                        query=user_query,
+                        session_id=session_id,
+                        attachments=artifacts,
+                        step_callback=_on_machine_thought,
+                    )
+                final_text = mc_out.markdown_response
+                structured_out = mc_out.structured_data
+                model_id_used = "slm-os-machine-controller"
+                backend_used = f"native-os-{mc_out.os_family.lower()}"
+                ttft_ms = 8.5
+                tok_per_sec = 260.0
+                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
 
             elif is_fast_download_request:
                 route_dec.primary_agent = "slm_design_studio"
@@ -1053,7 +1122,7 @@ class TurnStateMachine:
                     final_text = vj.cleaned_artifact
 
             # 5. Materialize real downloadable files & run Design Studio Critic
-            if json_schema is None and final_text and not is_pure_skill_mutation_turn:
+            if json_schema is None and final_text and not is_pure_skill_mutation_turn and not is_machine_control_turn:
                 if also_run_task and mutated_skill is not None:
                     action_verb = "Updated & Applied Skill" if is_skill_improve_turn else "Created & Applied Skill"
                     skill_banner = (

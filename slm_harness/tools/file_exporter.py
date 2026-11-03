@@ -61,6 +61,7 @@ MIME_TYPES: Dict[str, str] = {
     "txt": "text/plain; charset=utf-8",
     "py": "text/x-python; charset=utf-8",
     "sql": "application/sql; charset=utf-8",
+    "wav": "audio/wav",
 }
 
 

@@ -125,6 +125,31 @@ class SkillDefinition:
 
 DEFAULT_SEED_SKILLS: List[Dict[str, Any]] = [
     {
+        "name": "os-machine-controller",
+        "title": "Universal OS & Machine Controller (macOS / Windows / Linux)",
+        "description": "One unified software control plane for the host machine: detects OS (Darwin/NT/POSIX), executes git checkout/branch/status, copies & backs up files with SHA-256 verification, merges Excel/CSV sheets, plays music/audio, searches files, schedules cron/launchd/schtasks jobs, and traverses desktop screens with live Agent Thought Process telemetry.",
+        "preferred_role": "primary",
+        "preferred_agent": "slm_cli_agent",
+        "preferred_tone": "tech",
+        "output_formats": ["xlsx", "csv", "wav", "sh", "md"],
+        "triggers": ["git checkout", "merge excel", "merge 2 excel", "play music", "copy files", "schedule job", "screen traverse", "control machine"],
+        "tags": ["machine", "os", "git", "excel", "music", "automation", "scheduler", "screen"],
+        "source": "builtin",
+        "instructions": (
+            "# Universal OS & Machine Controller\n\n"
+            "## Purpose\n"
+            "Allows SLMAgents to interact directly with the host machine across macOS (`Darwin`), Windows (`NT`), and Linux (`POSIX`).\n\n"
+            "## Capabilities\n"
+            "1. **Git Repo Control**: `git checkout`, `git branch`, `git status`, `git log`, `git diff`.\n"
+            "2. **File Operations**: Copy, move, and backup files with byte-size and SHA-256 verification.\n"
+            "3. **Excel & CSV Merger**: Merge 2+ Excel (`.xlsx`) or `.csv` sheets into a downloadable workbook.\n"
+            "4. **Music & Media Control**: Trigger native OS audio (`afplay`, `Music.app`, `Spotify`, `playerctl`) and stream audio in chat.\n"
+            "5. **Machine File Search**: Fast file discovery across workspace and user directories.\n"
+            "6. **Job Scheduler**: Register recurring `launchd`, `crontab`, and `schtasks` jobs.\n"
+            "7. **Screen Traversal**: Inspect active desktop windows and execute UI accessibility scripts while streaming every step of the Agent Thought Process."
+        ),
+    },
+    {
         "name": "real-harness-architect",
         "title": "Real Harness Autonomous Architect & Self-Review Engine",
         "description": "Claude-Code-grade Harness skill: formulates loophole-free architectural plans, clarifies ambiguities with interactive options, performs live web research, executes sandboxed verification, manages multi-threaded CPU memory, and runs automated self-review & self-improvement.",

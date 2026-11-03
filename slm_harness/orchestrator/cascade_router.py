@@ -271,6 +271,30 @@ class CascadeRouter:
                     return self._finish(t0, "slm_rag", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.97, "stage0_mime_document", needs_rag=True)
 
         # --- STAGE 1: Deterministic High-Precision Signatures (<1ms) ---
+        from ..tools.machine_control import detect_machine_control_intent
+
+        machine_intent = detect_machine_control_intent(q)
+        if machine_intent:
+            intent_agent_map = {
+                "merge_excel": ("slm_data", "coding"),
+                "git_control": ("slm_git_repo_manager", "coding"),
+                "file_copy": ("slm_cli_agent", "coding"),
+                "search_files": ("slm_cli_agent", "coding"),
+                "play_music": ("slm_cli_agent", "primary"),
+                "schedule_job": ("slm_task_planner", "primary"),
+                "screen_traverse": ("slm_cli_agent", "primary"),
+                "multi_machine": ("slm_task_planner", "primary"),
+            }
+            m_agent, m_role = intent_agent_map.get(machine_intent, ("slm_cli_agent", "primary"))
+            return self._finish(
+                t0,
+                m_agent,
+                forced_mode or ExecutionMode.FAST_DIRECT,
+                m_role,
+                0.99,
+                f"stage1_machine_{machine_intent}",
+            )
+
         if _WORKSPACE_TOOL_RE.search(q):
             return self._finish(
                 t0,

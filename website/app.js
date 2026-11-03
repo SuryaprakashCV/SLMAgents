@@ -2415,13 +2415,20 @@ function getAgentWelcomeCards(agentKey = "auto") {
       { tag: "DB Migrator", title: "Table Partitioning", desc: "Partition large audit logs by date", prompt: "Generate a zero-downtime PostgreSQL migration to partition the audit_logs table by range (created_at month)." },
       { tag: "DB Migrator", title: "Foreign Key Backfill", desc: "Non-blocking FK constraint addition", prompt: "Generate an Alembic migration to add a foreign key constraint from order_items.product_id to products.id without locking the table." }
     ];
+  } else if (agentKey === "SLMCLIAgent" || agentKey === "slm_cli_agent") {
+    return [
+      { tag: "Machine Git", title: "Git Checkout & Status", desc: "Inspect branches, commits & checkout safely", prompt: "git checkout main and show git status and recent commits" },
+      { tag: "Excel Merger", title: "Merge 2 Excel Sheets", desc: "Combine Excel sheets into a downloadable .xlsx", prompt: "merge 2 excel sheets and give me the merged downloadable file" },
+      { tag: "OS Media", title: "Play Music & Audio", desc: "Trigger OS audio bridge & live music stream", prompt: "play music on my machine" },
+      { tag: "OS Automation", title: "Search, Copy & Schedule", desc: "Find files, copy backups & schedule cron/launchd jobs", prompt: "search and find *.py files, copy README.md to backup/README_backup.md, and schedule a job every day at 9am" }
+    ];
   }
 
   // Default Auto-Orchestrator cards
   return [
     { tag: "Code", title: "Fibonacci Generator", desc: "Generates recursive & cached Python functions", prompt: "Write a Python script to compute the Fibonacci sequence with caching." },
+    { tag: "Machine Control", title: "OS & Machine Automation", desc: "Merge 2 Excel sheets, git checkout, copy files, play music & schedule jobs", prompt: "merge 2 excel sheets, check git status, copy README.md to backup, and search for *.py files" },
     { tag: "Text-to-SQL", title: "SQL Aggregation", desc: "Translate natural language into optimized SQL", prompt: "Generate SQL to find top 5 customers with total orders > $1000 in 2024" },
-    { tag: "Planner", title: "Milestone Roadmap", desc: "Decomposes complex projects into actionable steps", prompt: "Break down the milestone plan to launch a privacy-first mobile app." },
     { tag: "Math", title: "Math Solver", desc: "Step-by-step symbolic algebra & calculus", prompt: "Solve this math equation step-by-step: 3x^2 + 6x - 24 = 0" }
   ];
 }
@@ -2560,7 +2567,8 @@ const HUMAN_AGENT_NAMES = {
   slm_translation: "SLM Translation Hub",
   slm_math: "SLM Math Solver",
   slm_security: "SLM Security Audit",
-  slm_embeddings: "SLM Embeddings Engine"
+  slm_embeddings: "SLM Embeddings Engine",
+  slm_os_controller: "SLM OS & Machine Controller"
 };
 
 const HUMAN_MODE_NAMES = {

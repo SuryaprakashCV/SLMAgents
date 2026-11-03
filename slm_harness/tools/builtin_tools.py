@@ -572,3 +572,48 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
             tags=["clarify", "ambiguous", "question", "ask"],
         )
     )
+
+    # 16. machine_control (Universal OS & Machine Control Plane)
+    def _machine_control(args: Dict[str, Any], ctx: ToolExecutionContext) -> str:
+        from .machine_control import MachineControlEngine
+
+        task_query = str(args.get("task") or args.get("query") or "")
+        engine = MachineControlEngine(workspace_dir=ctx.workspace_dir)
+        outcome = engine.execute_from_query(task_query, session_id=ctx.session_id)
+        return outcome.markdown_response
+
+    registry.register(
+        ToolSpec(
+            name="machine_control",
+            description=(
+                "Execute OS-native machine actions across macOS/Windows/Linux: git checkout/status/branch, "
+                "copy/backup files, merge 2+ Excel/CSV sheets, play music/audio, search & find files, "
+                "schedule cron/launchd/schtasks jobs, and traverse desktop screen/window hierarchy."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string"},
+                },
+                "required": ["task"],
+            },
+            risk_level=RiskLevel.L2_SANDBOX_COMPUTE,
+            handler=_machine_control,
+            tags=[
+                "machine",
+                "os",
+                "git",
+                "checkout",
+                "copy",
+                "excel",
+                "merge",
+                "music",
+                "play",
+                "search",
+                "schedule",
+                "screen",
+                "automation",
+            ],
+        )
+    )
+
