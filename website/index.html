@@ -1399,11 +1399,17 @@ for idx, num in enumerate(fib, 1):
   <script>
     function openDownloadModal() {
       var modal = document.getElementById('download-app-modal');
-      if (modal) modal.classList.add('active');
+      if (modal) {
+        modal.classList.add('open');
+        modal.style.display = 'flex';
+      }
     }
     function closeDownloadModal() {
       var modal = document.getElementById('download-app-modal');
-      if (modal) modal.classList.remove('active');
+      if (modal) {
+        modal.classList.remove('open');
+        modal.style.display = 'none';
+      }
     }
     async function installAndOpenMacApp(btn) {
       var orig = btn.innerHTML;
