@@ -610,8 +610,16 @@ class ONNXCPUBackend:
             prev_decoded = ""
             finish_reason = "length"
             t_decode_start = time.perf_counter()
+            hard_limit = max_new + 96
+            step_idx = 0
 
-            for step_idx in range(max_new):
+            while step_idx < hard_limit:
+                if step_idx >= max_new:
+                    in_code = prev_decoded.count("```") % 2 == 1
+                    stripped_tail = prev_decoded.rstrip(" ")
+                    at_boundary = bool(stripped_tail) and stripped_tail[-1] in (".", "!", "?", "\n", "`", ")")
+                    if not in_code and at_boundary:
+                        break
                 if req.cancel_token:
                     req.cancel_token.check()
 
@@ -680,7 +688,8 @@ class ONNXCPUBackend:
                     finish_reason = "stop"
                     break
 
-                if step_idx + 1 < max_new:
+                step_idx += 1
+                if step_idx < hard_limit:
                     past_pos = prompt_len + len(generated_ids) - 1
                     logits, state = self._run_forward_slice([next_tok], past_pos, state)
 

@@ -6,7 +6,7 @@
   <meta name="description" content="Interactive API sandbox to test and benchmark all 26 local SLM agents via the SLMAgents 2.0 10-Plane Pure-CPU Agent Harness (slm_harness), with live CascadeRouter telemetry, Watermark LRU MemoryArena metrics, and standalone OS harness installers.">
   <link rel="canonical" href="https://www.slmagents.ai/playground.html">
   <title>Interactive 10-Plane Agent Harness Sandbox &amp; Unit Test Generator | SLMAgents 2.0</title>
-  <link rel="stylesheet" href="style.css?v=56.0">
+  <link rel="stylesheet" href="style.css?v=62.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -119,15 +119,15 @@
           </div>
           <div class="builder-controls">
             <a id="pg-agent-mac-dl" href="/api/installers/download/agent-macos?agent=rag" class="builder-dl-btn">Selected Agent · macOS (.command)</a>
-            <a id="pg-agent-win-dl" href="/api/installers/download/agent-windows?agent=rag" class="builder-dl-btn">Selected Agent · Windows (.bat)</a>
-            <a id="pg-agent-lin-dl" href="/api/installers/download/agent-linux?agent=rag" class="builder-dl-btn">Selected Agent · Linux (.run)</a>
-            <button onclick="openDownloadModal()" class="btn btn-primary" style="padding: 0.42rem 0.8rem; font-size: 0.76rem;">Full Suite OS Installers</button>
+            <a id="pg-agent-win-dl" href="/api/installers/download/agent-windows?agent=rag" class="builder-dl-btn">Selected Agent · Windows (.exe)</a>
+            <a id="pg-agent-lin-dl" href="/api/installers/download/agent-linux?agent=rag" class="builder-dl-btn">Selected Agent · Linux (.AppImage)</a>
+            <button onclick="openDownloadModal()" class="btn btn-primary" style="padding: 0.44rem 0.85rem; font-size: 0.78rem;">Full Suite OS Installers</button>
           </div>
         </div>
 
-        <div class="studio-grid" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem; align-items: start;">
-          <!-- Parameters Panel -->
-          <div class="studio-panel" style="background: #ffffff; border: 1px solid var(--border); padding: 1.5rem; border-radius: 8px;">
+        <div class="studio-grid" style="display: grid; grid-template-columns: 0.95fr 1.25fr; gap: 2.5rem; align-items: start; padding-top: 0.5rem;">
+          <!-- Parameters Panel (Open Editorial Column, No Box) -->
+          <div class="studio-panel" style="background: transparent; border: none; padding: 0;">
             <h3 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin-top: 0; margin-bottom: 1.15rem; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
               <span>Agent Configuration &amp; Inputs</span>
@@ -173,8 +173,8 @@
             </button>
           </div>
 
-          <!-- Console Panel -->
-          <div class="studio-panel" style="background: #ffffff; border: 1px solid var(--border); padding: 1.5rem; border-radius: 8px; display: flex; flex-direction: column;">
+          <!-- Console Panel (Open Editorial Column, No Outer Box) -->
+          <div class="studio-panel" style="background: transparent; border: none; padding: 0; display: flex; flex-direction: column;">
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.65rem;">
               <button id="tab-mode-exec" class="code-tab-btn active" onclick="setStudioMode('exec')" style="background: #18181b; color: #ffffff; border-radius: 5px; padding: 0.35rem 0.75rem; border: none; font-family: var(--font-mono); font-size: 0.76rem; font-weight: 600; cursor: pointer;">Execute Sandbox</button>
               <button id="tab-mode-unittest" class="code-tab-btn" onclick="setStudioMode('unittest')" style="background: #f4f4f5; color: var(--text-secondary); border-radius: 5px; padding: 0.35rem 0.75rem; border: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.76rem; font-weight: 600; cursor: pointer;">Generate Pytest Suite</button>
@@ -213,7 +213,7 @@
     </main>
   </div>
 
-  <script src="app.js?v=56.0"></script>
+  <script src="app.js?v=62.0"></script>
   <script>
     (function() {
       const sel = document.getElementById('studio-agent-select');

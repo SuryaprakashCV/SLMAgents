@@ -3,10 +3,10 @@ name: linkedin-viral-tech-posts
 title: "Linkedin Viral Tech Posts Specialist"
 description: "Autonomous skill for LinkedIn viral tech posts."
 role: primary
-agent: slm_email
+agent: direct_assistant
 tone: friendly
 output_formats: [docx, pdf, md]
-triggers: [linkedin viral tech posts, linkedin, viral, tech, posts]
+triggers: [linkedin viral tech posts, linkedin post, viral linkedin]
 tags: [communication, content, writing]
 enabled: true
 source: ai-generated

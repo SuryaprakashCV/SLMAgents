@@ -41,6 +41,13 @@ class CPUProfile(str, Enum):
     POWER = "power"        # <= 8.0 GB RAM ceiling (Qwen3-8B GGUF + 0.8B draft + full specialist suite)
 
 
+class ReasoningEffort(str, Enum):
+    LOW = "low"        # Fast sub-second TTFT (0.8B / 1.5B ONNX, direct answers, minimal overhead)
+    MEDIUM = "medium"  # Balanced (3B ONNX / 4B GGUF, structured upfront plan + sandbox verification)
+    HIGH = "high"      # Deep reasoning (4B / 8B GGUF fitting RAM, web research, detailed plan + self-review critic)
+
+
+
 class ApprovalPolicy(str, Enum):
     AUTO_SAFE = "auto-safe"  # Auto-allow L0-L2 (pure, workspace read, sandboxed compute); prompt on L3-L4 (writes, shell, net)
     ASK_ALL = "ask"          # Prompt on L2-L4 (including sandbox Python/SQL exec)
@@ -202,17 +209,17 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
 
 PROFILE_PRESETS: Dict[CPUProfile, Dict[str, Any]] = {
     CPUProfile.LITE: {
-        "ram_soft_limit_mb": 2100,
-        "ram_hard_limit_mb": 2600,
+        "ram_soft_limit_mb": 2400,
+        "ram_hard_limit_mb": 3200,
         "context_window": 3072,
         "speculative_lookup": True,
         "prefill_chunk_size": 256,
         "role_bindings": {
-            "primary": "qwen3.5-0.8b-onnx",
-            "router": "qwen3.5-0.8b-onnx",
-            "coding": "qwen3.5-0.8b-onnx",
+            "primary": "qwen2.5-coder-1.5b-onnx",
+            "router": "qwen2.5-coder-1.5b-onnx",
+            "coding": "qwen2.5-coder-1.5b-onnx",
             "sql": "qwen2.5-text2sql-onnx",
-            "math": "qwen3.5-0.8b-onnx",
+            "math": "qwen2.5-coder-1.5b-onnx",
             "embeddings": "minilm-embed-onnx",
             "reranker": "bge-reranker-int8-onnx",
             "stt": "whisper-small-int8-onnx",
@@ -282,6 +289,7 @@ class HarnessConfig:
     hooks: Dict[str, List[str]] = field(default_factory=dict)
     mcp_servers: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     workspace_instructions: str = ""
+    default_reasoning_effort: ReasoningEffort = ReasoningEffort.MEDIUM
 
     def apply_profile(self, profile: CPUProfile) -> None:
         self.profile = profile
@@ -300,6 +308,69 @@ class HarnessConfig:
                     else "qwen3.5-0.8b-onnx"
                 )
                 self.role_bindings["coding"] = self.role_bindings["primary"]
+
+    def preferred_candidates_for_reasoning(
+        self,
+        role: str,
+        reasoning_effort: str = "medium",
+        available_ram_mb: int = 4000,
+    ) -> List[str]:
+        """Returns ordered candidate model IDs calibrated to (role, reasoning_effort, available_ram_mb)."""
+        effort = (reasoning_effort or self.default_reasoning_effort.value or "medium").lower().strip()
+        if role in ("embeddings", "reranker", "stt", "vision", "router"):
+            base_id = self.role_bindings.get(role, "qwen3.5-0.8b-onnx")
+            return [base_id]
+
+        if role == "sql":
+            if effort == "high":
+                return ["qwen2.5-text2sql-onnx", "qwen3-4b-gguf", "qwen2.5-coder-3b-onnx"]
+            return ["qwen2.5-text2sql-onnx", "qwen2.5-coder-1.5b-onnx", "qwen3.5-0.8b-onnx"]
+
+        if role == "math":
+            if effort == "low":
+                return ["qwen2.5-math-1.5b-onnx", "qwen3.5-0.8b-onnx", "qwen2.5-coder-1.5b-onnx"]
+            if effort == "high":
+                return ["qwen3-4b-gguf", "qwen2.5-math-1.5b-onnx", "qwen2.5-coder-3b-onnx"]
+            return ["qwen2.5-math-1.5b-onnx", "qwen3-4b-gguf", "qwen3.5-0.8b-onnx"]
+
+        if role == "coding":
+            if effort == "low":
+                return ["qwen2.5-coder-1.5b-onnx", "qwen2.5-coder-3b-onnx", "qwen3.5-0.8b-onnx", "qwen3-4b-gguf"]
+            if effort == "high":
+                if available_ram_mb >= 5400:
+                    return ["qwen3-8b-gguf", "qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen2.5-coder-1.5b-onnx"]
+                return ["qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen2.5-coder-1.5b-onnx"]
+            # medium
+            return ["qwen2.5-coder-3b-onnx", "qwen3-4b-gguf", "qwen2.5-coder-1.5b-onnx", "qwen3.5-0.8b-onnx"]
+
+        # primary / general
+        if effort == "low":
+            return ["qwen3.5-0.8b-onnx", "qwen2.5-1.5b-onnx", "qwen2.5-coder-1.5b-onnx", "qwen2.5-coder-3b-onnx", "qwen3-4b-gguf"]
+        if effort == "high":
+            if available_ram_mb >= 5400:
+                return ["qwen3-8b-gguf", "qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen2.5-1.5b-onnx"]
+            return ["qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen2.5-1.5b-onnx", "qwen3.5-0.8b-onnx"]
+        # medium
+        return ["qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen2.5-1.5b-onnx", "qwen3.5-0.8b-onnx"]
+
+    def resolve_model_for_reasoning(
+        self,
+        role: str,
+        reasoning_effort: str = "medium",
+        available_ram_mb: int = 4000,
+    ) -> ModelSpec:
+        candidates = self.preferred_candidates_for_reasoning(role, reasoning_effort, available_ram_mb)
+        for cand_id in candidates:
+            spec = MODEL_CATALOG.get(cand_id)
+            if not spec:
+                continue
+            if spec.est_ram_mb <= max(1200, available_ram_mb + 600):
+                if os.path.exists(spec.abs_path(self.models_dir)):
+                    return spec
+                if os.path.exists(spec.abs_path(USER_MODELS_DIR)):
+                    self.models_dir = USER_MODELS_DIR
+                    return spec
+        return self.resolve_model_spec(role)
 
     def resolve_model_spec(self, role: str) -> ModelSpec:
         model_id = self.role_bindings.get(role) or self.role_bindings.get("primary", "qwen3-4b-gguf")

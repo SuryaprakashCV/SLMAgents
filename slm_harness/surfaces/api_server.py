@@ -240,11 +240,13 @@ def build_harness_chat_streaming_response(
     design_tone: str = "",
     active_skills: Sequence[str] = (),
     max_tokens: int = 2400,
+    reasoning_effort: str = "medium",
+    clarification_choice: Optional[str] = None,
 ) -> StreamingResponse:
     """
-    Runs `TurnStateMachine` on a worker thread and streams dual-compatible SSE frames
-    (`thought`, `token`, `done`, `error` + rich 10-plane events `run_started`, `telemetry`,
-    `approval_required`, `clarification_needed`, `citations`, `cancelled`).
+    Runs `TurnStateMachine` on a MultiThreadExecutionScheduler worker lane and streams
+    dual-compatible SSE frames (`thought`, `token`, `done`, `error` + rich 10-plane events
+    `run_started`, `plan_created`, `clarification_needed`, `citations`, `cancelled`).
     """
     # Ensure web server mode uses async ticket resolution rather than blocking terminal stdin
     get_approval_broker().set_interactive_handler(None)
@@ -253,6 +255,19 @@ def build_harness_chat_streaming_response(
     run_id = req_id.strip() if req_id and req_id.strip() else f"run_{uuid.uuid4().hex[:10]}"
     sid = session_id.strip() if session_id and session_id.strip() else "default_session"
     pinned = _normalize_agent_pin(target_agent)
+    eff_norm = (reasoning_effort or "medium").strip().lower()
+    if eff_norm not in ("low", "medium", "high"):
+        eff_norm = "medium"
+
+    # Automatically preempt any lingering in-flight run before starting a new turn so it releases the CPU lock immediately
+    try:
+        for old_rid in get_cancellation_registry().active_runs():
+            if old_rid != run_id:
+                get_cancellation_registry().cancel(old_rid, reason="Preempted by new user request")
+                get_approval_broker().resolve(old_rid, approved=False)
+                get_clarification_broker().resolve(old_rid, answer="")
+    except Exception:
+        pass
     if design_tone:
         get_blackboard().put(sid, "preferred_design_tone", design_tone.strip().lower())
 
@@ -286,6 +301,8 @@ def build_harness_chat_streaming_response(
                 web_search=web_search,
                 active_skills=active_skills,
                 max_tokens=max_tokens,
+                reasoning_effort=eff_norm,
+                clarification_choice=clarification_choice,
             )
             outcome_box["outcome"] = outcome
         except Exception as exc:
@@ -293,7 +310,11 @@ def build_harness_chat_streaming_response(
         finally:
             worker_done.set()
 
-    threading.Thread(target=_worker, daemon=True, name=f"slm-turn-{run_id}").start()
+    lane = "fast" if eff_norm == "low" else "compute"
+    try:
+        get_runtime().arena.scheduler.submit(lane, _worker)
+    except Exception:
+        threading.Thread(target=_worker, daemon=True, name=f"slm-turn-{run_id}").start()
 
     async def _sse_gen() -> AsyncIterator[str]:
         all_thoughts: List[str] = []
@@ -313,7 +334,8 @@ def build_harness_chat_streaming_response(
                 "req_id": run_id,
                 "session_id": sid,
                 "profile": cfg.profile.value,
-                "primary_model": cfg.resolve_model_spec("primary").model_id,
+                "reasoning_effort": eff_norm,
+                "primary_model": cfg.resolve_model_for_reasoning("primary", eff_norm).model_id,
                 "rss_mb": get_process_rss_mb(),
             }
         )
@@ -350,9 +372,12 @@ def build_harness_chat_streaming_response(
 
                     elif et == EventType.PLAN_CREATED:
                         steps = p.get("steps") or []
-                        msg = f"Compiled {len(steps)}-step topological DAG: " + " -> ".join(
-                            f"{s.get('node_id')}:{s.get('agent')}" for s in steps
-                        )
+                        if steps and isinstance(steps[0], dict):
+                            msg = f"Compiled {len(steps)}-step topological DAG: " + " -> ".join(
+                                f"{s.get('node_id')}:{s.get('agent')}" for s in steps
+                            )
+                        else:
+                            msg = f"Formulated {len(steps)}-step Execution Plan ({p.get('reasoning_effort', eff_norm).upper()} reasoning)"
                         all_thoughts.append(msg)
                         yield _sse(
                             {
@@ -360,6 +385,8 @@ def build_harness_chat_streaming_response(
                                 "event_type": et.value,
                                 "thought": msg,
                                 "thoughts": all_thoughts,
+                                "plan_steps": steps,
+                                "reasoning_effort": p.get("reasoning_effort", eff_norm),
                                 "payload": p,
                                 "session_id": sid,
                                 "req_id": run_id,
@@ -444,12 +471,13 @@ def build_harness_chat_streaming_response(
                             }
                         )
 
-                    elif et in (EventType.VERIFIER_PASSED, EventType.VERIFIER_FAILED):
-                        msg = (
-                            f"Deterministic verifier passed ({p.get('agent', 'check')})"
-                            if et == EventType.VERIFIER_PASSED
-                            else f"Verifier caught issue — auto-repairing: {str(p.get('feedback', ''))[:120]}"
-                        )
+                    elif et in (EventType.VERIFIER_PASSED, EventType.VERIFIER_FAILED, EventType.VERIFIER_RETRY):
+                        if et == EventType.VERIFIER_PASSED:
+                            msg = f"Deterministic verifier passed ({p.get('agent', 'check')})"
+                        elif et == EventType.VERIFIER_RETRY:
+                            msg = f"Architectural Self-Review Critic triggered refinement: {str(p.get('feedback', ''))[:120]}"
+                        else:
+                            msg = f"Verifier caught issue — auto-repairing: {str(p.get('feedback', ''))[:120]}"
                         all_thoughts.append(msg)
                         yield _sse(
                             {
@@ -607,8 +635,7 @@ def build_harness_chat_streaming_response(
                         )
                         return
 
-                if not drained:
-                    await asyncio.sleep(0.01)
+                await asyncio.sleep(0.005 if drained else 0.01)
 
             if "fatal_error" in outcome_box:
                 yield _sse(
@@ -623,9 +650,21 @@ def build_harness_chat_streaming_response(
                     }
                 )
         finally:
+            if not worker_done.is_set():
+                get_cancellation_registry().cancel(run_id, reason="Client disconnected from SSE stream")
+                get_approval_broker().resolve(run_id, approved=False)
+                get_clarification_broker().resolve(run_id, answer="")
             bus.unsubscribe_run_queue(run_id, ev_queue)
 
-    return StreamingResponse(_sse_gen(), media_type="text/event-stream")
+    return StreamingResponse(
+        _sse_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -646,6 +685,8 @@ class HarnessChatRequest(BaseModel):
     forced_mode: Optional[str] = None
     json_schema: Optional[Dict[str, Any]] = None
     max_tokens: int = 2400
+    reasoning_effort: str = "medium"
+    clarification_choice: Optional[str] = None
 
 
 class CancelRunRequest(BaseModel):
@@ -763,6 +804,20 @@ def mount_harness_routes(app: FastAPI) -> None:
             design_tone=req.design_tone,
             active_skills=req.active_skills,
             max_tokens=req.max_tokens,
+            reasoning_effort=req.reasoning_effort,
+            clarification_choice=req.clarification_choice,
+        )
+
+    @app.post("/api/harness/models/ensure")
+    async def ensure_model_endpoint(req: Request) -> Dict[str, Any]:
+        body = await req.json()
+        role = str(body.get("role") or "primary")
+        reasoning_effort = str(body.get("reasoning_effort") or "medium")
+        model_id = body.get("model_id")
+        return get_runtime().ensure_capability_model(
+            role=role,
+            reasoning_effort=reasoning_effort,
+            model_id=model_id,
         )
 
     # --- Declarative Skill Repository (`.slm/skills/<name>/SKILL.md`) Endpoints ---
@@ -907,13 +962,27 @@ def mount_harness_routes(app: FastAPI) -> None:
 
     # --- Mid-Flight Run Control (<40ms Cancel, HITL Approval, Clarification, Steer) ---
 
+    @app.post("/api/runs/force-quit")
+    async def force_quit_all_runs(req: Optional[CancelRunRequest] = None) -> Dict[str, Any]:
+        reason = req.reason if req else "Force quit by user"
+        reg = get_cancellation_registry()
+        active_ids = reg.active_runs()
+        count = reg.cancel_all(reason=reason)
+        bus = get_event_bus()
+        for rid in active_ids:
+            get_approval_broker().resolve(rid, approved=False)
+            get_clarification_broker().resolve(rid, answer="")
+            bus.emit(EventType.RUN_CANCELLED, rid, "default_session", reason=reason, total_ms=0)
+        return {"ok": True, "cancelled_count": count, "active_runs_cancelled": active_ids, "reason": reason}
+
     @app.post("/api/runs/{run_id}/cancel")
     async def cancel_run(run_id: str, req: Optional[CancelRunRequest] = None) -> Dict[str, Any]:
         reason = req.reason if req else "Cancelled by user"
         found = get_cancellation_registry().cancel(run_id, reason=reason)
-        # Wake any waiting approval or clarification ticket immediately
+        # Wake any waiting approval or clarification ticket and unblock SSE stream immediately
         get_approval_broker().resolve(run_id, approved=False)
         get_clarification_broker().resolve(run_id, answer="")
+        get_event_bus().emit(EventType.RUN_CANCELLED, run_id, "default_session", reason=reason, total_ms=0)
         return {"ok": True, "run_id": run_id, "cancelled": found, "reason": reason}
 
     @app.post("/api/runs/{run_id}/approve")

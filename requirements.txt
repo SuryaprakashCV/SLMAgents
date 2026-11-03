@@ -21,3 +21,8 @@ openpyxl
 xlrd
 pdfplumber
 python-pptx
+psutil
+rich
+duckduckgo-search
+numpy
+pydantic

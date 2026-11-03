@@ -133,7 +133,7 @@ class GGUFCPUBackend:
         if req.cancel_token:
             req.cancel_token.check()
 
-        is_qwen3_hybrid = "qwen3-8b" in self.spec.model_id.lower()
+        is_qwen3_hybrid = "qwen3" in self.spec.model_id.lower()
         prompt_str = (
             req.prompt
             if req.prompt is not None

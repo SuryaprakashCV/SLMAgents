@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -74,7 +74,125 @@ class HarnessRuntime:
             "status": self.arena.status(),
         }
 
+    def _is_model_on_disk(self, spec: ModelSpec) -> bool:
+        target_path = spec.abs_path(self.config.models_dir)
+        if spec.backend == "gguf":
+            return os.path.isfile(target_path)
+        onnx_sub = os.path.join(target_path, "onnx")
+        return (
+            os.path.isdir(onnx_sub) and any(f.endswith(".onnx") for f in os.listdir(onnx_sub))
+        ) or (
+            os.path.isdir(target_path) and any(f.endswith(".onnx") for f in os.listdir(target_path))
+        )
+
+    def _ensure_model_downloaded(
+        self,
+        spec: ModelSpec,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> bool:
+        if self._is_model_on_disk(spec):
+            return True
+        if self.config.offline_only:
+            return False
+
+        target_path = spec.abs_path(self.config.models_dir)
+        topo = detect_cpu_topology(override_threads=self.config.n_threads)
+        # Verify model fits available RAM + swap headroom before downloading
+        if topo.available_ram_mb > 0 and spec.est_ram_mb > (topo.available_ram_mb + 2048):
+            return False
+
+        try:
+            from huggingface_hub import hf_hub_download, snapshot_download
+            import download_models
+
+            for item in download_models.AGENT_MODELS:
+                if spec.backend == "gguf" and item.get("kind") == "gguf_file":
+                    rel_match = os.path.join(item["dir"], item["filename"])
+                    if os.path.normpath(spec.rel_path) == os.path.normpath(rel_match):
+                        dest_dir = os.path.dirname(target_path)
+                        os.makedirs(dest_dir, exist_ok=True)
+                        msg = (
+                            f"Auto-downloading '{spec.model_id}' ({spec.est_ram_mb} MB) "
+                            f"calibrated for {topo.available_ram_mb} MB available RAM & {topo.recommended_threads} CPU threads..."
+                        )
+                        print(f"[HarnessRuntime] {msg}")
+                        if progress_callback:
+                            progress_callback(msg)
+                        hf_hub_download(repo_id=item["repo"], filename=item["filename"], local_dir=dest_dir)
+                        return self._is_model_on_disk(spec)
+                elif item.get("dir") == spec.rel_path or os.path.basename(target_path) == item.get("dir"):
+                    os.makedirs(target_path, exist_ok=True)
+                    msg = (
+                        f"Auto-downloading '{spec.model_id}' ({spec.est_ram_mb} MB) "
+                        f"calibrated for {topo.available_ram_mb} MB available RAM & {topo.recommended_threads} CPU threads..."
+                    )
+                    print(f"[HarnessRuntime] {msg}")
+                    if progress_callback:
+                        progress_callback(msg)
+                    snapshot_download(
+                        repo_id=item["repo"],
+                        local_dir=target_path,
+                        allow_patterns=item.get("allow_patterns"),
+                    )
+                    return self._is_model_on_disk(spec)
+        except Exception as exc:
+            print(f"[HarnessRuntime] On-demand model download note for {spec.model_id}: {exc}")
+        return self._is_model_on_disk(spec)
+
+    def ensure_capability_model(
+        self,
+        role: str = "primary",
+        reasoning_effort: Optional[str] = None,
+        model_id: Optional[str] = None,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> ModelSpec:
+        """
+        Selects the optimal CPU model for (role, reasoning_effort) that fits available RAM & CPU.
+        If the required model for a specialist capability is not yet present on disk, downloads it on-demand.
+        """
+        self.arena.check_memory_pressure()
+        topo = self.topology
+        avail_mb = topo.available_ram_mb if topo.available_ram_mb > 0 else 4000
+
+        if model_id and model_id in MODEL_CATALOG:
+            explicit_spec = MODEL_CATALOG[model_id]
+            if self._is_model_on_disk(explicit_spec) or self._ensure_model_downloaded(explicit_spec, progress_callback):
+                return explicit_spec
+
+        effort = (reasoning_effort or self.config.default_reasoning_effort.value or "medium").lower().strip()
+        is_hosted_2vcpu = bool(os.environ.get("SPACE_ID") or self.config.profile.value == "lite" or topo.physical_cores <= 2)
+        if is_hosted_2vcpu:
+            if role in ("embeddings", "reranker", "stt", "sql"):
+                spec = self.config.resolve_model_spec(role)
+                if not self._is_model_on_disk(spec):
+                    self._ensure_model_downloaded(spec, progress_callback=progress_callback)
+                return spec
+            fast_spec = MODEL_CATALOG["qwen2.5-coder-1.5b-onnx"]
+            if self._is_model_on_disk(fast_spec) or self._ensure_model_downloaded(fast_spec, progress_callback=progress_callback):
+                return fast_spec
+            fb_spec = MODEL_CATALOG["qwen3.5-0.8b-onnx"]
+            self._ensure_model_downloaded(fb_spec, progress_callback=progress_callback)
+            return fb_spec
+
+        candidates = self.config.preferred_candidates_for_reasoning(role, effort, avail_mb)
+
+        # 1. Prefer an already-downloaded candidate in the reasoning tier priority list that fits RAM
+        for cand_id in candidates:
+            spec = MODEL_CATALOG.get(cand_id)
+            if spec and spec.est_ram_mb <= max(1200, avail_mb + 1400) and self._is_model_on_disk(spec):
+                return spec
+
+        # 2. If none of the preferred candidates are on disk, auto-download the best candidate fitting RAM & CPU
+        for cand_id in candidates:
+            spec = MODEL_CATALOG.get(cand_id)
+            if spec and spec.est_ram_mb <= max(1200, avail_mb + 1400):
+                if self._ensure_model_downloaded(spec, progress_callback=progress_callback):
+                    return spec
+
+        return self.config.resolve_model_for_reasoning(role, effort, avail_mb)
+
     def _load_spec_instance(self, spec: ModelSpec) -> Any:
+        self._ensure_model_downloaded(spec)
         if spec.backend == "gguf":
             return GGUFCPUBackend(spec, self.config)
         if spec.backend == "onnx":
@@ -93,16 +211,25 @@ class HarnessRuntime:
         self,
         role: str = "primary",
         model_id: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
+        progress_callback: Optional[Callable[[str], None]] = None,
     ) -> Union[GGUFCPUBackend, ONNXCPUBackend]:
-        if model_id and model_id in MODEL_CATALOG:
-            spec = MODEL_CATALOG[model_id]
-        else:
-            spec = self.config.resolve_model_spec(role)
+        from .gguf_cpu import Llama
 
-        if self.config.preferred_backend == "onnx" and spec.backend == "gguf":
-            alt_id = self.config.role_bindings.get("onnx_primary", "qwen2.5-coder-3b-onnx")
-            spec = MODEL_CATALOG.get(alt_id, MODEL_CATALOG["qwen3.5-0.8b-onnx"])
-        elif self.config.preferred_backend == "gguf" and spec.backend == "onnx" and role in ("primary", "coding"):
+        spec = self.ensure_capability_model(
+            role=role,
+            reasoning_effort=reasoning_effort,
+            model_id=model_id,
+            progress_callback=progress_callback,
+        )
+
+        if spec.backend == "gguf" and (self.config.preferred_backend == "onnx" or Llama is None):
+            coder_spec = MODEL_CATALOG["qwen2.5-coder-3b-onnx"]
+            if os.path.isdir(coder_spec.abs_path(self.config.models_dir)):
+                spec = coder_spec
+            else:
+                spec = MODEL_CATALOG["qwen2.5-coder-1.5b-onnx"]
+        elif self.config.preferred_backend == "gguf" and spec.backend == "onnx" and role in ("primary", "coding") and Llama is not None and (reasoning_effort or "medium") != "low":
             gguf_spec = MODEL_CATALOG["qwen3-4b-gguf"]
             if os.path.exists(gguf_spec.abs_path(self.config.models_dir)):
                 spec = gguf_spec
@@ -112,7 +239,11 @@ class HarnessRuntime:
         except Exception:
             if spec.fallback_model_id and spec.fallback_model_id in MODEL_CATALOG:
                 fb = MODEL_CATALOG[spec.fallback_model_id]
-                return self.arena.acquire(fb, self._load_spec_instance)
+                if fb.backend != "gguf" or Llama is not None:
+                    try:
+                        return self.arena.acquire(fb, self._load_spec_instance)
+                    except Exception:
+                        pass
             return self.arena.acquire(MODEL_CATALOG["qwen3.5-0.8b-onnx"], self._load_spec_instance)
 
     def stream(
@@ -121,6 +252,8 @@ class HarnessRuntime:
         prompt: Optional[str] = None,
         role: str = "primary",
         model_id: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
+        progress_callback: Optional[Callable[[str], None]] = None,
         max_tokens: int = 1024,
         temperature: float = 0.2,
         top_p: float = 0.9,
@@ -131,7 +264,12 @@ class HarnessRuntime:
         enable_thinking: bool = False,
         cancel_token: Optional[CancellationToken] = None,
     ) -> Iterator[GenerationChunk]:
-        llm = self.get_llm(role=role, model_id=model_id)
+        llm = self.get_llm(
+            role=role,
+            model_id=model_id,
+            reasoning_effort=reasoning_effort,
+            progress_callback=progress_callback,
+        )
         req = GenerationRequest(
             messages=messages,
             prompt=prompt,
@@ -153,6 +291,8 @@ class HarnessRuntime:
         prompt: Optional[str] = None,
         role: str = "primary",
         model_id: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
+        progress_callback: Optional[Callable[[str], None]] = None,
         max_tokens: int = 1024,
         temperature: float = 0.2,
         top_p: float = 0.9,
@@ -163,7 +303,12 @@ class HarnessRuntime:
         enable_thinking: bool = False,
         cancel_token: Optional[CancellationToken] = None,
     ) -> GenerationResult:
-        llm = self.get_llm(role=role, model_id=model_id)
+        llm = self.get_llm(
+            role=role,
+            model_id=model_id,
+            reasoning_effort=reasoning_effort,
+            progress_callback=progress_callback,
+        )
         req = GenerationRequest(
             messages=messages,
             prompt=prompt,

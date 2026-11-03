@@ -18,6 +18,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
 
+# Pre-download quantized pure-CPU lite profile models into /app/models (cached Docker layer)
+COPY download_models.py .
+RUN python3 download_models.py --profile lite
+
 # Copy the rest of the monorepo codebase
 COPY . .
 
@@ -25,8 +29,9 @@ COPY . .
 ENV OMP_NUM_THREADS=2 \
     MKL_NUM_THREADS=2 \
     SLM_N_THREADS=2 \
+    SLM_PROFILE=lite \
     OMP_WAIT_POLICY=PASSIVE \
-    KMP_BLOCKTIME=0 \
+    KMP_BLOCKTIME=1 \
     ORT_ENABLE_AVX2=1 \
     SLM_MAX_BATCH_SIZE=16 \
     SLM_BATCH_TIMEOUT_MS=3.0

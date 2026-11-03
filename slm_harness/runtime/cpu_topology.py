@@ -142,16 +142,80 @@ def detect_cpu_topology(override_threads: Optional[int] = None) -> CPUTopology:
         except Exception:
             pass
 
-    # Optimal CPU inference thread formula:
-    # On hybrid Apple Silicon / Intel P+E architectures, binding GEMM/MatMul threads to
-    # P-cores (+ at most half E-cores up to 8) avoids barrier synchronization stalls.
+    # Detect Linux cgroup memory limit (e.g., Hugging Face Spaces 16 GB container on a 128 GB AWS host)
+    try:
+        cg_lim_bytes = 0
+        if os.path.exists("/sys/fs/cgroup/memory.max"):
+            raw_max = open("/sys/fs/cgroup/memory.max", "r", encoding="utf-8").read().strip()
+            if raw_max.isdigit():
+                cg_lim_bytes = int(raw_max)
+        elif os.path.exists("/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+            raw_lim = open("/sys/fs/cgroup/memory/memory.limit_in_bytes", "r", encoding="utf-8").read().strip()
+            if raw_lim.isdigit():
+                cg_lim_bytes = int(raw_lim)
+        if 0 < cg_lim_bytes < (64 * 1024 * 1024 * 1024):
+            cg_total_mb = cg_lim_bytes / (1024 * 1024)
+            rss_now = get_process_rss_mb()
+            total_ram_mb = cg_total_mb
+            avail_ram_mb = max(512.0, cg_total_mb - rss_now)
+        elif os.environ.get("SPACE_ID"):
+            rss_now = get_process_rss_mb()
+            total_ram_mb = 16384.0
+            avail_ram_mb = max(512.0, 16384.0 - rss_now)
+    except Exception:
+        pass
+
+    # Detect Linux cgroup CPU quota & scheduler affinity (e.g., Hugging Face Spaces / Docker 2-vCPU container on a 64-core Xeon host)
+    cgroup_cpus: Optional[int] = None
+    try:
+        if hasattr(os, "sched_getaffinity"):
+            aff_count = len(os.sched_getaffinity(0))
+            if 0 < aff_count < physical:
+                cgroup_cpus = aff_count
+        if os.path.exists("/sys/fs/cgroup/cpu.max"):
+            parts = open("/sys/fs/cgroup/cpu.max", "r", encoding="utf-8").read().strip().split()
+            if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit() and int(parts[1]) > 0:
+                cg_val = max(1, int(round(int(parts[0]) / int(parts[1]))))
+                cgroup_cpus = min(cgroup_cpus, cg_val) if cgroup_cpus else cg_val
+        elif os.path.exists("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"):
+            q = int(open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "r", encoding="utf-8").read().strip())
+            p = int(open("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "r", encoding="utf-8").read().strip())
+            if q > 0 and p > 0:
+                cg_val = max(1, int(round(q / p)))
+                cgroup_cpus = min(cgroup_cpus, cg_val) if cgroup_cpus else cg_val
+    except Exception:
+        pass
+
+    env_threads = os.environ.get("SLM_N_THREADS", "").strip()
     if override_threads and override_threads > 0:
         rec_threads = override_threads
+    elif env_threads.isdigit() and int(env_threads) > 0:
+        rec_threads = int(env_threads)
+    elif cgroup_cpus is not None:
+        rec_threads = min(8, max(1, cgroup_cpus))
     else:
         if e_cores > 0 and p_cores >= 4:
             rec_threads = min(8, p_cores + max(1, e_cores // 2))
         else:
-            rec_threads = min(8, max(2, physical))
+            rec_threads = min(8, max(1, physical))
+
+    if cgroup_cpus is not None and cgroup_cpus < physical:
+        physical = cgroup_cpus
+        logical = min(logical, cgroup_cpus)
+        p_cores = cgroup_cpus
+        e_cores = 0
+    elif rec_threads <= 2 and system == "Linux":
+        physical = min(physical, rec_threads)
+        logical = min(logical, rec_threads)
+        p_cores = physical
+        e_cores = 0
+
+    # If running in a 2-vCPU Linux container on a large shared Xeon host (>32 GB host RAM),
+    # report the 16 GB container memory ceiling rather than the 128 GB multi-tenant host node
+    if system == "Linux" and (rec_threads <= 2 or "xeon" in brand.lower()) and total_ram_mb > 32768.0:
+        rss_now = get_process_rss_mb()
+        total_ram_mb = 16384.0
+        avail_ram_mb = max(512.0, 16384.0 - rss_now)
 
     bg_threads = max(1, min(2, e_cores if e_cores > 0 else max(1, physical // 4)))
 
@@ -185,9 +249,9 @@ def configure_cpu_environment(override_threads: Optional[int] = None, pure_cpu: 
     os.environ["OPENBLAS_NUM_THREADS"] = t_str
     os.environ["SLM_N_THREADS"] = t_str
     os.environ["ORT_ENABLE_AVX2"] = "1"
-    # Passive/1ms wait avoids burning 100% idle CPU spin between interactive chat turns
+    # Passive/1ms wait avoids burning 100% idle CPU spin while keeping intra-op barriers fast
     os.environ.setdefault("OMP_WAIT_POLICY", "PASSIVE")
-    os.environ.setdefault("KMP_BLOCKTIME", "1")
+    os.environ["KMP_BLOCKTIME"] = "1"
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     if pure_cpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = ""

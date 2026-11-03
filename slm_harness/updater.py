@@ -305,6 +305,8 @@ def activate_central_sync_overlay() -> Optional[str]:
     Checks if a newer commit is on GitHub, pulls it into `~/.slm_harness/central_sync/`,
     and activates `~/.slm_harness/central_sync/` as the primary code & UI root.
     """
+    if os.environ.get("SPACE_ID") or os.environ.get("SLM_DISABLE_OTA", "0") == "1":
+        return None
     try:
         res = pull_central_update(force=False, timeout=6.0)
         if res.get("updated"):
@@ -325,6 +327,10 @@ def start_background_auto_updater(repo_dir: Optional[str] = None, interval_sec: 
     Whenever the user uploads or pushes a commit to Git, running Desktop Apps and servers
     automatically pull and hot-reload the update with zero manual clicks.
     """
+    if os.environ.get("SPACE_ID") or os.environ.get("SLM_DISABLE_OTA", "0") == "1":
+        return
+    if repo_dir and not os.path.isdir(os.path.join(repo_dir, ".git")) and not getattr(sys, "frozen", False):
+        return
     global _AUTO_UPDATER_STARTED
     with _AUTO_UPDATER_LOCK:
         if _AUTO_UPDATER_STARTED:

@@ -7,7 +7,7 @@
   
   <link rel="canonical" href="https://www.slmagents.ai/web_scraper.html">
   <title>SLM Web Scraper: HTML Sanitization & Structured Data Extraction | SLMAgents</title>
-  <link rel="stylesheet" href="style.css?v=55.0">
+  <link rel="stylesheet" href="style.css?v=62.0">
   
   <!-- OpenGraph / Social Meta Tags -->
   <meta property="og:type" content="article">
@@ -45,7 +45,7 @@
   </script>
 </head>
 <body>
-              <!-- Top Engineering Header -->
+                  <!-- Top Engineering Header -->
   <header class="site-top-header web-only-nav">
     <div class="container nav-container">
       <div style="display: flex; align-items: center; gap: 10px;">
@@ -106,7 +106,7 @@
           <p style="font-size: 1.05rem; color: #334155; line-height: 1.65; font-weight: 500; margin: 0;">Extract structured JSON directly from dirty, obfuscated HTML layouts offline using BeautifulSoup and local neural reasoning.</p>
         </section>
 
-                                        <nav class="doc-nav">
+                                                        <nav class="doc-nav">
           <a href="#overview">01 / Overview</a>
           <a href="#install">02 / OS Installers &amp; CLI</a>
           <a href="#harness">03 / 10-Plane Harness</a>
@@ -119,7 +119,7 @@
         <p>The SLM Web Scraper parses raw HTML strings, stripping scripts, styles, duplicate nav tags, and ads. The sanitized flat content is compiled locally into structured formats using target JSON schemas.</p>
       </section>
 
-                                                        <!-- INSTALLATION & STANDALONE OS HARNESS INSTALLERS -->
+                                                                        <!-- INSTALLATION & STANDALONE OS HARNESS INSTALLERS -->
         <section class="doc-section" id="install">
           <h2>02 / Standalone OS Harness Installers, CLI &amp; Python SDK</h2>
           <p>In <strong>SLMAgents 2.0</strong>, <strong>SLM Web Scraper</strong> executes inside the <strong>10-Plane Pure-CPU Agent Harness (<code>slm_harness</code>)</strong>. Download a self-extracting <strong>Individual Agent + Harness OS Installer</strong> for macOS, Windows, or Linux (bundling <code>slm_web_scraper</code> + <code>slm_harness</code> + the <code>./slm</code> CLI), install the full 26-agent desktop suite, or install via Python <code>pip</code>:</p>
@@ -136,30 +136,29 @@
             <a href="/api/installers/download/agent-windows?agent=web_scraper" class="subpage-installer-card">
               <div class="subpage-installer-title">
                 <span>Windows Installer</span>
-                <span class="subpage-installer-ext">.bat</span>
+                <span class="subpage-installer-ext">.exe</span>
               </div>
-              <div class="subpage-installer-desc">Self-extracting Windows payload + portable Python 3.11 + <code>slm_web_scraper</code></div>
+              <div class="subpage-installer-desc">Native 64-bit Windows Setup with portable Python 3.11 + <code>slm_web_scraper</code> + <code>slm_harness</code></div>
             </a>
             <a href="/api/installers/download/agent-linux?agent=web_scraper" class="subpage-installer-card">
               <div class="subpage-installer-title">
                 <span>Linux Installer</span>
-                <span class="subpage-installer-ext">.run</span>
+                <span class="subpage-installer-ext">.AppImage</span>
               </div>
-              <div class="subpage-installer-desc">Self-extracting Linux archive with <code>slm_web_scraper</code> + <code>slm_harness</code> + <code>./slm</code> CLI</div>
+              <div class="subpage-installer-desc">Standalone Linux AppImage with <code>slm_web_scraper</code> + <code>slm_harness</code> + <code>./slm</code> CLI</div>
             </a>
           </div>
 
           <h3>2. Full 26-Agent Studio &amp; Desktop OS Installers</h3>
           <div class="subpage-suite-links">
-            <a href="/api/installers/download/macos-dmg" class="subpage-suite-link">macOS .dmg (281 MB)</a>
-            <a href="/api/installers/download/macos-pkg" class="subpage-suite-link">macOS .pkg (236 MB)</a>
-            <a href="/api/installers/download/windows" class="subpage-suite-link">Windows .bat (3.7 MB)</a>
-            <a href="/api/installers/download/linux" class="subpage-suite-link">Linux .run (3.4 MB)</a>
-            <button onclick="openDownloadModal()" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.76rem;">All OS Installers Modal</button>
+            <a href="/api/installers/download/macos-dmg" class="subpage-suite-link">macOS .dmg (280 MB)</a>
+            <a href="/api/installers/download/windows" class="subpage-suite-link">Windows .exe (2.8 MB)</a>
+            <a href="/api/installers/download/linux" class="subpage-suite-link">Linux .AppImage (3.4 MB)</a>
+            <button onclick="openDownloadModal()" class="btn btn-primary" style="padding: 0.38rem 0.8rem; font-size: 0.76rem;">All OS Installers Modal</button>
           </div>
 
           <h3>3. 10-Plane Harness CLI (<code>./slm</code>) &amp; Python <code>pip</code> Installation</h3>
-          <div class="code-panel" style="margin: 0.75rem 0;">
+          <div class="code-panel" style="margin: 0.85rem 0;">
             <div class="code-header">
               <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
               <div class="code-title">Terminal — 10-Plane Harness CLI &amp; Pip</div>
@@ -216,7 +215,7 @@
           <p>Clone this agent alongside the <strong>10-Plane Pure-CPU Harness (<code>slm_harness</code>)</strong> from the monorepo using Git sparse-checkout — no need to download all 26 agents:</p>
 
           <h3>Option 1 — Sparse Checkout with 10-Plane Harness (Recommended)</h3>
-          <div class="code-panel" style="margin: 0.75rem 0;">
+          <div class="code-panel" style="margin: 0.85rem 0;">
             <div class="code-header">
               <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
               <div class="code-title">Terminal — Git Sparse Checkout</div>
@@ -239,7 +238,7 @@
           </div>
 
           <h3>Option 2 — Full Repository Clone</h3>
-          <div class="code-panel" style="margin: 0.75rem 0;">
+          <div class="code-panel" style="margin: 0.85rem 0;">
             <div class="code-header">
               <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
               <div class="code-title">Terminal — Full Clone</div>
@@ -251,10 +250,18 @@
             </div>
           </div>
 
-          <p style="margin-top: 1rem; font-size: 0.84rem; color: var(--text-secondary); background: #fafafa; border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 1rem;">
+          <p style="margin-top: 1.25rem; font-size: 0.86rem; color: var(--text-secondary); border-left: 2px solid #09090b; padding-left: 1rem;">
             <strong>Note:</strong> After checkout, install the harness and agent in editable mode with <code>pip install -e ./slm_harness -e ./slm_web_scraper</code> or download the pre-packaged OS Harness Installer above.
           </p>
         </section>
+
+        
+
+        
+
+        
+
+        
 
         
 
@@ -308,7 +315,7 @@
 
         <section class="doc-section" id="config">
         <h2>05 / Configuration &amp; API Reference</h2>
-        <h3>`SLMWebScraper` Initialization</h3>
+        <h3><code>SLMWebScraper</code> Initialization</h3>
         <pre><code class="language-python">from slm_web_scraper.web_scraper import SLMWebScraper
 
 scraper = SLMWebScraper()</code></pre>
@@ -324,7 +331,7 @@ scraper = SLMWebScraper()</code></pre>
 </tbody>
         </table>
 
-        <h3>`scrape_url` Method</h3>
+        <h3><code>scrape_url</code> Method</h3>
         <p>Fetches a URL, filters out header/footer menus, dropdown lists, sidebars, and ads, and automatically parses tables and image content:</p>
 
         <h4>Hybrid Visual Scraping (Tables & Images)</h4>
@@ -344,13 +351,13 @@ Overview
 The SLM Vision Parser uses local multimodal vision models to extract image structures directly.
 
 API Reference
-`SLMVisionParser` Initialization
+<code>SLMVisionParser</code> Initialization
 from slm_vision_parser.vision_parser import SLMVisionParser
 parser = SLMVisionParser()
 
 [Table Description: The HTML table represents the constructor parameter configuration for SLMVisionParser, detailing the "model_path" parameter of type string (str), which references the local directory containing pre-downloaded checkpoints and defaults to local model weights.]
 
-`parse_image` Method
+<code>parse_image</code> Method
 Run coordinate mappings or caption generation by supplying task tags. Below is the input flowchart diagram processed by the vision model:
 [Image Description: A flowchart showing a start step ('Start Process') and a next step ('Next Step Link') connected with two arrows from the start step to the next step.]</code></pre>
         </div>
@@ -360,11 +367,12 @@ Run coordinate mappings or caption generation by supplying task tags. Below is t
           <div class="footer-row">
             <div><strong style="color: var(--text-primary);">SLMAgents 2.0</strong> · Powered by the 10-Plane Pure-CPU Agent Harness (<code>slm_harness</code>) · MIT License</div>
             <div class="footer-links">
-              <a href="index.html">Overview</a>
+              <a href="index.html">Home</a>
               <a href="index.html#os-installers">OS Installers</a>
               <a href="chat.html">Chat Studio</a>
-              <a href="playground.html">API Sandbox</a>
-              <a href="blogs.html">Research</a>
+              <a href="playground.html">Playground</a>
+              <a href="blogs.html">Blogs</a>
+              <a href="https://github.com/t00114218-stack/SLMAgents" target="_blank">GitHub</a>
             </div>
           </div>
         </footer>
@@ -375,6 +383,6 @@ Run coordinate mappings or caption generation by supplying task tags. Below is t
 </main>
   </div>
 
-  <script src="app.js?v=55.0"></script>
+  <script src="app.js?v=62.0"></script>
 </body>
 </html>

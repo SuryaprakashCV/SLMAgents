@@ -2,11 +2,11 @@
 name: create-resume-design-skil-improve
 title: "Create Resume Design Skil Improve Specialist"
 description: "Autonomous skill for create a resume design skil and improve my resume."
-role: coding
-agent: slm_code_interpreter
+role: primary
+agent: slm_rag
 tone: tech
-output_formats: [py, md]
-triggers: [create resume design skil improve, create, resume, design, skil, improve]
+output_formats: [docx, pdf, md]
+triggers: [create resume design, improve my resume, ats resume]
 tags: [coding, engineering, automation]
 enabled: true
 source: ai-generated

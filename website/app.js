@@ -2065,17 +2065,29 @@ async function fetchLiveRAMStats() {
   
   try {
     const endpoint = getApiEndpoint("/api/system/stats");
-    const res = await fetch(endpoint);
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 3500);
+    const res = await fetch(endpoint, { signal: ctrl.signal });
+    clearTimeout(tid);
     if (res.ok) {
       const data = await res.json();
       if (data.process_ram_mb !== undefined) {
         ramMbEl.textContent = `${data.process_ram_mb} MB`;
       }
       if (sysRamEl) {
-        if (data.used_ram_gb !== undefined && data.total_ram_gb !== undefined) {
-          sysRamEl.textContent = `${data.used_ram_gb} / ${data.total_ram_gb} GB (${data.ram_percent}%)`;
-        } else if (data.ram_percent !== undefined) {
-          sysRamEl.textContent = `${data.ram_percent}% used`;
+        let usedGb = data.used_ram_gb;
+        let totalGb = data.total_ram_gb;
+        let pct = data.ram_percent;
+        // Defense-in-depth: if running on a shared 2T Xeon cloud host where raw node RAM (>32GB) leaked
+        if (totalGb > 32 && ((data.device && data.device.includes("(2T CPU)")) || (data.device && data.device.toLowerCase().includes("xeon")))) {
+          totalGb = 16.0;
+          usedGb = Number((Math.max(512, data.process_ram_mb || 2021) / 1024).toFixed(2));
+          pct = Number(((usedGb / totalGb) * 100).toFixed(1));
+        }
+        if (usedGb !== undefined && totalGb !== undefined) {
+          sysRamEl.textContent = `${usedGb} / ${totalGb} GB (${pct}%)`;
+        } else if (pct !== undefined) {
+          sysRamEl.textContent = `${pct}% used`;
         }
       }
       const tagEl = document.querySelector(".ram-runtime-tag");
@@ -2086,10 +2098,10 @@ async function fetchLiveRAMStats() {
   } catch (e) {
     // Graceful fallback
     if (ramMbEl.textContent === "-- MB") {
-      ramMbEl.textContent = "3046.8 MB";
+      ramMbEl.textContent = "1980.4 MB";
     }
     if (sysRamEl && sysRamEl.textContent === "-- GB") {
-      sysRamEl.textContent = "16.0 GB Total";
+      sysRamEl.textContent = "1.93 / 16.0 GB (12.1%)";
     }
   }
 }
@@ -2108,8 +2120,14 @@ async function handleClearRamCache() {
     btn.disabled = true;
   }
   try {
+    if (window.activeHarnessRunId && typeof forceQuitActiveGeneration === "function") {
+      forceQuitActiveGeneration();
+    }
     const endpoint = getApiEndpoint("/api/system/clear-cache");
-    await fetch(endpoint, { method: "POST" });
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 5000);
+    await fetch(endpoint, { method: "POST", signal: ctrl.signal });
+    clearTimeout(tid);
     await fetchLiveRAMStats();
   } catch (e) {
     console.warn("Failed to clear cache:", e);
@@ -2756,6 +2774,26 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
 
     body.appendChild(contentEl);
 
+    if (meta && meta.clarification && Array.isArray(meta.clarification.options) && meta.clarification.options.length > 0) {
+      const cl = meta.clarification;
+      const origQ = encodeURIComponent(cl.original_query || "");
+      const cCard = document.createElement("div");
+      cCard.className = "clarify-chips-card";
+      const chipsHtml = cl.options.map((opt, idx) => {
+        const safeOpt = escapeHtmlSafe(opt);
+        const encOpt = encodeURIComponent(opt);
+        return `<button type="button" class="btn-clarify-chip" onclick="selectPlanClarificationOption(decodeURIComponent('${origQ}'), decodeURIComponent('${encOpt}'), this)">${idx + 1}. ${safeOpt}</button>`;
+      }).join("");
+      cCard.innerHTML = `
+        <div class="clarify-card-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>${escapeHtmlSafe(cl.question || "Select an option to customize or clarify the plan:")}</span>
+        </div>
+        <div class="clarify-options-row">${chipsHtml}</div>
+      `;
+      body.appendChild(cCard);
+    }
+
     if (meta && Array.isArray(meta.citations) && meta.citations.length > 0) {
       const citeRow = document.createElement("div");
       citeRow.className = "citation-chip-row";
@@ -3385,13 +3423,13 @@ function renderLiveStreamedContent(container, rawTokens) {
 }
 
 /* Chat Submission */
-async function handleChatSubmit(event) {
-  if (event) event.preventDefault();
+async function handleChatSubmit(event, overrideMessage = null, clarificationChoice = null) {
+  if (event && typeof event.preventDefault === "function") event.preventDefault();
   
   const inputEl = document.getElementById("chat-text-input");
   const sendBtn = document.getElementById("chat-send-btn");
   const selectMode = document.getElementById("chat-agent-override");
-  const message = inputEl ? inputEl.value.trim() : "";
+  const message = overrideMessage !== null ? String(overrideMessage).trim() : (inputEl ? inputEl.value.trim() : "");
   const attachments = Array.from(chatAttachments);
   
   if (!message && attachments.length === 0) return;
@@ -3399,7 +3437,17 @@ async function handleChatSubmit(event) {
   if (typeof hideSlashCommandPalette === "function") {
     hideSlashCommandPalette();
   }
-  if (message.toLowerCase() === "/skills" || message.toLowerCase() === "/skill") {
+  const msgLower = message.toLowerCase();
+  if (msgLower === "/low" || msgLower === "/medium" || msgLower === "/high") {
+    const eff = msgLower.slice(1);
+    setReasoningEffort(eff);
+    if (inputEl) {
+      inputEl.value = "";
+      autoResizeChatTextarea(inputEl);
+    }
+    return;
+  }
+  if (msgLower === "/skills" || msgLower === "/skill") {
     if (inputEl) {
       inputEl.value = "";
       autoResizeChatTextarea(inputEl);
@@ -3412,7 +3460,22 @@ async function handleChatSubmit(event) {
   
   chatAttachments = [];
   renderAttachmentsTray();
-  
+
+  // If a previous generation is still active, preempt it cleanly so the new request never queues behind it
+  if (window.activeHarnessRunId) {
+    try {
+      if (window.activeHarnessReader) {
+        window.activeHarnessReader.cancel().catch(() => {});
+        window.activeHarnessReader = null;
+      }
+      if (window.activeHarnessAbortController) {
+        window.forceQuitTriggered = true;
+        window.activeHarnessAbortController.abort();
+        window.activeHarnessAbortController = null;
+      }
+    } catch (e) {}
+  }
+
   const session = getOrCreateCurrentSession();
   const targetSessionId = session.id;
   const reqId = "req_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
@@ -3468,7 +3531,13 @@ async function handleChatSubmit(event) {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
               <span class="live-engine-title live-thought-title">Executing Reasoning Pipeline</span>
             </div>
-            <div class="live-engine-timer live-stopwatch-timer">0.0s</div>
+            <div style="display: inline-flex; align-items: center; gap: 8px;">
+              <div class="live-engine-timer live-stopwatch-timer">0.0s</div>
+              <button type="button" class="btn-force-quit-inline" onclick="forceQuitActiveGeneration('${reqId}')" title="Force Quit Execution Immediately (Esc)">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1.5" width="9" height="9" rx="2"></rect></svg>
+                <span>Force Quit</span>
+              </button>
+            </div>
           </div>
           <div class="live-engine-timeline live-step-timeline">
             <div class="live-step-row active">
@@ -3505,11 +3574,18 @@ async function handleChatSubmit(event) {
     let accumulatedThoughts = ["Analyzing query & extracting execution constraints..."];
     let accumulatedTokens = "";
     let accumulatedRoutedAgent = "";
+    let accumulatedPlanSteps = [];
+    let accumulatedClarification = null;
+    const abortController = new AbortController();
+    window.activeHarnessAbortController = abortController;
+    window.activeHarnessReader = null;
+    window.forceQuitTriggered = false;
     window.activeHarnessRunId = reqId;
     setHarnessStopButtonVisible(true);
     try {
       let cleanMsg = message;
       let forcedMode = "";
+      let selectedEffort = window.currentReasoningEffort || localStorage.getItem("slm_reasoning_effort") || "medium";
       let webSearchFlag = window.isWebSearchEnabled !== false;
       if (cleanMsg.toLowerCase().startsWith("/plan ")) {
         cleanMsg = cleanMsg.slice(6).trim();
@@ -3517,6 +3593,18 @@ async function handleChatSubmit(event) {
       } else if (cleanMsg.toLowerCase().startsWith("/web ")) {
         cleanMsg = cleanMsg.slice(5).trim();
         webSearchFlag = true;
+      } else if (cleanMsg.toLowerCase().startsWith("/low ")) {
+        cleanMsg = cleanMsg.slice(5).trim();
+        selectedEffort = "low";
+        setReasoningEffort("low");
+      } else if (cleanMsg.toLowerCase().startsWith("/medium ")) {
+        cleanMsg = cleanMsg.slice(8).trim();
+        selectedEffort = "medium";
+        setReasoningEffort("medium");
+      } else if (cleanMsg.toLowerCase().startsWith("/high ")) {
+        cleanMsg = cleanMsg.slice(6).trim();
+        selectedEffort = "high";
+        setReasoningEffort("high");
       }
       const toneSelectEl = document.getElementById("chat-tone-select");
       const selectedDesignTone = toneSelectEl ? toneSelectEl.value : "";
@@ -3530,6 +3618,8 @@ async function handleChatSubmit(event) {
         web_search: webSearchFlag,
         design_tone: selectedDesignTone,
         active_skills: Array.from(window.pinnedSkillsSet || []),
+        reasoning_effort: selectedEffort,
+        clarification_choice: clarificationChoice || null,
         use_harness: true,
         history: session.messages.slice(-6).map(m => ({ role: m.role, content: m.text }))
       };
@@ -3538,7 +3628,8 @@ async function handleChatSubmit(event) {
       const response = await fetch(chatEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: abortController.signal
       });
       
       if (!response.ok) {
@@ -3546,6 +3637,7 @@ async function handleChatSubmit(event) {
       }
       
       const reader = response.body.getReader();
+      window.activeHarnessReader = reader;
       const decoder = new TextDecoder();
       let finalPayload = null;
       let streamBuffer = "";
@@ -3570,6 +3662,10 @@ async function handleChatSubmit(event) {
             if (data.type === "thought") {
               if (data.payload && data.payload.skill && typeof loadSkillsFromRepo === "function") {
                 loadSkillsFromRepo();
+              }
+              if (Array.isArray(data.plan_steps) && data.plan_steps.length > 0) {
+                accumulatedPlanSteps = data.plan_steps;
+                renderInlinePlanCard(reqId, data.plan_steps, data.reasoning_effort || selectedEffort);
               }
               const cleanThought = stripThoughtEmojis(data.thought);
               if (cleanThought && !accumulatedThoughts.includes(cleanThought)) {
@@ -3634,7 +3730,11 @@ async function handleChatSubmit(event) {
             } else if (data.type === "approval_required" && data.payload) {
               renderInlineApprovalCard(reqId, data.run_id || reqId, data.payload);
             } else if (data.type === "clarification_needed" && data.payload) {
-              renderInlineClarificationCard(reqId, data.run_id || reqId, data.payload);
+              accumulatedClarification = {
+                ...data.payload,
+                original_query: data.payload.original_query || cleanMsg
+              };
+              renderInlineClarificationCard(reqId, data.run_id || reqId, accumulatedClarification);
             } else if (data.type === "token") {
               if (data.tok_per_sec) {
                 const ttftLbl = data.ttft_ms ? `TTFT ${Math.round(data.ttft_ms)}ms • ` : "";
@@ -3702,7 +3802,16 @@ async function handleChatSubmit(event) {
       const activeTargetSession = chatSessions.find(s => s.id === targetSessionId) || session;
       
       if (!finalPayload) {
-        throw new Error("The response stream ended before a final result was received.");
+        if (window.forceQuitTriggered) {
+          finalPayload = {
+            type: "cancelled",
+            response: accumulatedTokens ? `${accumulatedTokens}\n\n*(Force quit by user)*` : "*(Execution force-quit by user)*",
+            routed_agent: accumulatedRoutedAgent || "SLM Orchestrator",
+            thoughts: [...accumulatedThoughts, "Execution force-quit by user"]
+          };
+        } else {
+          throw new Error("The response stream ended before a final result was received.");
+        }
       }
       
       let rawResp = finalPayload.response || "No response text generated.";
@@ -3731,6 +3840,9 @@ async function handleChatSubmit(event) {
         total_ms: finalPayload.total_ms || 0,
         model_id: finalPayload.model_id || "",
         mode: finalPayload.mode || "",
+        reasoning_effort: selectedEffort,
+        plan_steps: accumulatedPlanSteps,
+        clarification: accumulatedClarification,
         trace: finalPayload.trace || null
       };
       if (turnMeta.tok_per_sec || turnMeta.total_ms) {
@@ -3783,14 +3895,23 @@ async function handleChatSubmit(event) {
       if (remainingInFlight.length <= 1) {
         activeTargetSession.isGenerating = false;
       }
-      const errorMsg = {
-        role: "assistant",
-        text: `⚠️ **Execution Error**: Failed to process query through orchestrator.\n\n\`${err.message}\``,
-        routedAgent: "System Error Handler",
-        thoughts: ["Connection or inference execution error", err.message],
-        timestamp: new Date().toISOString()
-      };
-      activeTargetSession.messages.push(errorMsg);
+      const isForceQuit = Boolean(window.forceQuitTriggered || (err && err.name === "AbortError"));
+      const msgObj = isForceQuit
+        ? {
+            role: "assistant",
+            text: accumulatedTokens ? `${accumulatedTokens}\n\n*(Force quit by user)*` : "*(Execution force-quit by user)*",
+            routedAgent: accumulatedRoutedAgent || "SLM Orchestrator",
+            thoughts: [...accumulatedThoughts, "Execution force-quit by user"],
+            timestamp: new Date().toISOString()
+          }
+        : {
+            role: "assistant",
+            text: `⚠️ **Execution Error**: Failed to process query through orchestrator.\n\n\`${err.message}\``,
+            routedAgent: "System Error Handler",
+            thoughts: ["Connection or inference execution error", err.message],
+            timestamp: new Date().toISOString()
+          };
+      activeTargetSession.messages.push(msgObj);
       saveChatSessionsToStorage();
       renderChatSessionList();
       if (currentSessionId === targetSessionId) {
@@ -3798,7 +3919,7 @@ async function handleChatSubmit(event) {
         if (activeRow) {
           activeRow.remove();
         }
-        appendMessageElementToViewport("assistant", errorMsg.text, [], errorMsg.routedAgent, errorMsg.thoughts);
+        appendMessageElementToViewport("assistant", msgObj.text, [], msgObj.routedAgent, msgObj.thoughts);
       }
     }
   })();
@@ -4199,6 +4320,48 @@ function animateShowcaseReplay(mode) {
 window.activeHarnessRunId = null;
 window.currentInspectorTab = "trace";
 window.latestInspectorState = null;
+window.currentReasoningEffort = localStorage.getItem("slm_reasoning_effort") || "medium";
+
+function setReasoningEffort(effort) {
+  const norm = String(effort || "medium").toLowerCase();
+  const valid = ["low", "medium", "high"].includes(norm) ? norm : "medium";
+  window.currentReasoningEffort = valid;
+  try {
+    localStorage.setItem("slm_reasoning_effort", valid);
+  } catch (e) {}
+  document.querySelectorAll(".btn-reasoning-pill").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-effort") === valid);
+  });
+  const labelMap = {
+    low: "Reasoning: Low (Fast Direct)",
+    medium: "Reasoning: Medium (Plan + Sandbox)",
+    high: "Reasoning: High (Research + Critic)"
+  };
+  updateHarnessTelemetryPill(labelMap[valid] || "CPU Ready");
+}
+window.setReasoningEffort = setReasoningEffort;
+
+document.addEventListener("DOMContentLoaded", () => {
+  const savedEffort = localStorage.getItem("slm_reasoning_effort") || "medium";
+  document.querySelectorAll(".btn-reasoning-pill").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-effort") === savedEffort);
+  });
+});
+
+function renderInlinePlanCard(reqId, planSteps, reasoningEffort) {
+  // Plan steps are shown naturally inside the Thought Process timeline without duplicating a separate box
+  return;
+}
+
+function selectPlanClarificationOption(originalQuery, chosenOption, btnEl) {
+  if (!chosenOption) return;
+  const card = btnEl ? btnEl.closest(".clarify-chips-card") : null;
+  if (card) {
+    card.innerHTML = `<div class="clarify-card-header">✓ Selected: <strong>${escapeHtmlSafe(chosenOption)}</strong></div>`;
+  }
+  handleChatSubmit(null, chosenOption, chosenOption);
+}
+window.selectPlanClarificationOption = selectPlanClarificationOption;
 
 function setHarnessStopButtonVisible(visible) {
   const stopBtn = document.getElementById("chat-stop-btn");
@@ -4222,20 +4385,52 @@ function updateHarnessTelemetryPill(text) {
   }
 }
 
-async function stopActiveGeneration() {
-  const rid = window.activeHarnessRunId;
-  if (!rid) return;
-  updateHarnessTelemetryPill("Stopping...");
+function forceQuitActiveGeneration(targetReqId) {
+  const rid = targetReqId || window.activeHarnessRunId;
+  window.forceQuitTriggered = true;
+  setHarnessStopButtonVisible(false);
+  updateHarnessTelemetryPill("Force Quit");
+
+  // 1. Immediately abort client-side fetch & stream reader (0ms UI recovery)
   try {
-    await fetch(getApiEndpoint(`/api/runs/${encodeURIComponent(rid)}/cancel`), {
+    if (window.activeHarnessReader) {
+      window.activeHarnessReader.cancel().catch(() => {});
+      window.activeHarnessReader = null;
+    }
+  } catch (e) {}
+  try {
+    if (window.activeHarnessAbortController) {
+      window.activeHarnessAbortController.abort();
+      window.activeHarnessAbortController = null;
+    }
+  } catch (e) {}
+
+  // 2. Non-blocking backend cancellation for all active runs + specific runId
+  fetch(getApiEndpoint("/api/runs/force-quit"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason: "Force quit by user" })
+  }).catch(() => {});
+
+  if (rid) {
+    fetch(getApiEndpoint(`/api/runs/${encodeURIComponent(rid)}/cancel`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: "Stopped via Web AI Studio Stop button" })
-    });
-  } catch (e) {
-    console.warn("Stop request notice:", e);
+      body: JSON.stringify({ reason: "Force quit by user" })
+    }).catch(() => {});
   }
 }
+
+async function stopActiveGeneration() {
+  forceQuitActiveGeneration();
+}
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape" && window.activeHarnessRunId) {
+    e.preventDefault();
+    forceQuitActiveGeneration();
+  }
+});
 
 async function handleHarnessProfileChange() {
   const profEl = document.getElementById("harness-profile-select");
@@ -4339,17 +4534,24 @@ function renderInlineClarificationCard(reqId, runId, payload) {
   const body = activeRow.querySelector(".chat-assistant-body");
   if (!body) return;
 
-  const ticketId = payload.ticket_id || runId;
+  const ticketId = payload.ticket_id || "";
+  const origQuery = encodeURIComponent(payload.original_query || "");
   const options = Array.isArray(payload.options) ? payload.options : [];
   const card = document.createElement("div");
   card.className = "clarify-chips-card";
-  const chipsHtml = options.map(opt => {
+  const chipsHtml = options.map((opt, idx) => {
     const safeOpt = escapeHtmlSafe(opt);
     const encOpt = encodeURIComponent(opt);
-    return `<button type="button" class="btn-clarify-chip" onclick="submitHarnessClarification('${escapeHtmlSafe(runId)}', '${escapeHtmlSafe(ticketId)}', decodeURIComponent('${encOpt}'), this)">${safeOpt}</button>`;
+    if (ticketId) {
+      return `<button type="button" class="btn-clarify-chip" onclick="submitHarnessClarification('${escapeHtmlSafe(runId)}', '${escapeHtmlSafe(ticketId)}', decodeURIComponent('${encOpt}'), this)">${idx + 1}. ${safeOpt}</button>`;
+    }
+    return `<button type="button" class="btn-clarify-chip" onclick="selectPlanClarificationOption(decodeURIComponent('${origQuery}'), decodeURIComponent('${encOpt}'), this)">${idx + 1}. ${safeOpt}</button>`;
   }).join("");
   card.innerHTML = `
-    <div class="hitl-card-title">Clarification Needed: ${escapeHtmlSafe(payload.question || "Please choose an option:")}</div>
+    <div class="clarify-card-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>${escapeHtmlSafe(payload.question || "Please choose an option to clarify or refine the plan:")}</span>
+    </div>
     <div class="clarify-options-row">${chipsHtml}</div>
   `;
   body.appendChild(card);

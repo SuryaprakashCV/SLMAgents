@@ -12,11 +12,91 @@ import gc
 import threading
 import time
 from collections import OrderedDict
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from ..config import MODEL_CATALOG, HarnessConfig, ModelSpec, get_config
-from .cpu_topology import get_cpu_topology, get_process_rss_mb
+from .cpu_topology import detect_cpu_topology, get_cpu_topology, get_process_rss_mb
+
+
+class MultiThreadExecutionScheduler:
+    """
+    Bounded Multi-Lane Non-Blocking Thread Scheduler with Watchdog Timeouts & Memory Guard.
+    Prevents heavy inference, web research, or background model downloads from starving
+    interactive routing or status/UI queries under concurrent load.
+    """
+
+    def __init__(self, max_compute_workers: int = 4, max_fast_workers: int = 6, max_bg_workers: int = 3) -> None:
+        self._fast_pool = ThreadPoolExecutor(max_workers=max_fast_workers, thread_name_prefix="slm-fast")
+        self._compute_pool = ThreadPoolExecutor(max_workers=max_compute_workers, thread_name_prefix="slm-compute")
+        self._bg_pool = ThreadPoolExecutor(max_workers=max_bg_workers, thread_name_prefix="slm-bg")
+        self._lock = threading.Lock()
+        self.active_fast: int = 0
+        self.active_compute: int = 0
+        self.active_bg: int = 0
+        self.completed_tasks: int = 0
+        self.timed_out_tasks: int = 0
+
+    def submit(self, lane: str, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Future:
+        lane_norm = lane.lower()
+        pool = (
+            self._fast_pool
+            if lane_norm == "fast"
+            else (self._bg_pool if lane_norm == "background" else self._compute_pool)
+        )
+
+        def _wrapped() -> Any:
+            with self._lock:
+                if lane_norm == "fast":
+                    self.active_fast += 1
+                elif lane_norm == "background":
+                    self.active_bg += 1
+                else:
+                    self.active_compute += 1
+            try:
+                return fn(*args, **kwargs)
+            finally:
+                with self._lock:
+                    if lane_norm == "fast":
+                        self.active_fast = max(0, self.active_fast - 1)
+                    elif lane_norm == "background":
+                        self.active_bg = max(0, self.active_bg - 1)
+                    else:
+                        self.active_compute = max(0, self.active_compute - 1)
+                    self.completed_tasks += 1
+
+        return pool.submit(_wrapped)
+
+    def run_with_timeout(
+        self,
+        lane: str,
+        timeout_sec: float,
+        fn: Callable[..., Any],
+        *args: Any,
+        default: Any = None,
+        **kwargs: Any,
+    ) -> Any:
+        fut = self.submit(lane, fn, *args, **kwargs)
+        try:
+            return fut.result(timeout=timeout_sec)
+        except FuturesTimeoutError:
+            with self._lock:
+                self.timed_out_tasks += 1
+            return default
+        except Exception:
+            return default
+
+    def status(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "active_fast": self.active_fast,
+                "active_compute": self.active_compute,
+                "active_background": self.active_bg,
+                "completed_tasks": self.completed_tasks,
+                "timed_out_tasks": self.timed_out_tasks,
+            }
+
 
 
 class RunCancelledError(Exception):
@@ -115,6 +195,27 @@ class MemoryArena:
         self._model_locks: Dict[str, threading.Lock] = {}
         self.eviction_count: int = 0
         self.tier_stepdowns: List[str] = []
+        topo = get_cpu_topology()
+        compute_workers = max(2, min(6, topo.performance_cores))
+        self.scheduler = MultiThreadExecutionScheduler(
+            max_compute_workers=compute_workers,
+            max_fast_workers=max(4, compute_workers + 2),
+            max_bg_workers=3,
+        )
+
+    def check_memory_pressure(self) -> Dict[str, Any]:
+        """Proactively inspects RSS and host available RAM; evicts idle models if under pressure."""
+        topo = get_cpu_topology()
+        rss = get_process_rss_mb()
+        evicted = 0
+        if rss > self.config.ram_soft_limit_mb:
+            evicted = self.purge_unpinned()
+        return {
+            "process_rss_mb": rss,
+            "available_ram_mb": topo.available_ram_mb,
+            "total_ram_mb": topo.total_ram_mb,
+            "evicted_idle_models": evicted,
+        }
 
     def _get_model_lock(self, model_id: str) -> threading.Lock:
         with self._lock:
@@ -274,15 +375,19 @@ class MemoryArena:
                 }
                 for e in self._entries.values()
             ]
+        topo = detect_cpu_topology(override_threads=self.config.n_threads)
         return {
             "profile": self.config.profile.value,
             "pure_cpu": self.config.pure_cpu,
             "process_rss_mb": get_process_rss_mb(),
+            "available_ram_mb": topo.available_ram_mb,
+            "total_ram_mb": topo.total_ram_mb,
             "ram_soft_limit_mb": self.config.ram_soft_limit_mb,
             "ram_hard_limit_mb": self.config.ram_hard_limit_mb,
             "loaded_models": loaded,
             "eviction_count": self.eviction_count,
             "tier_stepdowns": self.tier_stepdowns[-5:],
+            "scheduler": self.scheduler.status(),
         }
 
 

@@ -31,6 +31,7 @@ class EventType(str, Enum):
     TOOL_RESULT = "tool_result"
     VERIFIER_PASSED = "verifier_passed"
     VERIFIER_FAILED = "verifier_failed"
+    VERIFIER_RETRY = "verifier_retry"
     CLARIFICATION_NEEDED = "clarification_needed"
     CLARIFICATION_RESOLVED = "clarification_resolved"
     APPROVAL_REQUIRED = "approval_required"

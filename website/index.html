@@ -9,7 +9,7 @@
   <meta name="keywords" content="SLMAgents, slm_harness, 10-Plane Agent Harness, Pure CPU AI Agents, Small Language Models, llama.cpp GGUF, Quantized INT4 INT8 CPU, Local RAG, Text-to-SQL, Offline AI Studio, macOS Windows Linux AI Installer">
   <meta name="author" content="Suryaprakash C V, SLMAgents Community">
   <meta name="robots" content="index, follow">
-  <link rel="stylesheet" href="style.css?v=55.0">
+  <link rel="stylesheet" href="style.css?v=62.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -102,20 +102,20 @@
       <div style="max-width: 1120px; margin: 0 auto;">
 
         <!-- ==============================================================
-             HERO: SPLIT SYSTEMS ENGINEERING SPECIFICATION
+             HERO: SYSTEMS SPECIFICATION HEADER + FULL-WIDTH INTERACTIVE CONSOLE
              ============================================================== -->
         <section class="eng-hero">
-          <div class="eng-hero-grid">
-            <div>
-              <div class="eng-eyebrow">
-                <span class="eng-eyebrow-dot"></span>
-                <span>SLMAgents 2.0.0 · 10-Plane Pure-CPU Harness · MIT License</span>
-              </div>
-              <h1>Deterministic Local AI Agents on Standard CPUs</h1>
-              <p class="eng-hero-lead">
-                Small models fail when wrapped in prompt-heavy loops built for 200B cloud APIs. <strong>SLMAgents 2.0</strong> moves reliability into the systems layer via <code>slm_harness</code>—orchestrating <strong>26 specialized agents</strong> across hybrid <code>llama.cpp</code> GGUF (<code>Q4_K_M</code>) and quantized INT4/INT8 CPU runtimes with <code>&lt;35ms</code> Cascade Routing, GBNF JSON-Schema grammar decoding, a Watermark LRU <code>MemoryArena</code>, and self-healing verifiers at <strong>$0 API cost</strong>.
-              </p>
+          <div class="eng-hero-top">
+            <div class="eng-eyebrow">
+              <span class="eng-eyebrow-dot"></span>
+              <span>SLMAgents 2.0.0 · 10-Plane Pure-CPU Agent Harness · MIT Open Source</span>
+            </div>
+            <h1>Deterministic Local AI Agents on Standard CPUs</h1>
+            <p class="eng-hero-lead">
+              Small models fail when wrapped in prompt-heavy loops built for 200B cloud APIs. <strong>SLMAgents 2.0</strong> moves reliability into the systems layer via <code>slm_harness</code>—orchestrating <strong>26 specialized agents</strong> across hybrid <code>llama.cpp</code> GGUF (<code>Q4_K_M</code>) and quantized INT4/INT8 CPU runtimes with <code>&lt;35ms</code> Cascade Routing, GBNF JSON-Schema grammar decoding, a Watermark LRU <code>MemoryArena</code>, and self-healing verifiers at <strong>$0 API cost</strong>.
+            </p>
 
+            <div class="eng-cta-toolbar">
               <div class="eng-cta-row">
                 <a href="#os-installers" class="btn btn-primary">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -133,52 +133,86 @@
               </div>
 
               <div class="eng-cli-bar">
-                <div style="overflow-x: auto; white-space: nowrap;">
+                <div class="eng-cli-scroll">
                   <span class="prompt-sym">$</span><span id="hero-cli-cmd">git clone https://github.com/t00114218-stack/SLMAgents.git &amp;&amp; ./SLMAgents/slm doctor</span>
                 </div>
                 <button type="button" class="eng-cli-copy" onclick="navigator.clipboard.writeText('git clone https://github.com/t00114218-stack/SLMAgents.git && cd SLMAgents && ./slm doctor'); this.textContent='Copied'; setTimeout(()=>this.textContent='Copy', 1800);">Copy</button>
               </div>
             </div>
+          </div>
 
-            <!-- Right Column: Live Harness Execution Trace & Telemetry Card -->
-            <div class="eng-terminal-card">
-              <div class="eng-terminal-header">
+          <!-- Full-Width Interactive 10-Plane Execution Trace & Telemetry Console -->
+          <div class="eng-terminal-card">
+            <div class="eng-terminal-header">
+              <div class="eng-terminal-title-group">
                 <div class="code-dots">
                   <div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div>
                 </div>
-                <span>slm_harness // 10-Plane Execution Trace (n_gpu_layers=0)</span>
-                <span style="color: #10b981;">CPU ONLINE</span>
+                <span>slm_harness // 10-Plane Execution Trace</span>
               </div>
-              <div class="eng-terminal-body">
-<pre><span style="color:#64748b;">$ ./slm ask "Verify Q3 revenue in @sales.db and compute 15% tax provision"</span>
-<span style="color:#38bdf8;">[Plane 6 · CascadeRouter]</span>  stage=1 (deterministic_file_sig)  latency=<span style="color:#34d399;">2.1ms</span>
-  └─ DAG: <span style="color:#e2e8f0;">SLMTextToSQL</span> ──► <span style="color:#e2e8f0;">SLMMathAgent</span> (confidence=0.98)
-<span style="color:#38bdf8;">[Plane 2 · MemoryArena]</span>    profile=<span style="color:#f8fafc;">balanced (4.7 GB cap)</span>   rss=<span style="color:#34d399;">3,272 MB</span>
-  └─ slot=code_sql: <span style="color:#e2e8f0;">Qwen2.5-Coder-3B-Q4_K_M.gguf</span> (warm, 0 evictions)
-<span style="color:#38bdf8;">[Plane 5 · GBNF Grammar]</span>   schema=ToolCallEnvelope           speed=<span style="color:#34d399;">24.6 tok/s</span>
+
+              <div class="eng-terminal-tabs" role="tablist" aria-label="Execution Trace Workloads">
+                <button type="button" class="eng-term-tab active" onclick="switchHeroTrace(this, 'hero-trace-sql')">01 · SQL + SymPy DAG</button>
+                <button type="button" class="eng-term-tab" onclick="switchHeroTrace(this, 'hero-trace-rag')">02 · Context-Distilled RAG</button>
+                <button type="button" class="eng-term-tab" onclick="switchHeroTrace(this, 'hero-trace-code')">03 · Python AST Sandbox</button>
+              </div>
+
+              <span class="eng-terminal-status">● CPU ONLINE (n_gpu_layers=0)</span>
+            </div>
+
+            <!-- Trace Tab 1: SQL + Math DAG -->
+            <div class="eng-terminal-body" id="hero-trace-sql">
+<pre><span style="color:#64748b;">$ ./slm ask "Verify Q3 settled revenue in @sales.db and 15% tax"</span>
+<span style="color:#38bdf8;">[Plane 6 · CascadeRouter]</span>  stage=1 (file_sig)   latency=<span style="color:#34d399;">2.1ms</span>   conf=<span style="color:#f8fafc;">0.98</span>
+  └─ DAG: <span style="color:#e2e8f0;">SLMTextToSQL</span> (@sales.db) ──► <span style="color:#e2e8f0;">SLMMathAgent</span> (SymPy tax check)
+<span style="color:#38bdf8;">[Plane 2 · MemoryArena]</span>    profile=<span style="color:#f8fafc;">balanced (4.7 GB)</span>  rss=<span style="color:#34d399;">3,272 MB</span>  evict=<span style="color:#34d399;">0</span>
+  └─ slot=code_sql: <span style="color:#e2e8f0;">Qwen2.5-Coder-3B-Q4_K_M.gguf</span> (warm on 7 P-cores)
+<span style="color:#38bdf8;">[Plane 5 · GBNF Grammar]</span>   schema=ToolCallEnvelope  speed=<span style="color:#34d399;">24.6 tok/s</span>
   └─ sql: <span style="color:#a7f3d0;">SELECT SUM(net_revenue) FROM q3_ledger WHERE status='settled';</span>
-<span style="color:#38bdf8;">[Plane 7 · SQLVerifier]</span>    sqlite_explain_query_plan=<span style="color:#34d399;">PASS</span>   rows_read=1,420
-  └─ handle=<span style="color:#fde68a;">artifact://9f3a81c04b12</span>  summary="Q3 net_revenue = $1,250,000.00"
-<span style="color:#38bdf8;">[Plane 7 · SymPyVerifier]</span>  expr=<span style="color:#a7f3d0;">1250000 * 0.15</span>               verified=<span style="color:#34d399;">$187,500.00</span>
-<span style="color:#38bdf8;">[Plane 1 · CheckpointWAL]</span>  turn_id=ckpt_0194a  status=<span style="color:#34d399;">COMMITTED (total: 612ms)</span></pre>
+<span style="color:#38bdf8;">[Plane 7 · SQLVerifier]</span>    sqlite_explain=<span style="color:#34d399;">PASS</span>  handle=<span style="color:#fde68a;">artifact://9f3a81c04b12</span>
+<span style="color:#38bdf8;">[Plane 7 · SymPyVerifier]</span>  expr=<span style="color:#a7f3d0;">1250000 * 0.15</span>  verified=<span style="color:#34d399;">$187,500.00</span> (PASS)
+<span style="color:#38bdf8;">[Plane 1 · CheckpointWAL]</span>  turn_id=ckpt_0194a   status=<span style="color:#34d399;">COMMITTED (612ms · $0.00)</span></pre>
+            </div>
+
+            <!-- Trace Tab 2: Context-Distilled CPU RAG -->
+            <div class="eng-terminal-body" id="hero-trace-rag" style="display: none;">
+<pre><span style="color:#64748b;">$ ./slm ask "What is the monthly SLA uptime and credit in @msa.pdf?"</span>
+<span style="color:#38bdf8;">[Plane 6 · CascadeRouter]</span>  stage=1 (mime=.pdf)  latency=<span style="color:#34d399;">1.4ms</span>   agent=<span style="color:#f8fafc;">SLMRag</span>
+<span style="color:#38bdf8;">[Plane 4 · HybridMemory]</span>   index=FTS5_BM25 + HNSW_INT8  model=<span style="color:#e2e8f0;">mxbai-embed-large</span>
+  └─ lookup=<span style="color:#34d399;">0.03ms (warm)</span>  reranker=<span style="color:#e2e8f0;">bge-reranker-base (Top-K=2 distilled)</span>
+<span style="color:#38bdf8;">[Plane 3 · ContextEngine]</span>  raw_tokens=18,400 ──► distilled=<span style="color:#34d399;">310 (-98.3% bloat)</span>
+<span style="color:#38bdf8;">[Plane 5 · GGUF Runtime]</span>   model=<span style="color:#e2e8f0;">Qwen3-4B-Q4_K_M.gguf</span>  ttft=<span style="color:#34d399;">104ms</span>  speed=<span style="color:#34d399;">24.6 tok/s</span>
+<span style="color:#38bdf8;">[Plane 7 · CiteVerifier]</span>   spans=<span style="color:#f8fafc;">["[1] Sec 4.1", "[2] Sec 4.2"]</span>  grounding=<span style="color:#34d399;">1.00 PASS</span>
+<span style="color:#38bdf8;">[Plane 1 · CheckpointWAL]</span>  turn_id=ckpt_0194b   status=<span style="color:#34d399;">COMMITTED (1.15s · $0.00)</span></pre>
+            </div>
+
+            <!-- Trace Tab 3: Sandboxed Python AST Execution -->
+            <div class="eng-terminal-body" id="hero-trace-code" style="display: none;">
+<pre><span style="color:#64748b;">$ ./slm ask "Load @q3_sales.csv and compute operating margin by region"</span>
+<span style="color:#38bdf8;">[Plane 3 · Scratchpad]</span>     @q3_sales.csv ──► <span style="color:#fde68a;">artifact://7d92a01bc44e</span> (12,400 rows)
+<span style="color:#38bdf8;">[Plane 6 · CascadeRouter]</span>  stage=2 (fts5_bm25)  latency=<span style="color:#34d399;">3.8ms</span>   agent=<span style="color:#f8fafc;">SLMCodeInterpreter</span>
+<span style="color:#38bdf8;">[Plane 8 · PolicyGuard]</span>    risk=<span style="color:#34d399;">L1_READ</span>         sandbox=POSIX_rlimit (net=DENY)
+<span style="color:#38bdf8;">[Plane 7 · ASTVerifier]</span>    ast_parse=<span style="color:#34d399;">PASS</span>       imports=<span style="color:#a7f3d0;">['pandas', 'json']</span>
+<span style="color:#38bdf8;">[Plane 7 · ExecSandbox]</span>    exit=0  stdout=<span style="color:#a7f3d0;">{"NA": "34.2%", "EMEA": "31.8%", "APAC": "36.5%"}</span>
+<span style="color:#38bdf8;">[Plane 1 · CheckpointWAL]</span>  turn_id=ckpt_0194c   status=<span style="color:#34d399;">COMMITTED (540ms · $0.00)</span></pre>
+            </div>
+
+            <div class="eng-metrics-strip">
+              <div class="eng-metric-cell">
+                <div class="eng-metric-val">24.6 tok/s</div>
+                <div class="eng-metric-lbl">Qwen3-4B GGUF (Q4_K_M) on CPU</div>
               </div>
-              <div class="eng-metrics-strip">
-                <div class="eng-metric-cell">
-                  <div class="eng-metric-val">24.6 tok/s</div>
-                  <div class="eng-metric-lbl">Qwen3-4B CPU GGUF</div>
-                </div>
-                <div class="eng-metric-cell">
-                  <div class="eng-metric-val">&lt;35 ms</div>
-                  <div class="eng-metric-lbl">4-Stage Cascade Router</div>
-                </div>
-                <div class="eng-metric-cell">
-                  <div class="eng-metric-val">0.03 ms</div>
-                  <div class="eng-metric-lbl">Warm INT8 Embedding</div>
-                </div>
-                <div class="eng-metric-cell">
-                  <div class="eng-metric-val">$0.00</div>
-                  <div class="eng-metric-lbl">Cloud API / GPU Cost</div>
-                </div>
+              <div class="eng-metric-cell">
+                <div class="eng-metric-val">&lt;35 ms</div>
+                <div class="eng-metric-lbl">4-Stage Calibrated Cascade Router</div>
+              </div>
+              <div class="eng-metric-cell">
+                <div class="eng-metric-val">0.03 ms</div>
+                <div class="eng-metric-lbl">Warm 1024-d INT8 Vector Lookup</div>
+              </div>
+              <div class="eng-metric-cell">
+                <div class="eng-metric-val" style="color: #34d399;">$0.00</div>
+                <div class="eng-metric-lbl">Cloud API, Token &amp; GPU Cost</div>
               </div>
             </div>
           </div>
@@ -197,25 +231,27 @@
           </div>
 
           <!-- 3-Column Full Suite OS Matrix -->
-          <div class="os-matrix-grid" style="grid-template-columns: repeat(3, 1fr);">
+          <div class="os-matrix-grid">
             <div class="os-installer-card">
               <div>
                 <div class="os-card-top">
                   <div class="os-name-group">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.33c.64-.78 1.08-1.86.96-2.94-.93.04-2.06.62-2.72 1.4-.58.68-1.1 1.79-.96 2.84 1.04.08 2.08-.52 2.72-1.3"/></svg>
+                    <span class="os-icon-box">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.33c.64-.78 1.08-1.86.96-2.94-.93.04-2.06.62-2.72 1.4-.58.68-1.1 1.79-.96 2.84 1.04.08 2.08-.52 2.72-1.3"/></svg>
+                    </span>
                     <span>macOS Installer</span>
                   </div>
                   <span class="os-size-tag">.dmg · 280 MB</span>
                 </div>
                 <p class="os-card-desc">Native macOS disk image with embedded Python 3.11, <code>llama-cpp-python</code>, ONNX Runtime, and all 26 agents.</p>
                 <div class="os-spec-list">
-                  <span>Arch: Apple Silicon (arm64) &amp; Intel</span>
+                  <span>Arch: Apple Silicon (M1–M4) &amp; Intel</span>
                   <span>Target: /Applications/SLMAgents.app</span>
                 </div>
               </div>
               <div style="display: flex; gap: 6px;">
-                <a href="/api/installers/download/macos-dmg" download="SLMAgents-2.0-macOS-Installer.dmg" class="btn btn-primary" style="flex: 1; padding: 0.48rem 0.6rem; font-size: 0.78rem;">Download .dmg</a>
-                <button type="button" onclick="installAndOpenMacApp(this)" class="btn btn-secondary" style="padding: 0.48rem 0.6rem; font-size: 0.76rem;" title="Mount and install directly when running locally">Install Local</button>
+                <a href="/api/installers/download/macos-dmg" download="SLMAgents-2.0-macOS-Installer.dmg" class="btn btn-primary" style="flex: 1; padding: 0.52rem 0.6rem; font-size: 0.8rem;">Download .dmg</a>
+                <button type="button" onclick="installAndOpenMacApp(this)" class="btn btn-secondary" style="padding: 0.52rem 0.65rem; font-size: 0.78rem;" title="Mount and install directly when running locally">Install Local</button>
               </div>
             </div>
 
@@ -223,7 +259,9 @@
               <div>
                 <div class="os-card-top">
                   <div class="os-name-group">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+                    <span class="os-icon-box">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+                    </span>
                     <span>Windows 10 / 11</span>
                   </div>
                   <span class="os-size-tag">.exe · 2.8 MB</span>
@@ -234,14 +272,16 @@
                   <span>Target: %LOCALAPPDATA%\SLMAgents</span>
                 </div>
               </div>
-              <a href="/api/installers/download/windows" download="SLMAgents-2.0-Windows-Setup.exe" class="btn btn-primary" style="width: 100%; padding: 0.48rem 0.6rem; font-size: 0.78rem;">Download Windows (.exe)</a>
+              <a href="/api/installers/download/windows" download="SLMAgents-2.0-Windows-Setup.exe" class="btn btn-primary" style="width: 100%; padding: 0.52rem 0.6rem; font-size: 0.8rem;">Download Windows (.exe)</a>
             </div>
 
             <div class="os-installer-card">
               <div>
                 <div class="os-card-top">
                   <div class="os-name-group">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                    <span class="os-icon-box">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                    </span>
                     <span>Linux AppImage</span>
                   </div>
                   <span class="os-size-tag">.AppImage · 3.4 MB</span>
@@ -252,18 +292,18 @@
                   <span>Target: ~/.local/share/slmagents</span>
                 </div>
               </div>
-              <a href="/api/installers/download/linux" download="SLMAgents-2.0-Linux-x86_64.AppImage" class="btn btn-primary" style="width: 100%; padding: 0.48rem 0.6rem; font-size: 0.78rem;">Download Linux (.AppImage)</a>
+              <a href="/api/installers/download/linux" download="SLMAgents-2.0-Linux-x86_64.AppImage" class="btn btn-primary" style="width: 100%; padding: 0.52rem 0.6rem; font-size: 0.8rem;">Download Linux (.AppImage)</a>
             </div>
           </div>
 
           <!-- Interactive Individual Agent + Harness OS Installer Selector -->
           <div class="agent-installer-builder">
             <div>
-              <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              <div style="font-weight: 700; font-size: 0.94rem; color: var(--text-primary); display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
                 <span>Individual Agent + 10-Plane Harness OS Installer Builder</span>
                 <span class="os-size-tag">78 Bundles · ~450 KB each</span>
               </div>
-              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+              <div style="font-size: 0.81rem; color: var(--text-secondary); margin-top: 3px;">
                 Need only one specialized agent? Select an agent to download a minimal self-extracting installer containing just that agent package + <code>slm_harness</code> + <code>./slm</code> CLI.
               </div>
             </div>
@@ -321,6 +361,54 @@
             <p class="eng-section-desc">
               Instead of relying on fragile prompt engineering, <code>slm_harness</code> decomposes local agent execution into 10 deterministic systems planes—bounding RAM usage, enforcing valid tool schemas at the token sampler level, and verifying outputs before they reach the user.
             </p>
+          </div>
+
+          <!-- Visual 5-Stage / 10-Plane Execution Blueprint -->
+          <div class="arch-pipeline-diagram" aria-label="10-Plane Execution Pipeline">
+            <div class="arch-stage-box">
+              <div>
+                <div class="arch-stage-num">01 · INGRESS &amp; POLICY</div>
+                <div class="arch-stage-name">Planes 8 &amp; 9 · Surfaces &amp; Guard</div>
+                <div class="arch-stage-detail">CLI (<code>./slm</code>), Offline Web Studio, OpenAI <code>/v1</code> API &amp; MCP Server gated by PII scrubber &amp; risk lattice.</div>
+              </div>
+              <div class="arch-stage-metric">&lt;5 ms Policy &amp; PII Gate</div>
+            </div>
+
+            <div class="arch-stage-box">
+              <div>
+                <div class="arch-stage-num">02 · DISPATCH &amp; DAG</div>
+                <div class="arch-stage-name">Plane 6 · Cascade Router</div>
+                <div class="arch-stage-detail">4-stage deterministic-first router: MIME/Regex → FTS5 BM25 → 1024-d Embedding Margin → 0.8B Token-Trie.</div>
+              </div>
+              <div class="arch-stage-metric">&lt;35 ms p95 Route Latency</div>
+            </div>
+
+            <div class="arch-stage-box">
+              <div>
+                <div class="arch-stage-num">03 · CONTEXT &amp; MEMORY</div>
+                <div class="arch-stage-name">Planes 3 &amp; 4 · Artifact &amp; 4-Tier</div>
+                <div class="arch-stage-detail">Stores large tables/files as <code>artifact://&lt;sha12&gt;</code> handles + SQLite FTS5 BM25 &amp; INT8 HNSW vectors.</div>
+              </div>
+              <div class="arch-stage-metric">70–85% Token Reduction</div>
+            </div>
+
+            <div class="arch-stage-box">
+              <div>
+                <div class="arch-stage-num">04 · CPU COMPUTE</div>
+                <div class="arch-stage-name">Planes 2 &amp; 5 · Arena &amp; GBNF</div>
+                <div class="arch-stage-detail">Watermark LRU <code>MemoryArena</code> governing hybrid <code>llama.cpp</code> GGUF (<code>Q4_K_M</code>) &amp; INT4/INT8 ONNX models.</div>
+              </div>
+              <div class="arch-stage-metric">24.6 tok/s · 100% Valid JSON</div>
+            </div>
+
+            <div class="arch-stage-box">
+              <div>
+                <div class="arch-stage-num">05 · VERIFY &amp; COMMIT</div>
+                <div class="arch-stage-name">Planes 1, 7 &amp; 10 · Verifiers &amp; WAL</div>
+                <div class="arch-stage-detail">Self-healing SQLite EXPLAIN, Python AST, SymPy &amp; Citation verifiers committed to SQLite WAL checkpoints.</div>
+              </div>
+              <div class="arch-stage-metric">&lt;1.2 ms WAL Checkpoint</div>
+            </div>
           </div>
 
           <div class="pillars-grid">
@@ -466,9 +554,7 @@
                 <button class="code-tab-btn" onclick="switchTab(this, 'sc1-out')">Verified Output</button>
               </div>
               <div class="code-content active" id="sc1-code">
-<pre><code># 10-Plane Harness CLI
-# $ ./slm ask "Generate first 10 primes and compute their mean in Python"
-
+<pre><code># $ ./slm ask "Generate first 10 primes and compute mean"
 from slm_orchestrator import SLMOrchestrator
 from slm_code_interpreter import SLMCodeInterpreter
 
@@ -476,19 +562,19 @@ orch = SLMOrchestrator()
 interp = SLMCodeInterpreter()
 
 route = orch.route(
-    question="Write Python to compute first 10 primes and their mean",
+    question="Compute first 10 primes and their mean",
     agents=["RAG", "CodeInterpreter", "Math"]
 )
 res = interp.execute(
     "primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]\n"
-    "print({'count': len(primes), 'mean': sum(primes)/len(primes)})"
+    "print({'count': len(primes), 'mean': sum(primes)/10})"
 )
 print(res)</code></pre>
               </div>
               <div class="code-content" id="sc1-out">
-<pre><code>[Plane 6 CascadeRouter] selected_agent="CodeInterpreter" (latency=2.4ms)
-[Plane 7 PythonASTVerifier] syntax=PASS  forbidden_imports=NONE
-[Plane 3 ArtifactScratchpad] stored stdout -> artifact://4c81e920ab11
+<pre><code>[Plane 6 CascadeRouter] agent="CodeInterpreter" (2.4ms)
+[Plane 7 PythonASTVerifier] syntax=PASS imports=ALLOW
+[Plane 3 Scratchpad] stdout -> artifact://4c81e920ab11
 
 {
   "status": "success",
@@ -506,7 +592,7 @@ print(res)</code></pre>
               <span class="trace-meta-tag">TRACE 02 · PLANE 3 ARTIFACT SCRATCHPAD</span>
               <h3>Zero-Prefill-Bloat Tabular Data Analytics</h3>
               <p>
-                Instead of dumping thousands of CSV rows into the prompt, <code>SLMDataAnalyst</code> registers the dataset in Plane 3's <code>ArtifactScratchpad</code> (`artifact://&lt;sha12&gt;`), passes only the compact column schema to the model, and executes verified Pandas aggregations locally.
+                Instead of dumping thousands of CSV rows into the prompt, <code>SLMDataAnalyst</code> registers the dataset in Plane 3's <code>ArtifactScratchpad</code> (<code>artifact://&lt;sha12&gt;</code>), passes only the compact column schema to the model, and executes verified Pandas aggregations locally.
               </p>
               <ul class="trace-step-list">
                 <li><span class="trace-step-num">[01]</span><span><strong>Out-of-Context Storage:</strong> 50,000-row CSV stays in memory/disk behind a 12-byte SHA handle.</span></li>
@@ -525,29 +611,26 @@ print(res)</code></pre>
                 <button class="code-tab-btn" onclick="switchTab(this, 'sc2-out')">Verified Output</button>
               </div>
               <div class="code-content active" id="sc2-code">
-<pre><code># 10-Plane Harness CLI
-# $ ./slm ask "Group @q3_regional_sales.csv by region and rank net margin"
-
+<pre><code># $ ./slm ask "Group @q3_regional_sales.csv by region"
 from slm_data import SLMDataAnalyst
 
 analyst = SLMDataAnalyst()
 report = analyst.analyze_file(
     file_path="q3_regional_sales.csv",
-    query="Summarize total revenue and operating margin by region"
+    query="Summarize revenue and margin by region"
 )
 print(report)</code></pre>
               </div>
               <div class="code-content" id="sc2-out">
-<pre><code>[Plane 3 ArtifactScratchpad] q3_regional_sales.csv -> artifact://7d92a01bc44e
-[Plane 3 SchemaDigest] cols=['region','revenue','cost','margin_pct'] rows=12,400
+<pre><code>[Plane 3 Scratchpad] csv -> artifact://7d92a01bc44e
+[Plane 3 SchemaDigest] cols=['region','rev','margin']
 
 {
   "artifact_handle": "artifact://7d92a01bc44e",
-  "columns": ["region", "revenue", "cost", "margin_pct"],
   "summary": {
-    "North America": {"revenue": "$1,420,000", "margin_pct": "34.2%"},
-    "EMEA":          {"revenue": "$980,000",   "margin_pct": "31.8%"},
-    "APAC":          {"revenue": "$760,000",   "margin_pct": "36.5%"}
+    "North America": {"rev": "$1.42M", "margin": "34.2%"},
+    "EMEA":          {"rev": "$0.98M", "margin": "31.8%"},
+    "APAC":          {"rev": "$0.76M", "margin": "36.5%"}
   }
 }</code></pre>
               </div>
@@ -579,29 +662,28 @@ print(report)</code></pre>
                 <button class="code-tab-btn" onclick="switchTab(this, 'sc3-out')">Verified Output</button>
               </div>
               <div class="code-content active" id="sc3-code">
-<pre><code># 10-Plane Harness CLI
-# $ ./slm ask "What is the SLA uptime guarantee in @enterprise_msa.pdf?"
-
+<pre><code># $ ./slm ask "What is the SLA uptime in @msa.pdf?"
 from slm_rag import SLMRag
 
 rag = SLMRag(temperature=0.0, max_tokens=256)
 answer = rag.answer(
-    question="What is the SLA uptime guarantee and service credit?",
+    question="What is the SLA uptime and credit?",
     chunks=[
-        "Section 4.1: Provider guarantees 99.95% monthly uptime [1].",
-        "Section 4.2: Downtime exceeding 21 minutes/month entitles Customer to a 10% credit [2]."
+        "Sec 4.1: Provider guarantees 99.95% uptime [1].",
+        "Sec 4.2: Downtime >21m/mo grants 10% credit [2]."
     ],
-    instruction="Cite exact section numbers using [1], [2]."
+    instruction="Cite exact sections using [1], [2]."
 )
 print(answer)</code></pre>
               </div>
               <div class="code-content" id="sc3-out">
-<pre><code>[Plane 4 HybridRetriever] embed_dim=1024 (INT8)  rerank_top_k=2  ttft=0.10s
-[Plane 7 CitationVerifier] citations_checked=2  grounding_score=1.00 (PASS)
+<pre><code>[Plane 4 HybridRetriever] dim=1024 top_k=2 ttft=0.10s
+[Plane 7 CitationVerifier] spans=2 grounding=1.00 PASS
 
 {
-  "answer": "Under Section 4.1, the monthly SLA uptime guarantee is 99.95% [1]. Under Section 4.2, downtime exceeding 21 minutes per month entitles the customer to a 10% service credit [2].",
-  "verified_citations": ["[1] Section 4.1", "[2] Section 4.2"],
+  "answer": "Sec 4.1 guarantees 99.95% uptime [1]; "
+            "Sec 4.2 grants a 10% credit [2].",
+  "verified_citations": ["[1] Sec 4.1", "[2] Sec 4.2"],
   "grounded": true
 }</code></pre>
               </div>
@@ -897,7 +979,7 @@ print(answer)</code></pre>
                   <span class="agent-cat-tag">Data &amp; Utilities</span>
                 </div>
                 <h3>SLM Vision Parser</h3>
-                <p>Offline quantized Vision-Language &amp; OCR pipeline (`Florence-2-base INT8`) for extracting tables, charts, receipts, and diagrams on CPU.</p>
+                <p>Offline quantized Vision-Language &amp; OCR pipeline (<code>Florence-2-base INT8</code>) for extracting tables, charts, receipts, and diagrams on CPU.</p>
               </div>
               <div>
                 <div class="agent-card-spec">Slot: vision_ocr (Florence-2 INT8) · OCR Bounding-Box Verifier</div>
@@ -1058,7 +1140,7 @@ print(answer)</code></pre>
                   <span class="agent-cat-tag">Data &amp; Utilities</span>
                 </div>
                 <h3>SLM Embeddings Server</h3>
-                <p>High-throughput CPU vector service computing normalized 1024-d (`mxbai-embed-large`) and 384-d (`bge-small`) INT8 embeddings in `0.03ms` warm.</p>
+                <p>High-throughput CPU vector service computing normalized 1024-d (<code>mxbai-embed-large</code>) and 384-d (<code>bge-small</code>) INT8 embeddings in <code>0.03ms</code> warm.</p>
               </div>
               <div>
                 <div class="agent-card-spec">Slot: embeddings (INT8 ONNX) · L2-Norm &amp; Dimension Verifier</div>
@@ -1173,7 +1255,7 @@ print(answer)</code></pre>
                   <span class="agent-cat-tag">Productivity</span>
                 </div>
                 <h3>SLM PKB Agent</h3>
-                <p>Indexes local Obsidian, Logseq, and Markdown vaults on CPU—discovering semantic clusters, bi-directional `[[wikilinks]]`, and frontmatter tags.</p>
+                <p>Indexes local Obsidian, Logseq, and Markdown vaults on CPU—discovering semantic clusters, bi-directional <code>[[wikilinks]]</code>, and frontmatter tags.</p>
               </div>
               <div>
                 <div class="agent-card-spec">Slot: embeddings (INT8) + primary · Vault Link Integrity Verifier</div>
@@ -1196,7 +1278,7 @@ print(answer)</code></pre>
                   <span class="agent-cat-tag">Productivity</span>
                 </div>
                 <h3>SLM Voice Agent</h3>
-                <p>100% offline speech-to-text (`Whisper-tiny.en INT8`), low-latency local agent reasoning, and CPU neural text-to-speech (`Kokoro-82M`).</p>
+                <p>100% offline speech-to-text (<code>Whisper-tiny.en INT8</code>), low-latency local agent reasoning, and CPU neural text-to-speech (<code>Kokoro-82M</code>).</p>
               </div>
               <div>
                 <div class="agent-card-spec">Slot: speech_stt + primary + speech_tts · Audio Frame Verifier</div>
@@ -1239,7 +1321,7 @@ print(answer)</code></pre>
         <!-- ==============================================================
              SECTION 05: EMPIRICAL BENCHMARKS & SYSTEMS RESEARCH
              ============================================================== -->
-        <section class="eng-section" id="blogs" style="border-bottom: none;">
+        <section class="eng-section" id="blogs">
           <div class="eng-section-header">
             <div class="eng-section-index">05 / EMPIRICAL BENCHMARKS &amp; RESEARCH</div>
             <h2 class="eng-section-title">Systems Architecture &amp; CPU Ablation Studies</h2>
@@ -1248,87 +1330,87 @@ print(answer)</code></pre>
             </p>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 3rem; margin-bottom: 3rem;">
             <!-- Paper 1: 10-Plane Harness -->
-            <article style="background: #ffffff; border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <article style="border-top: 2px solid #09090b; padding-top: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
               <div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.65rem;">
-                  <span class="os-size-tag">SYSTEMS PAPER · NOV 2026</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600; color: var(--accent-blue); letter-spacing: 0.05em;">SYSTEMS PAPER · NOV 2026</span>
                   <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">10 min read</span>
                 </div>
-                <h3 style="font-size: 1.15rem; font-weight: 700; line-height: 1.35; margin-bottom: 0.55rem;">
+                <h3 style="font-size: 1.25rem; font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; margin-bottom: 0.6rem;">
                   <a href="harness_blog.html" style="color: var(--text-primary); text-decoration: none;">Building a 10-Plane Local AI Agent Harness at $0 Cost: How We Made 0.8B–8B SLMs Reliable on Pure CPU</a>
                 </h3>
-                <p style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem;">
+                <p style="font-size: 0.88rem; color: #52525b; line-height: 1.65; margin-bottom: 1.25rem;">
                   Complete architectural breakdown of <code>slm_harness</code>—covering the <code>&lt;35ms</code> 4-stage Cascade Router, GBNF JSON-Schema grammar decoding, Watermark LRU <code>MemoryArena</code>, content-addressed <code>artifact://</code> handles, and Plane 7 self-healing verifiers.
                 </p>
               </div>
               <div>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.65rem; background: #fafafa; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.9rem; font-family: var(--font-mono);">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; padding: 0.85rem 0; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; margin-bottom: 1.1rem; font-family: var(--font-mono);">
                   <div>
-                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">24.6 tok/s</div>
-                    <div style="font-size: 0.66rem; color: var(--text-muted);">Qwen3-4B GGUF</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">24.6 tok/s</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted);">Qwen3-4B GGUF</div>
                   </div>
                   <div>
-                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">&lt;35 ms</div>
-                    <div style="font-size: 0.66rem; color: var(--text-muted);">Cascade Router</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">&lt;35 ms</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted);">Cascade Router</div>
                   </div>
                   <div>
-                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--accent-emerald);">3,272 MB</div>
-                    <div style="font-size: 0.66rem; color: var(--text-muted);">Peak Arena RSS</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: var(--accent-emerald);">3,272 MB</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted);">Peak Arena RSS</div>
                   </div>
                 </div>
-                <a href="harness_blog.html" class="btn btn-primary" style="width: 100%; font-size: 0.8rem;">Read 10-Plane Architecture Paper &rarr;</a>
+                <a href="harness_blog.html" class="agent-docs-link" style="font-size: 0.86rem;">Read 10-Plane Architecture Paper &rarr;</a>
               </div>
             </article>
 
             <!-- Paper 2: Context Distillation CPU RAG -->
-            <article style="background: #ffffff; border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <article style="border-top: 2px solid #09090b; padding-top: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
               <div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.65rem;">
-                  <span class="os-size-tag">CONTROLLED ABLATION · AUG 2026</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600; color: var(--accent-emerald); letter-spacing: 0.05em;">CONTROLLED ABLATION · AUG 2026</span>
                   <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">120-Query Study</span>
                 </div>
-                <h3 style="font-size: 1.15rem; font-weight: 700; line-height: 1.35; margin-bottom: 0.55rem;">
+                <h3 style="font-size: 1.25rem; font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; margin-bottom: 0.6rem;">
                   <a href="https://medium.com/@cvsuryaprakash/context-distillation-for-cpu-rag-a-controlled-study-on-sub-3b-models-f9244339c09f" target="_blank" style="color: var(--text-primary); text-decoration: none;">Context Distillation for CPU RAG: A Controlled Study on Sub-3B Models</a>
                 </h3>
-                <p style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem;">
+                <p style="font-size: 0.88rem; color: #52525b; line-height: 1.65; margin-bottom: 1.25rem;">
                   Why dumping 5–8 retrieved chunks into a sub-3B model causes prefill starvation and attention dilution on CPU—and how cross-encoder distillation to Top-K=2 achieves <code>95.8%</code> grounded accuracy with 75% faster TTFT.
                 </p>
               </div>
               <div>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.65rem; background: #fafafa; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.9rem; font-family: var(--font-mono);">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; padding: 0.85rem 0; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; margin-bottom: 1.1rem; font-family: var(--font-mono);">
                   <div>
-                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--accent-emerald);">95.8%</div>
-                    <div style="font-size: 0.66rem; color: var(--text-muted);">Grounded Acc.</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: var(--accent-emerald);">95.8%</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted);">Grounded Acc.</div>
                   </div>
                   <div>
-                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">0.10 s</div>
-                    <div style="font-size: 0.66rem; color: var(--text-muted);">TTFT p50 (-75%)</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">0.10 s</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted);">TTFT p50 (-75%)</div>
                   </div>
                   <div>
-                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">1.15 s</div>
-                    <div style="font-size: 0.66rem; color: var(--text-muted);">End-to-End p50</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">1.15 s</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted);">End-to-End p50</div>
                   </div>
                 </div>
-                <a href="https://medium.com/@cvsuryaprakash/context-distillation-for-cpu-rag-a-controlled-study-on-sub-3b-models-f9244339c09f" target="_blank" class="btn btn-secondary" style="width: 100%; font-size: 0.8rem;">Read Benchmark Study &rarr;</a>
+                <a href="https://medium.com/@cvsuryaprakash/context-distillation-for-cpu-rag-a-controlled-study-on-sub-3b-models-f9244339c09f" target="_blank" class="agent-docs-link" style="font-size: 0.86rem;">Read Benchmark Study &rarr;</a>
               </div>
             </article>
           </div>
 
-          <!-- Empirical Figures Row -->
-          <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1rem;">
-            <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 8px; padding: 1rem;">
-              <div style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">
+          <!-- Empirical Figures Row (Open Editorial Figures, No Grey Boxes) -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 2.5rem;">
+            <div>
+              <div style="font-family: var(--font-mono); font-size: 0.71rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em;">
                 Figure 1 · 120-Query CPU RAG Ablation Matrix (Sub-3B Models)
               </div>
-              <img src="complex_table.png" alt="CPU RAG Context Distillation Benchmark Table" style="width: 100%; height: auto; border-radius: 4px; border: 1px solid var(--border); display: block;">
+              <img src="complex_table.png" alt="CPU RAG Context Distillation Benchmark Table" style="width: 100%; height: auto; border-radius: 6px; display: block;">
             </div>
-            <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 8px; padding: 1rem;">
-              <div style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase;">
+            <div>
+              <div style="font-family: var(--font-mono); font-size: 0.71rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em;">
                 Figure 2 · Context Distillation Pipeline
               </div>
-              <img src="flowchart.png" alt="SLMAgents Context Distillation Pipeline" style="width: 100%; height: auto; border-radius: 4px; border: 1px solid var(--border); display: block;">
+              <img src="flowchart.png" alt="SLMAgents Context Distillation Pipeline" style="width: 100%; height: auto; border-radius: 6px; display: block;">
             </div>
           </div>
         </section>
@@ -1340,11 +1422,11 @@ print(answer)</code></pre>
               <strong style="color: var(--text-primary);">SLMAgents 2.0</strong> · 10-Plane Pure-CPU Local AI Agent Harness (<code>slm_harness</code>) · MIT License
             </div>
             <div class="footer-links">
-              <a href="index.html">Overview</a>
+              <a href="index.html">Home</a>
               <a href="#os-installers">OS Installers</a>
               <a href="chat.html">Chat Studio</a>
-              <a href="playground.html">API Sandbox</a>
-              <a href="blogs.html">Research</a>
+              <a href="playground.html">Playground</a>
+              <a href="blogs.html">Blogs</a>
               <a href="harness_blog.html">2.0 Paper</a>
               <a href="https://github.com/t00114218-stack/SLMAgents" target="_blank">GitHub</a>
             </div>
@@ -1366,7 +1448,7 @@ print(answer)</code></pre>
     </div>
   </div>
 
-  <script src="app.js?v=55.0"></script>
+  <script src="app.js?v=62.0"></script>
   <script>
     function syncHomeAgentInstaller(agentSlug) {
       var mac = document.getElementById('home-agent-dl-mac');
@@ -1375,6 +1457,16 @@ print(answer)</code></pre>
       if (mac) mac.href = '/api/installers/download/agent-macos?agent=' + encodeURIComponent(agentSlug);
       if (win) win.href = '/api/installers/download/agent-windows?agent=' + encodeURIComponent(agentSlug);
       if (lin) lin.href = '/api/installers/download/agent-linux?agent=' + encodeURIComponent(agentSlug);
+    }
+
+    function switchHeroTrace(btn, panelId) {
+      var tabs = document.querySelectorAll('.eng-term-tab');
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      if (btn) btn.classList.add('active');
+      ['hero-trace-sql', 'hero-trace-rag', 'hero-trace-code'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = (id === panelId) ? 'block' : 'none';
+      });
     }
   </script>
 </body>

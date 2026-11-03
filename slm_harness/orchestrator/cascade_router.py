@@ -16,12 +16,14 @@ import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from ..context.artifacts import ArtifactEntry
 from ..runtime import GrammarSpec, get_runtime
+
+if TYPE_CHECKING:
+    from ..context.artifacts import ArtifactEntry
 
 
 class ExecutionMode(str, Enum):
@@ -174,6 +176,31 @@ _MULTI_STEP_CONJUNCTION_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# High-precision Coding & Algorithm Intent Signature (catches misspellings like "fibinocci", "write a code", etc.)
+_CODING_INTENT_RE = re.compile(
+    r"(?:\b(?:write|create|build|implement|generate|develop|debug|refactor|optimize|give\s+me|show\s+me)\b.{0,40}\b(?:a\s+code|code|program|script|function|class|method|algorithm|api|endpoint|service|app|module|solution)\b)"
+    r"|(?:\b(?:code|program|script|function|algorithm|implementation)\s+(?:for|to|in|of|that)\b)"
+    r"|(?:\b(?:fib[ioa]+n[oa]+c+i|factorial|palindrome|prime\s+numbers?|binary\s+search|merge\s+sort|quick\s*sort|bubble\s+sort|heap\s*sort|insertion\s+sort|linked\s+list|binary\s+tree|bst|avl\s+tree|trie|graph\s+traversal|bfs|dfs|dijkstra|bellman\s+ford|dynamic\s+programming|knapsack|two\s+sum|lru\s+cache|rate\s+limiter|anagram|reverse\s+a\s+string|matrix\s+multiplication|leetcode|recursion|backtracking|sliding\s+window|monotonic\s+stack)\b)"
+    r"|(?:\b(?:in\s+python|in\s+javascript|in\s+typescript|in\s+java|in\s+c\+\+|in\s+rust|in\s+golang|in\s+go|python\s+code|python\s+program|python\s+script|js\s+code|fastapi|flask|django|react\s+component|node\.?js|pytest|unit\s+tests?)\b)"
+    r"|(?:```(?:python|js|ts|java|cpp|rust|go|bash|sh)\b|\bdef\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(|\bclass\s+[A-Z][a-zA-Z0-9_]*\s*[:(])",
+    re.IGNORECASE | re.DOTALL,
+)
+
+_EMAIL_EXPLICIT_RE = re.compile(
+    r"\b(?:email|e-mail|mail\s+to|subject\s+line|cold\s+outreach|follow[\s\-]?up\s+email|inbox|dear\s+hiring\s+manager|sincerely)\b",
+    re.IGNORECASE,
+)
+
+
+def _safe_normalize_rows(mat: np.ndarray) -> np.ndarray:
+    arr = np.nan_to_num(np.asarray(mat, dtype=np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+    if arr.ndim == 1:
+        norm = float(np.linalg.norm(arr))
+        return arr / norm if norm > 1e-8 else arr
+    norms = np.linalg.norm(arr, axis=1, keepdims=True)
+    norms = np.where(norms > 1e-8, norms, 1.0)
+    return arr / norms
+
 
 class CascadeRouter:
     """Sub-35ms 4-stage router mapping user queries & attachments to agent + execution mode."""
@@ -192,7 +219,8 @@ class CascadeRouter:
             if self._proto_matrix is not None and self._proto_dim == dim:
                 return self._proto_matrix
             texts = [AGENT_PROTOTYPES[name][1] for name in self._proto_names]
-            self._proto_matrix = rt.embed_batch(texts)
+            raw_mat = rt.embed_batch(texts)
+            self._proto_matrix = _safe_normalize_rows(raw_mat)
             self._proto_dim = dim
             return self._proto_matrix
 
@@ -236,10 +264,11 @@ class CascadeRouter:
                 return self._finish(t0, "slm_text_to_sql", forced_mode or ExecutionMode.EVALUATOR_OPTIMIZER, "sql", 0.98, "stage0_mime_sqlite")
             if "tabular" in kinds:
                 return self._finish(t0, "slm_data", forced_mode or ExecutionMode.REACT_LOOP, "coding", 0.97, "stage0_mime_tabular")
-            if "pdf" in kinds:
-                return self._finish(t0, "slm_pdf", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.97, "stage0_mime_pdf", needs_rag=True)
-            if "text" in kinds:
-                return self._finish(t0, "slm_rag", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.97, "stage0_mime_document", needs_rag=True)
+            if not _CODING_INTENT_RE.search(q):
+                if "pdf" in kinds:
+                    return self._finish(t0, "slm_pdf", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.97, "stage0_mime_pdf", needs_rag=True)
+                if "text" in kinds:
+                    return self._finish(t0, "slm_rag", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.97, "stage0_mime_document", needs_rag=True)
 
         # --- STAGE 1: Deterministic High-Precision Signatures (<1ms) ---
         if _WORKSPACE_TOOL_RE.search(q):
@@ -286,14 +315,22 @@ class CascadeRouter:
         ) >= 3:
             return self._finish(t0, "slm_meeting", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.93, "stage1_meeting")
 
-        if re.search(r"\b(?:draft an? email|write an? email|email reply|subject line)\b", q_low):
-            return self._finish(t0, "slm_email", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.93, "stage1_email")
+        if re.search(r"\b(?:draft an? email|write an? email|email reply|subject line)\b", q_low) and not _CODING_INTENT_RE.search(q):
+            return self._finish(t0, "slm_email", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.96, "stage1_email")
 
-        if re.search(r"\b(?:write|implement|debug)\b.*\b(?:python|function|class|script|algorithm)\b", q_low) or "def " in q:
-            return self._finish(t0, "slm_code_interpreter", forced_mode or ExecutionMode.EVALUATOR_OPTIMIZER, "coding", 0.94, "stage1_code")
+        if _CODING_INTENT_RE.search(q):
+            return self._finish(
+                t0,
+                "slm_code_interpreter",
+                forced_mode or ExecutionMode.EVALUATOR_OPTIMIZER,
+                "coding",
+                0.99,
+                "stage1_code",
+                needs_rag=False,
+            )
 
         if re.search(r"\b(?:bash|shell command|terminal command|cli command|chmod|crontab|find command)\b", q_low):
-            return self._finish(t0, "slm_cli_agent", forced_mode or ExecutionMode.FAST_DIRECT, "coding", 0.92, "stage1_cli")
+            return self._finish(t0, "slm_cli_agent", forced_mode or ExecutionMode.FAST_DIRECT, "coding", 0.95, "stage1_cli")
 
         if re.search(
             r"\b(?:ppt|pptx|powerpoint|presentation|slide\s*deck|slides|resume|curriculum\s*vitae|cv|down\s*load|linjk|export\s+to|convert\s+it\s+to)\b",
@@ -319,11 +356,16 @@ class CascadeRouter:
         try:
             mat = self._ensure_prototypes()
             if mat is not None:
-                q_vec = get_runtime().embed_query(q[:450])
-                sims = (mat @ q_vec).tolist()
+                q_vec = _safe_normalize_rows(get_runtime().embed_query(q[:450]))
+                with np.errstate(all="ignore"):
+                    raw_sims = np.nan_to_num(mat @ q_vec, nan=0.0, posinf=0.0, neginf=0.0)
+                sims = raw_sims.tolist()
                 paired = sorted(zip(self._proto_names, sims), key=lambda x: x[1], reverse=True)
                 top_candidates = [(name, float(sc)) for name, sc in paired[:4]]
         except Exception:
+            top_candidates = [("direct_assistant", 0.6)]
+
+        if not top_candidates:
             top_candidates = [("direct_assistant", 0.6)]
 
         best_agent, best_sim = top_candidates[0]
@@ -338,14 +380,20 @@ class CascadeRouter:
             best_agent = "slm_rag" if has_indexed_docs else "direct_assistant"
         elif best_agent == "slm_voice" and not has_audio_art:
             best_agent = "slm_rag" if has_indexed_docs else "direct_assistant"
+        elif best_agent == "slm_email" and not _EMAIL_EXPLICIT_RE.search(q_low):
+            best_agent = "direct_assistant"
 
-        # If session has indexed RAG docs and query asks factual domain questions, favor RAG grounding
+        # If session has indexed RAG docs and query asks factual document questions (not code/math/sql), favor RAG grounding
         if has_indexed_docs and best_agent in ("direct_assistant", "slm_vision_parser", "slm_document_parser"):
             best_agent = "slm_rag"
 
         # --- STAGE 3: Enum-Constrained 0.8B Tie-Breaker ONLY on close multi-specialist ties ---
         if best_sim >= 0.45 and margin < 0.025 and len(q.split()) >= 10 and len(top_candidates) >= 3:
-            shortlist_names = [c[0] for c in top_candidates[:3]]
+            shortlist_names = [
+                c[0]
+                for c in top_candidates[:3]
+                if not (c[0] == "slm_email" and not _EMAIL_EXPLICIT_RE.search(q_low))
+            ]
             if "direct_assistant" not in shortlist_names:
                 shortlist_names.append("direct_assistant")
             try:
@@ -362,6 +410,8 @@ class CascadeRouter:
                 )
                 picked = res.text.strip()
                 if picked in AGENT_PROTOTYPES:
+                    if picked == "slm_email" and not _EMAIL_EXPLICIT_RE.search(q_low):
+                        picked = "direct_assistant"
                     best_agent = picked
                     stage_label = "stage3_onnx_enum_tiebreak"
             except Exception:
@@ -373,7 +423,7 @@ class CascadeRouter:
         role = AGENT_PROTOTYPES.get(best_agent, ("primary", ""))[0]
         mode = forced_mode or self._select_mode(best_agent, q, artifacts)
         secondary = [c[0] for c in top_candidates[1:3] if c[1] >= best_sim - 0.03 and c[0] != "direct_assistant"]
-        needs_rag = has_indexed_docs or best_agent in ("slm_rag", "slm_pdf", "slm_pkb")
+        needs_rag = best_agent in ("slm_rag", "slm_pdf", "slm_pkb")
 
         return RouteDecision(
             primary_agent=best_agent,

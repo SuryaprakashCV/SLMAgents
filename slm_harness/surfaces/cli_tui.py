@@ -71,6 +71,10 @@ SLASH_COMMANDS = [
     "/help",
     "/agent",
     "/profile",
+    "/reasoning",
+    "/low",
+    "/medium",
+    "/high",
     "/model",
     "/plan",
     "/attach",
@@ -262,6 +266,7 @@ def _save_readline() -> None:
 def run_interactive_chat(
     session_id: Optional[str] = None,
     initial_agent: Optional[str] = None,
+    initial_reasoning: str = "medium",
 ) -> int:
     console = _make_console()
     rt = get_runtime()
@@ -275,6 +280,7 @@ def run_interactive_chat(
 
     sid = session_id or f"cli_{uuid.uuid4().hex[:8]}"
     pinned_agent: Optional[str] = initial_agent
+    reasoning_effort: str = initial_reasoning if initial_reasoning in ("low", "medium", "high") else "medium"
     pending_attachments: List[str] = []
 
     # Wire interactive CLI HITL Approval & Clarification Brokers
@@ -332,7 +338,7 @@ def run_interactive_chat(
             sess_info = ckpt.ensure_session(sid)
             branch_lbl = sess_info["active_branch"]
             agent_lbl = pinned_agent or "auto"
-            prompt_prefix = f"\n[{cfg.profile.value}|{branch_lbl}|{agent_lbl}] > "
+            prompt_prefix = f"\n[{cfg.profile.value}|{reasoning_effort}|{branch_lbl}|{agent_lbl}] > "
             try:
                 user_in = input(prompt_prefix).strip()
             except (EOFError, KeyboardInterrupt):
@@ -387,6 +393,21 @@ def run_interactive_chat(
 
                 if cmd == "/model":
                     print(json.dumps(rt.arena.status(), indent=2))
+                    continue
+
+                if cmd in ("/low", "/medium", "/high"):
+                    reasoning_effort = cmd.lstrip("/")
+                    sel_spec = cfg.resolve_model_for_reasoning("primary", reasoning_effort)
+                    print(f"Reasoning effort set to {reasoning_effort.upper()} (target model: {sel_spec.model_id})")
+                    continue
+
+                if cmd == "/reasoning":
+                    if arg.lower() in ("low", "medium", "high"):
+                        reasoning_effort = arg.lower()
+                        sel_spec = cfg.resolve_model_for_reasoning("primary", reasoning_effort)
+                        print(f"Reasoning effort set to {reasoning_effort.upper()} (target model: {sel_spec.model_id})")
+                    else:
+                        print(f"Current reasoning effort: {reasoning_effort.upper()} (options: low | medium | high)")
                     continue
 
                 if cmd == "/attach":
@@ -518,6 +539,7 @@ def run_interactive_chat(
                 attachments=turn_atts,
                 pinned_agent=pinned_agent,
                 forced_mode=forced_mode,
+                reasoning_effort=reasoning_effort,
             ):
                 et = ev.event_type
                 p = ev.payload
@@ -620,6 +642,7 @@ def run_headless_ask(
     output_json: bool = False,
     session_id: str = "cli_headless",
     max_tokens: int = 1024,
+    reasoning_effort: str = "medium",
 ) -> int:
     user_q = " ".join(query_parts).strip()
     piped_stdin = ""
@@ -678,6 +701,7 @@ def run_headless_ask(
             forced_mode=forced,
             json_schema=parsed_schema,
             max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
         )
         if parsed_schema is not None and not output_json:
             if outcome.structured_output is not None:
@@ -696,6 +720,7 @@ def run_headless_ask(
         pinned_agent=agent,
         forced_mode=forced,
         max_tokens=max_tokens,
+        reasoning_effort=reasoning_effort,
     ):
         if ev.event_type == EventType.TOKEN_DELTA:
             sys.stdout.write(ev.payload.get("text", ""))
@@ -756,6 +781,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument("--profile", choices=["lite", "balanced", "power"], help="CPU RAM/Model profile override")
     parser.add_argument("--backend", choices=["auto", "gguf", "onnx"], help="Preferred CPU inference engine")
+    parser.add_argument("--reasoning", choices=["low", "medium", "high"], default="medium", help="Reasoning effort level (low=fast, medium=balanced plan, high=deep web research & critic)")
     parser.add_argument("--offline", action="store_true", help="Strict 100% air-gapped offline mode")
 
     sub = parser.add_subparsers(dest="subcommand")
@@ -830,6 +856,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return run_interactive_chat(
             session_id=getattr(parsed, "session", None),
             initial_agent=getattr(parsed, "agent", None),
+            initial_reasoning=getattr(parsed, "reasoning", "medium"),
         )
     if cmd == "ask":
         return run_headless_ask(
@@ -841,6 +868,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             output_json=parsed.json,
             session_id=parsed.session,
             max_tokens=parsed.max_tokens,
+            reasoning_effort=getattr(parsed, "reasoning", "medium"),
         )
     if cmd == "run":
         return run_yaml_workflow(parsed.workflow)

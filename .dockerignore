@@ -5,7 +5,8 @@
 __pycache__
 *.pyc
 *.egg-info
-dist
+dist/SLMAgents.app
+dist/*.dmg
 build
 models
 website/.git

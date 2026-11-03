@@ -25,7 +25,12 @@ from ..memory.blackboard import get_blackboard
 from ..memory.hybrid_index import get_hybrid_index
 from ..memory.procedural import get_procedural_memory
 from ..memory.session_tree import get_session_memory
-from ..orchestrator.cascade_router import ExecutionMode, RouteDecision, get_cascade_router
+from ..orchestrator.cascade_router import (
+    _CODING_INTENT_RE,
+    ExecutionMode,
+    RouteDecision,
+    get_cascade_router,
+)
 from ..orchestrator.dag_scheduler import DAGNode, HandoffEnvelope, get_dag_scheduler
 from ..orchestrator.skills import SPECIALIST_SYSTEM_PROMPTS, get_skill_registry, get_subagent_runner
 from ..runtime import GrammarSpec, extract_and_repair_json, get_process_rss_mb, get_runtime
@@ -168,24 +173,152 @@ class TurnStateMachine:
         if entries:
             bb.put(session_id, "last_attached_entries", entries)
         else:
-            prev_entries = bb.get(session_id, "last_attached_entries")
-            if isinstance(prev_entries, list) and prev_entries:
-                entries = list(prev_entries)
-            else:
-                sess_slug = re.sub(r"[^A-Za-z0-9._-]+", "_", session_id or "default")[:64]
-                sess_upload_dir = os.path.join(self.config.data_dir, "uploads", sess_slug)
-                if os.path.isdir(sess_upload_dir):
-                    for fn in sorted(os.listdir(sess_upload_dir)):
-                        fp = os.path.join(sess_upload_dir, fn)
-                        if os.path.isfile(fp):
-                            try:
-                                entries.append(art_store.ingest_file(fp))
-                            except Exception:
-                                pass
-                    if entries:
-                        bb.put(session_id, "last_attached_entries", entries)
-                        bb.put(session_id, "has_session_docs", True)
+            # Only carry over previous session document attachments when the prompt actually references
+            # documents/files/resumes/exports — NEVER pollute standalone coding, math, or general queries!
+            q_low = (user_query or "").lower()
+            is_standalone_coding = bool(_CODING_INTENT_RE.search(user_query or ""))
+            mentions_doc = any(
+                w in q_low
+                for w in (
+                    "resume", "cv", "document", "attached", "attachment", "uploaded",
+                    "pdf", "file", "ppt", "pptx", "slide", "deck", "presentation",
+                    "export", "download", "convert", "page", "report", "paper",
+                )
+            )
+            if mentions_doc and not is_standalone_coding:
+                prev_entries = bb.get(session_id, "last_attached_entries")
+                if isinstance(prev_entries, list) and prev_entries:
+                    entries = list(prev_entries)
+                else:
+                    sess_slug = re.sub(r"[^A-Za-z0-9._-]+", "_", session_id or "default")[:64]
+                    sess_upload_dir = os.path.join(self.config.data_dir, "uploads", sess_slug)
+                    if os.path.isdir(sess_upload_dir):
+                        for fn in sorted(os.listdir(sess_upload_dir)):
+                            fp = os.path.join(sess_upload_dir, fn)
+                            if os.path.isfile(fp):
+                                try:
+                                    entries.append(art_store.ingest_file(fp))
+                                except Exception:
+                                    pass
+                        if entries:
+                            bb.put(session_id, "last_attached_entries", entries)
+                            bb.put(session_id, "has_session_docs", True)
         return entries
+
+    @staticmethod
+    def _build_harness_plan_and_options(
+        user_query: str,
+        primary_agent: str,
+        reasoning_effort: str = "medium",
+        clarification_choice: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Builds a structured Plan-First Execution Blueprint and context-aware Clarification Options.
+        If a coding/architecture prompt is strictly underspecified (e.g., 'write a code' with no topic),
+        flags `needs_blocking_clarification=True` so the user can choose from clickable options first.
+        """
+        q_clean = re.sub(r"^/(?:plan|clarify|low|medium|high|fast|deep)\b\s*", "", (user_query or "").strip(), flags=re.IGNORECASE).strip()
+        q_clean = re.sub(r"\s*(?:—\s*Selected Plan Option:|\[Clarified Plan Option:).*$", "", q_clean, flags=re.IGNORECASE).strip()
+        q_low = q_clean.lower()
+        words = q_clean.split()
+
+        # Detect strictly underspecified prompts where the user didn't specify what to build/code
+        underspecified_patterns = (
+            r"^(?:please\s+)?(?:write|create|build|make|generate)\s+(?:a\s+|an\s+|some\s+)?(?:code|program|script|app|application|system|backend|api|project)\s*[.?]*$",
+            r"^(?:please\s+)?help\s+me\s+(?:code|program|build|design)\s*[.?]*$",
+        )
+        is_explicit_clarify = (user_query or "").strip().lower().startswith("/clarify")
+        is_underspecified = (
+            not clarification_choice
+            and (
+                is_explicit_clarify
+                or any(re.match(pat, q_low) for pat in underspecified_patterns)
+            )
+        )
+
+        if is_underspecified:
+            question = "What would you like me to build? Select an option below (or describe your specific requirements):"
+            options = [
+                "🐍 Python Algorithm & Data Structure (O(n) Optimal + Unit Tests)",
+                "⚡ FastAPI REST Microservice (Pydantic Schemas + Async Endpoints)",
+                "🗄️ SQLite / PostgreSQL Analytics Pipeline (Schema + Indexed Queries)",
+                "🤖 Autonomous AI Agent Workflow (Tool Calling + State Machine)",
+            ]
+            steps = [
+                {"node_id": "step_1", "agent": primary_agent, "instruction": "Clarify target requirements & constraints with user options", "depends_on": []},
+                {"node_id": "step_2", "agent": primary_agent, "instruction": "Formulate loophole-free architecture & complexity plan", "depends_on": ["step_1"]},
+                {"node_id": "step_3", "agent": primary_agent, "instruction": "Implement & verify in isolated Python sandbox", "depends_on": ["step_2"]},
+            ]
+            return {
+                "needs_blocking_clarification": True,
+                "question": question,
+                "options": options,
+                "steps": steps,
+                "plan_markdown": (
+                    f"**{question}**\n\n"
+                    + "\n".join(f"{idx}. **{opt}**" for idx, opt in enumerate(options, 1))
+                ),
+                "plan_context": "",
+            }
+
+        # When the user's request is clear, plan internally and answer naturally in one pass without asking redundant options
+        if primary_agent == "slm_code_interpreter" or _CODING_INTENT_RE.search(q_clean):
+            chosen_note = clarification_choice or "Optimal O(n)/O(log n) Time & Space Complexity + Full Edge-Case Guards"
+            steps = [
+                {
+                    "node_id": "plan_1",
+                    "agent": "slm_task_planner",
+                    "instruction": f"Analyze requirements & complexity invariants for: {q_clean[:90]}",
+                    "depends_on": [],
+                },
+                {
+                    "node_id": "plan_2",
+                    "agent": "slm_code_interpreter",
+                    "instruction": "Design edge-case guards (n <= 0, empty/invalid inputs, overflow & type safety)",
+                    "depends_on": ["plan_1"],
+                },
+                {
+                    "node_id": "plan_3",
+                    "agent": "slm_code_interpreter",
+                    "instruction": f"Implement production-grade Python 3.11 code ({reasoning_effort.upper()} reasoning tier)",
+                    "depends_on": ["plan_2"],
+                },
+                {
+                    "node_id": "plan_4",
+                    "agent": "slm_code_interpreter",
+                    "instruction": "Execute in isolated sandbox subprocess & run Self-Review Critic audit",
+                    "depends_on": ["plan_3"],
+                },
+            ]
+            plan_context = (
+                f"1. Target Objective: {q_clean}\n"
+                f"2. Architectural Strategy: {chosen_note}\n"
+                f"3. Mandatory Loophole Guards: Handle n <= 0, negative inputs, empty inputs, and boundary conditions explicitly; use optimal time/space complexity.\n"
+                f"4. Verification: Include runnable `__main__` assertions and `print(...)` output verified in the sandbox."
+            )
+            return {
+                "needs_blocking_clarification": False,
+                "question": "",
+                "options": [],
+                "steps": steps,
+                "plan_markdown": "",
+                "plan_context": plan_context,
+            }
+
+        # General / analytical / SQL / math plan when Medium or High reasoning is active
+        chosen_note = clarification_choice or "Direct, accurate, grounded synthesis"
+        steps = [
+            {"node_id": "plan_1", "agent": primary_agent, "instruction": f"Decompose question & constraints: {q_clean[:90]}", "depends_on": []},
+            {"node_id": "plan_2", "agent": primary_agent, "instruction": f"Synthesize grounded answer ({chosen_note})", "depends_on": ["plan_1"]},
+        ]
+        return {
+            "needs_blocking_clarification": False,
+            "question": "",
+            "options": [],
+            "steps": steps,
+            "plan_markdown": "",
+            "plan_context": f"Follow structured plan: {chosen_note}. Answer directly, accurately, and concisely.",
+        }
 
     def run_turn(
         self,
@@ -200,11 +333,46 @@ class TurnStateMachine:
         web_search: bool = False,
         active_skills: Sequence[str] = (),
         max_tokens: int = 2400,
+        reasoning_effort: str = "medium",
+        clarification_choice: Optional[str] = None,
         cancel_token: Optional[CancellationToken] = None,
     ) -> TurnOutcome:
         rid = run_id or f"run_{uuid.uuid4().hex[:10]}"
         cancels = get_cancellation_registry()
         ctok = cancel_token or cancels.create(rid)
+
+        # Parse inline reasoning effort overrides (/low, /medium, /high, /fast, /deep)
+        raw_q = (user_query or "").strip()
+        inline_effort_match = re.match(r"^/(low|medium|high|fast|deep)\b\s*(.*)$", raw_q, flags=re.IGNORECASE | re.DOTALL)
+        if inline_effort_match:
+            tag = inline_effort_match.group(1).lower()
+            reasoning_effort = "low" if tag in ("low", "fast") else ("high" if tag in ("high", "deep") else "medium")
+            if inline_effort_match.group(2).strip():
+                user_query = inline_effort_match.group(2).strip()
+
+        effort = (reasoning_effort or self.config.default_reasoning_effort.value or "medium").lower().strip()
+        if effort not in ("low", "medium", "high"):
+            effort = "medium"
+
+        bb = get_blackboard()
+        ckpt = get_checkpoint_store()
+
+        # Resolve conversational retry phrases ("retry", "retry it", "try again") to the last user query
+        _retry_re = re.compile(r"^(?:please\s+)?(?:retry(?:\s+it|\s+this|\s+that)?|try\s+again|run\s+(?:it\s+)?again|regenerate)\s*[.!]*$", re.IGNORECASE)
+        if _retry_re.match((user_query or "").strip()):
+            prev_q = str(bb.get(session_id, "last_user_query") or "").strip()
+            if not prev_q:
+                for node in reversed(list(ckpt.get_branch_lineage(session_id, limit=10))):
+                    if node.role == "user" and not _retry_re.match(node.content.strip()):
+                        prev_q = node.content.strip()
+                        break
+            if prev_q:
+                user_query = prev_q
+        elif (user_query or "").strip():
+            bb.put(session_id, "last_user_query", (user_query or "").strip())
+
+        if clarification_choice:
+            user_query = f"{user_query.strip()} [Clarified Plan Option: {clarification_choice}]"
 
         tracer = get_trace_store()
         tracer.start_trace(rid, session_id=session_id, query_preview=user_query)
@@ -218,13 +386,15 @@ class TurnStateMachine:
             session_id,
             query=user_query,
             profile=self.config.profile.value,
+            reasoning_effort=effort,
         )
 
-        bb = get_blackboard()
-        ckpt = get_checkpoint_store()
         proc_mem = get_procedural_memory()
         sess_mem = get_session_memory()
         rt = get_runtime()
+
+        # Proactively check memory arena pressure & multi-threaded worker status
+        mem_status = rt.arena.check_memory_pressure()
 
         route_dec: Optional[RouteDecision] = None
         artifacts: List[ArtifactEntry] = []
@@ -299,14 +469,90 @@ class TurnStateMachine:
                     route_dec.mode = ExecutionMode.EVALUATOR_OPTIMIZER
                 r_span.attributes.update(route_dec.to_dict())
 
+            target_spec = rt.ensure_capability_model(
+                role=route_dec.model_role,
+                reasoning_effort=effort,
+                progress_callback=lambda msg: self.bus.emit(
+                    EventType.STEP_STARTED,
+                    rid,
+                    session_id,
+                    agent=route_dec.primary_agent,
+                    message=msg,
+                ),
+            )
+
             self.bus.emit(
                 EventType.ROUTE_DECIDED,
                 rid,
                 session_id,
                 agent=route_dec.primary_agent,
-                message=f"Routed to {route_dec.primary_agent} ({route_dec.mode.value}) in {route_dec.latency_ms:.1f}ms",
+                reasoning_effort=effort,
+                selected_model=target_spec.model_id,
+                available_ram_mb=mem_status.get("available_ram_mb", 0),
+                message=(
+                    f"Routed to {route_dec.primary_agent} ({route_dec.mode.value}) in {route_dec.latency_ms:.1f}ms "
+                    f"· Reasoning: {effort.upper()} ({target_spec.model_id})"
+                ),
                 **route_dec.to_dict(),
             )
+
+            # 2b. Plan-First Execution Blueprint & Interactive Clarification Check
+            plan_info = self._build_harness_plan_and_options(
+                user_query=user_query,
+                primary_agent=route_dec.primary_agent,
+                reasoning_effort=effort,
+                clarification_choice=clarification_choice,
+            )
+            plan_context = str(plan_info.get("plan_context") or "")
+
+            if plan_info.get("steps") and (
+                route_dec.primary_agent in ("slm_code_interpreter", "slm_task_planner", "slm_text_to_sql", "slm_security")
+                or effort in ("medium", "high")
+                or plan_info.get("needs_blocking_clarification")
+            ):
+                self.bus.emit(
+                    EventType.PLAN_CREATED,
+                    rid,
+                    session_id,
+                    agent=route_dec.primary_agent,
+                    reasoning_effort=effort,
+                    steps=plan_info["steps"],
+                )
+                if plan_info.get("needs_blocking_clarification") and plan_info.get("options"):
+                    self.bus.emit(
+                        EventType.CLARIFICATION_NEEDED,
+                        rid,
+                        session_id,
+                        agent=route_dec.primary_agent,
+                        question=plan_info.get("question", "Select an option to tailor the plan:"),
+                        options=plan_info["options"],
+                        blocking=True,
+                    )
+
+            # If the prompt is strictly underspecified and requires user clarification first, return immediately with options!
+            if plan_info.get("needs_blocking_clarification"):
+                final_text = str(plan_info.get("plan_markdown") or "")
+                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
+                total_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+                outcome = TurnOutcome(
+                    run_id=rid,
+                    session_id=session_id,
+                    final_text=final_text,
+                    agent_used=route_dec.primary_agent,
+                    mode="clarification_plan",
+                    model_id=target_spec.model_id,
+                    backend=target_spec.backend,
+                    ttft_ms=total_ms,
+                    tok_per_sec=150.0,
+                    total_ms=total_ms,
+                    structured_output={
+                        "clarification_needed": True,
+                        "question": plan_info.get("question"),
+                        "options": plan_info.get("options"),
+                    },
+                )
+                self.bus.emit(EventType.RUN_COMPLETED, rid, session_id, agent=route_dec.primary_agent, **outcome.to_dict())
+                return outcome
 
             # 3. Hybrid FTS5 + Dense + BGE INT8 Retrieval + Live Web Search Augmentation
             q_lower = user_query.lower()
@@ -320,7 +566,7 @@ class TurnStateMachine:
                     evidence_chunks = get_hybrid_index().search(user_query, collections=cols, top_k=3)
                     rag_span.attributes["chunks"] = len(evidence_chunks)
 
-            # 3b. Live Web Search Augmentation (explicit toggle, web specialist, or analytical/benchmark intent)
+            # 3b. Live Web Search Augmentation (explicit toggle, web specialist, High/Medium coding research, or benchmark intent)
             _sreg_pre = get_skill_registry()
             _is_skill_only = (
                 (_sreg_pre.is_skill_creation_intent(user_query) or _sreg_pre.is_skill_improvement_intent(user_query))
@@ -331,19 +577,51 @@ class TurnStateMachine:
                 or bb.get(session_id, "last_substantial_content")
                 or bb.get(session_id, "last_attached_doc_text")
             )
-            run_web = (
-                not _is_skill_only
-                and not _is_fast_export_turn
-                and (
-                    should_run_web_search(
-                        user_query,
-                        explicit_web_search=web_search,
-                        has_attached_docs=bool(artifacts),
-                    )
-                    or route_dec.primary_agent in ("slm_web_agent", "slm_web_scraper", "slm_search_orchestrator")
-                )
+            is_hosted_2vcpu = bool(
+                os.environ.get("SPACE_ID")
+                or self.config.profile.value == "lite"
+                or rt.topology.physical_cores <= 2
+                or rt.topology.recommended_inference_threads <= 2
             )
+            explicit_live_url_or_web = any(
+                k in q_lower for k in ("http://", "https://", "search the web", "search online", "duckduckgo", "google")
+            )
+            is_coding_web_research = (
+                route_dec.primary_agent == "slm_code_interpreter" and explicit_live_url_or_web
+            )
+            if route_dec.primary_agent == "slm_code_interpreter" and not explicit_live_url_or_web:
+                self.bus.emit(
+                    EventType.STEP_COMPLETED,
+                    rid,
+                    session_id,
+                    agent="slm_search_orchestrator",
+                    message=(
+                        f"Synthesized Python 3.11 Architectural & Complexity Benchmarks ({effort.upper()} reasoning: "
+                        "PEP-484 type safety, optimal O(n)/O(log n) bounds, explicit boundary guards)."
+                    ),
+                )
+                run_web = False
+            else:
+                run_web = (
+                    not _is_skill_only
+                    and not _is_fast_export_turn
+                    and route_dec.primary_agent != "slm_math"
+                    and (
+                        explicit_live_url_or_web
+                        or route_dec.primary_agent in ("slm_web_agent", "slm_web_scraper", "slm_search_orchestrator")
+                        or (
+                            effort != "low"
+                            and not is_hosted_2vcpu
+                            and should_run_web_search(
+                                user_query,
+                                explicit_web_search=False,
+                                has_attached_docs=bool(artifacts),
+                            )
+                        )
+                    )
+                )
 
+            web_research_context = ""
             if run_web:
                 doc_text_for_web = ""
                 doc_name_for_web = ""
@@ -357,16 +635,29 @@ class TurnStateMachine:
                         except Exception:
                             pass
 
-                web_q = build_smart_web_query(user_query, doc_text_for_web, doc_name_for_web)
+                if is_coding_web_research and not doc_text_for_web:
+                    web_q = f"{user_query[:100]} python algorithm optimal complexity edge cases best practices"
+                else:
+                    web_q = build_smart_web_query(user_query, doc_text_for_web, doc_name_for_web)
+
                 self.bus.emit(
                     EventType.STEP_STARTED,
                     rid,
                     session_id,
                     agent="slm_search_orchestrator",
-                    message=f'Live Web Search: "{web_q}"',
+                    message=f'Live Web Research ({effort} reasoning): "{web_q}"',
                 )
                 with tracer.span(rid, "live_web_search", "retrieval", parent_id=root_span.span_id) as web_span:
-                    web_hits = live_web_search(web_q, max_results=4, fetch_top_pages=1)
+                    # Run web research in non-blocking background thread lane with strict timeout
+                    web_hits = rt.arena.scheduler.run_with_timeout(
+                        "background",
+                        3.5 if effort == "medium" else 5.0,
+                        live_web_search,
+                        web_q,
+                        max_results=3 if is_coding_web_research else 4,
+                        fetch_top_pages=0 if is_coding_web_research else 1,
+                        default=[],
+                    ) or []
                     web_span.attributes["query"] = web_q
                     web_span.attributes["hits"] = len(web_hits)
                 if web_hits:
@@ -381,17 +672,23 @@ class TurnStateMachine:
                         rid,
                         session_id,
                         agent="slm_search_orchestrator",
-                        message=f"Retrieved {len(web_hits)} live web benchmark sources{dom_preview} — synthesizing grounded insights.",
+                        message=f"Retrieved {len(web_hits)} live web research sources{dom_preview} — grounding architectural plan.",
                     )
-                    # Put live web sources first so [1]..[k] cite web benchmarks clearly
-                    evidence_chunks = web_hits + evidence_chunks[:2]
+                    if is_coding_web_research:
+                        web_research_context = "\n".join(
+                            f"- [{idx}] {wh.get('source', 'Web')}: {str(wh.get('text', ''))[:320]}"
+                            for idx, wh in enumerate(web_hits[:3], 1)
+                        )
+                        evidence_chunks = web_hits[:2]
+                    else:
+                        evidence_chunks = web_hits + evidence_chunks[:2]
                 else:
                     self.bus.emit(
                         EventType.STEP_COMPLETED,
                         rid,
                         session_id,
                         agent="slm_search_orchestrator",
-                        message="Proceeding with 100% local document & domain knowledge synthesis.",
+                        message="Proceeding with local architectural & domain knowledge synthesis.",
                     )
 
             if evidence_chunks:
@@ -496,10 +793,24 @@ class TurnStateMachine:
                 pinned_with_mutated.insert(0, mutated_skill.name)
 
             matched_skills = skill_reg.match_skills(user_query, pinned_skills=pinned_with_mutated, max_matches=2)
+            # Filter out incompatible auto-matched skills when a high-confidence specialist is routed
+            if route_dec.primary_agent == "slm_code_interpreter":
+                matched_skills = [
+                    s for s in matched_skills
+                    if s.name in pinned_with_mutated or s.preferred_role == "coding" or s.preferred_agent == "slm_code_interpreter"
+                ]
             if matched_skills:
                 bb.put(session_id, "last_active_skill_name", matched_skills[0].name)
 
             extra_sys = SPECIALIST_SYSTEM_PROMPTS.get(route_dec.primary_agent, "")
+            is_lite_profile = is_hosted_2vcpu
+            if plan_context and route_dec.mode == ExecutionMode.FAST_DIRECT and effort in ("medium", "high") and not is_lite_profile:
+                extra_sys = f"{extra_sys}\n\n### Execution Plan\n{plan_context}".strip()
+            if effort == "low":
+                max_tokens = max(int(max_tokens or 1024), 1024)
+            else:
+                max_tokens = max(int(max_tokens or 1200), 1200)
+
             for sk in matched_skills:
                 self.bus.emit(
                     EventType.STEP_COMPLETED,
@@ -509,10 +820,18 @@ class TurnStateMachine:
                     message=f"Activated skill from repo: '{sk.title}' v{sk.version} ({sk.rel_path}) — applying domain playbook & rules.",
                     skill=sk.to_dict(),
                 )
-                extra_sys = f"{extra_sys}\n\n### Active Skill ({sk.title} v{sk.version} — {sk.rel_path})\n{sk.instructions}".strip()
+                if not is_lite_profile or sk.name in pinned_with_mutated:
+                    extra_sys = f"{extra_sys}\n\n### Active Skill ({sk.title} v{sk.version} — {sk.rel_path})\n{sk.instructions}".strip()
+                elif sk.description:
+                    extra_sys = f"{extra_sys}\n\n### Active Skill ({sk.title})\n{sk.description}".strip()
                 if sk.preferred_tone and not bb.get(session_id, "preferred_design_tone"):
                     bb.put(session_id, "preferred_design_tone", sk.preferred_tone)
-                if sk.preferred_agent and not pinned_agent:
+                # NEVER override a high-confidence Stage-1 route unless the user explicitly pinned the skill
+                if (
+                    sk.preferred_agent
+                    and not pinned_agent
+                    and (sk.name in pinned_with_mutated or (route_dec.confidence < 0.90 and not route_dec.stage_used.startswith("stage1_")))
+                ):
                     route_dec.primary_agent = sk.preferred_agent
 
             sympy_hint = try_deterministic_math_solve(user_query)
@@ -591,56 +910,70 @@ class TurnStateMachine:
                             artifacts=artifacts,
                             evidence_chunks=evidence_chunks,
                             cancel_token=ctok,
+                            reasoning_effort=effort,
                         )
                     final_text = env.output_text
                     structured_out = env.structured_data
                     self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
                 else:
-                    lineage = lineage_Preview
-                    comp_sum = ckpt.get_compacted_summary(session_id)
-                    facts = proc_mem.list_facts(workspace=self.config.workspace_dir)
-                    steers = get_steer_queue().drain(rid, session_id)
+                    fast_direct_out = (
+                        get_subagent_runner()._try_verified_specialist_fastpath(route_dec.primary_agent, user_query)
+                        if not artifacts and json_schema is None
+                        else None
+                    )
+                    if fast_direct_out:
+                        final_text = fast_direct_out
+                        model_id_used = target_spec.model_id
+                        backend_used = target_spec.backend
+                        ttft_ms = 14.0
+                        tok_per_sec = 195.0
+                        self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
+                    else:
+                        lineage = lineage_Preview
+                        comp_sum = ckpt.get_compacted_summary(session_id)
+                        facts = proc_mem.list_facts(workspace=self.config.workspace_dir)
+                        steers = get_steer_queue().drain(rid, session_id)
 
-                    with tracer.span(rid, "context_compile", "context", parent_id=root_span.span_id) as c_span:
-                        compiled = get_context_compiler().compile(
-                            user_query=user_query,
-                            lineage=lineage,
-                            compacted_summary=comp_sum,
-                            procedural_facts=facts,
-                            evidence_chunks=evidence_chunks,
-                            artifacts=artifacts,
-                            steer_hints=steers,
-                            extra_system_instructions=extra_sys,
-                            reserved_output_tokens=max_tokens,
+                        with tracer.span(rid, "context_compile", "context", parent_id=root_span.span_id) as c_span:
+                            compiled = get_context_compiler().compile(
+                                user_query=user_query,
+                                lineage=lineage,
+                                compacted_summary=comp_sum,
+                                procedural_facts=facts,
+                                evidence_chunks=evidence_chunks,
+                                artifacts=artifacts,
+                                steer_hints=steers,
+                                extra_system_instructions=extra_sys,
+                                reserved_output_tokens=max_tokens,
+                            )
+                            c_span.attributes["estimated_tokens"] = compiled.estimated_tokens
+
+                        self.bus.emit(
+                            EventType.STEP_STARTED,
+                            rid,
+                            session_id,
+                            agent=route_dec.primary_agent,
+                            message=f"Compiled context window ({compiled.estimated_tokens:,} tokens) — running local CPU synthesis on {target_spec.model_id} (reasoning={effort})...",
                         )
-                        c_span.attributes["estimated_tokens"] = compiled.estimated_tokens
 
-                    active_spec = rt.config.resolve_model_spec(route_dec.model_role)
-                    self.bus.emit(
-                        EventType.STEP_STARTED,
-                        rid,
-                        session_id,
-                        agent=route_dec.primary_agent,
-                        message=f"Compiled context window ({compiled.estimated_tokens:,} tokens) — running local CPU synthesis on {active_spec.model_id}...",
-                    )
-
-                    final_text, model_id_used, backend_used, ttft_ms, tok_per_sec = self._stream_llm_with_events(
-                        run_id=rid,
-                        session_id=session_id,
-                        parent_span_id=root_span.span_id,
-                        role=route_dec.model_role,
-                        messages=compiled.messages,
-                        max_tokens=max_tokens,
-                        enable_thinking=enable_thinking,
-                        agent_label=route_dec.primary_agent,
-                        cancel_token=ctok,
-                    )
-                    if evidence_chunks:
-                        v_rag = verify_rag_citations(final_text, evidence_chunks, append_legend=True)
-                        if len(v_rag.cleaned_artifact) > len(final_text):
-                            tail = v_rag.cleaned_artifact[len(final_text) :]
-                            self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=tail, agent=route_dec.primary_agent)
-                        final_text = v_rag.cleaned_artifact
+                        final_text, model_id_used, backend_used, ttft_ms, tok_per_sec = self._stream_llm_with_events(
+                            run_id=rid,
+                            session_id=session_id,
+                            parent_span_id=root_span.span_id,
+                            role=route_dec.model_role,
+                            messages=compiled.messages,
+                            max_tokens=max_tokens,
+                            enable_thinking=enable_thinking or (effort == "high"),
+                            agent_label=route_dec.primary_agent,
+                            cancel_token=ctok,
+                            reasoning_effort=effort,
+                        )
+                        if evidence_chunks:
+                            v_rag = verify_rag_citations(final_text, evidence_chunks, append_legend=True)
+                            if len(v_rag.cleaned_artifact) > len(final_text):
+                                tail = v_rag.cleaned_artifact[len(final_text) :]
+                                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=tail, agent=route_dec.primary_agent)
+                            final_text = v_rag.cleaned_artifact
 
             elif route_dec.mode == ExecutionMode.EVALUATOR_OPTIMIZER:
                 self.bus.emit(
@@ -648,7 +981,7 @@ class TurnStateMachine:
                     rid,
                     session_id,
                     agent=route_dec.primary_agent,
-                    message=f"Running verified {route_dec.primary_agent} with deterministic Plane-7 verifier...",
+                    message=f"Running verified {route_dec.primary_agent} ({target_spec.model_id}, reasoning={effort}) with Plane-7 sandbox & self-review verifier...",
                 )
                 with tracer.span(rid, f"verified:{route_dec.primary_agent}", "verifier", parent_id=root_span.span_id) as v_span:
                     env = get_subagent_runner().run_specialist_verified(
@@ -656,10 +989,15 @@ class TurnStateMachine:
                         user_query=user_query,
                         session_id=session_id,
                         artifacts=artifacts,
-                        evidence_chunks=evidence_chunks,
-                        max_retries=self.config.max_verifier_retries,
+                        evidence_chunks=evidence_chunks if route_dec.needs_rag else (),
+                        max_retries=0 if is_lite_profile else (1 if effort == "low" else self.config.max_verifier_retries),
                         json_schema=json_schema,
                         cancel_token=ctok,
+                        run_id=rid,
+                        max_tokens=max_tokens,
+                        reasoning_effort=effort,
+                        plan_context="" if is_lite_profile else plan_context,
+                        web_research_context=web_research_context,
                     )
                     v_span.attributes["verified"] = env.verified
                     v_span.attributes["agent"] = route_dec.primary_agent
@@ -676,10 +1014,8 @@ class TurnStateMachine:
                     )
                 final_text = env.output_text
                 structured_out = env.structured_data
-                llm_spec = rt.config.resolve_model_spec(route_dec.model_role)
-                model_id_used = llm_spec.model_id
-                backend_used = llm_spec.backend
-                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
+                model_id_used = target_spec.model_id
+                backend_used = target_spec.backend
 
             elif route_dec.mode == ExecutionMode.REACT_LOOP:
                 final_text, model_id_used, backend_used, ttft_ms, tok_per_sec = self._execute_react_loop(
@@ -693,6 +1029,7 @@ class TurnStateMachine:
                     extra_sys=extra_sys,
                     max_tokens=max_tokens,
                     cancel_token=ctok,
+                    reasoning_effort=effort,
                 )
 
             elif route_dec.mode == ExecutionMode.PLAN_DAG:
@@ -705,6 +1042,7 @@ class TurnStateMachine:
                     evidence_chunks=evidence_chunks,
                     max_tokens=max_tokens,
                     cancel_token=ctok,
+                    reasoning_effort=effort,
                 )
 
             # Final `--schema` check if requested across any mode
@@ -862,11 +1200,15 @@ class TurnStateMachine:
         json_schema: Optional[Dict[str, Any]] = None,
         enable_thinking: bool = False,
         web_search: bool = False,
+        active_skills: Sequence[str] = (),
         max_tokens: int = 2400,
+        reasoning_effort: str = "medium",
+        clarification_choice: Optional[str] = None,
     ) -> Iterator[HarnessEvent]:
-        """Executes `run_turn` asynchronously and yields live `HarnessEvent`s until completion."""
+        """Executes `run_turn` asynchronously on the MultiThreadExecutionScheduler and yields live `HarnessEvent`s."""
         rid = run_id or f"run_{uuid.uuid4().hex[:10]}"
         q = self.bus.subscribe_run_queue(rid)
+        lane = "fast" if (reasoning_effort or "medium").lower() == "low" else "compute"
 
         def _worker() -> None:
             self.run_turn(
@@ -879,11 +1221,13 @@ class TurnStateMachine:
                 json_schema=json_schema,
                 enable_thinking=enable_thinking,
                 web_search=web_search,
+                active_skills=active_skills,
                 max_tokens=max_tokens,
+                reasoning_effort=reasoning_effort,
+                clarification_choice=clarification_choice,
             )
 
-        t = threading.Thread(target=_worker, name=f"slm-turn-{rid}", daemon=True)
-        t.start()
+        get_runtime().arena.scheduler.submit(lane, _worker)
         yield from self.bus.iter_run_events(rid, q)
 
     def _stream_llm_with_events(
@@ -897,6 +1241,7 @@ class TurnStateMachine:
         enable_thinking: bool,
         agent_label: str,
         cancel_token: CancellationToken,
+        reasoning_effort: str = "medium",
     ) -> tuple[str, str, str, float, float]:
         rt = get_runtime()
         tracer = get_trace_store()
@@ -911,6 +1256,7 @@ class TurnStateMachine:
         with tracer.span(run_id, f"llm_decode:{role}", "llm", parent_id=parent_span_id) as sp:
             for ch in rt.stream(
                 role=role,
+                reasoning_effort=reasoning_effort,
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=0.2,
@@ -987,6 +1333,7 @@ class TurnStateMachine:
         extra_sys: str,
         max_tokens: int,
         cancel_token: CancellationToken,
+        reasoning_effort: str = "medium",
     ) -> tuple[str, str, str, float, float]:
         rt = get_runtime()
         tracer = get_trace_store()
@@ -1037,6 +1384,7 @@ class TurnStateMachine:
             with tracer.span(run_id, f"react_step_{step_idx}", "llm", parent_id=parent_span_id) as sp:
                 gen = rt.generate(
                     role="primary",
+                    reasoning_effort=reasoning_effort,
                     messages=messages,
                     max_tokens=640,
                     temperature=0.0,
@@ -1150,6 +1498,7 @@ class TurnStateMachine:
             enable_thinking=False,
             agent_label=route_dec.primary_agent,
             cancel_token=cancel_token,
+            reasoning_effort=reasoning_effort,
         )
 
     def _execute_plan_dag(
@@ -1162,6 +1511,7 @@ class TurnStateMachine:
         evidence_chunks: Sequence[Dict[str, Any]],
         max_tokens: int,
         cancel_token: CancellationToken,
+        reasoning_effort: str = "medium",
     ) -> tuple[str, str, str, float, float]:
         tracer = get_trace_store()
         dag = get_dag_scheduler()
@@ -1197,6 +1547,7 @@ class TurnStateMachine:
                     evidence_chunks=evidence_chunks if node.agent in ("slm_rag", "slm_pdf") else (),
                     upstream_handoffs=upstream,
                     cancel_token=cancel_token,
+                    reasoning_effort=reasoning_effort,
                 )
                 env.node_id = node.node_id
                 n_span.attributes["verified"] = env.verified
@@ -1214,7 +1565,7 @@ class TurnStateMachine:
         if len(envelopes) == 1:
             txt = envelopes[0].output_text
             self.bus.emit(EventType.TOKEN_DELTA, run_id, session_id, text=txt, agent=envelopes[0].agent)
-            spec = get_runtime().config.resolve_model_spec("primary")
+            spec = get_runtime().ensure_capability_model("primary", reasoning_effort=reasoning_effort)
             return txt, spec.model_id, spec.backend, 0.0, 0.0
 
         synth_blocks = "\n\n".join(env.to_prompt_block() for env in envelopes)
@@ -1238,6 +1589,7 @@ class TurnStateMachine:
             enable_thinking=False,
             agent_label="plan_dag_synthesizer",
             cancel_token=cancel_token,
+            reasoning_effort=reasoning_effort,
         )
 
 

@@ -247,7 +247,11 @@ def get_shared_genai(role: str = "onnx_primary") -> Tuple[HarnessONNXModelHandle
     cfg = get_config()
     onnx_id = cfg.role_bindings.get(role) or cfg.role_bindings.get("onnx_primary") or "qwen2.5-coder-3b-onnx"
     spec = MODEL_CATALOG.get(onnx_id, MODEL_CATALOG["qwen3.5-0.8b-onnx"])
-    if not os.path.exists(spec.abs_path(cfg.models_dir)):
-        spec = MODEL_CATALOG["qwen3.5-0.8b-onnx"]
+    if spec.backend != "onnx" or not os.path.exists(spec.abs_path(cfg.models_dir)):
+        coder_spec = MODEL_CATALOG["qwen2.5-coder-3b-onnx"]
+        if os.path.exists(coder_spec.abs_path(cfg.models_dir)):
+            spec = coder_spec
+        else:
+            spec = MODEL_CATALOG["qwen3.5-0.8b-onnx"]
     backend: ONNXCPUBackend = rt.arena.acquire(spec, rt._load_spec_instance)
     return HarnessONNXModelHandle(backend), HarnessONNXTokenizerHandle(backend)

@@ -74,16 +74,31 @@ cat broken.json | ./slm ask "Extract clean record" --schema '{"type":"object","p
 
 ---
 
+### Standalone OS Harness Installers (Full Suite & Per-Agent)
+
+SLMAgents 2.0 provides self-contained installers for **macOS**, **Windows**, and **Linux**—both for the complete 26-agent desktop studio and as lightweight **individual per-agent + 10-Plane Harness installers**:
+
+| Target | Installer Format | Description | Endpoint / Artifact |
+| :--- | :--- | :--- | :--- |
+| **macOS Desktop (.dmg)** | `SLMAgents-Studio-macOS-Installer.dmg` (281 MB) | Native drag-and-drop macOS `.app` bundle + 10-Plane Harness + `./slm` CLI | `/api/installers/download/macos-dmg` |
+| **macOS Package (.pkg)** | `SLMAgents-Studio-macOS-Installer.pkg` (236 MB) | Standard macOS Installer wizard installing to `/Applications/SLMAgents Studio.app` | `/api/installers/download/macos-pkg` |
+| **Windows Installer (.bat)** | `SLMAgents-Studio-Windows-Installer.bat` (3.7 MB) | Self-extracting Windows archive with automatic portable Python 3.11 provisioning + Desktop shortcut | `/api/installers/download/windows` |
+| **Linux Installer (.run)** | `SLMAgents-Studio-Linux-Installer.run` (3.4 MB) | Self-extracting Linux bundle with venv setup, `./slm` symlink, and XDG `.desktop` entry | `/api/installers/download/linux` |
+| **Individual Agent + Harness (All OSes)** | `.command` (macOS) / `.bat` (Windows) / `.run` (Linux) | Standalone per-agent installer bundling `slm_harness` + `slm_<agent>` + `./slm` CLI for any of the 26 agents | `/api/installers/download/agent-{macos,windows,linux}?agent=<slug>` |
+
+---
+
 ## Repository Structure
 
-This monorepo is organized into the following main projects:
+This monorepo is organized into the 10-Plane Pure-CPU Harness (`slm_harness/`) and 26 specialized agent packages:
 
-| Folder | Description | Installation |
+| Folder | Description | Installation / CLI |
 | :--- | :--- | :--- |
-| [**`slm_orchestrator`**](./slm_orchestrator) | Semantic router powered by local ONNX neural models with dynamic few-shot mapping and autonomous routing. | `pip install slm-orchestrator` |
-| [**`slm_rag`**](./slm_rag) | High-efficiency local CPU Retrieval-Augmented Generation library via ONNX Runtime with autonomous tool use. | `pip install slm-rag` |
-| [**`slm_summarizer`**](./slm_summarizer) | High-efficiency local CPU text summarization agent via ONNX Runtime with an evaluator-corrector loop. | `pip install slm-summarizer` |
-| [**`slm_text_to_sql`**](./slm_text_to_sql) | CPU-optimized Text-to-SQL agent via ONNX Runtime, with built-in QLoRA TPU/GPU fine-tuning. | `pip install slm-text-to-sql` |
+| [**`slm_harness`**](./slm_harness) | **10-Plane Pure-CPU Agent Harness (`./slm`)**: `<35ms` CascadeRouter, GBNF constrained decoding, Watermark LRU `MemoryArena`, 4-Tier Memory, and Deterministic Verifiers. | `pip install -e ./slm_harness` / `./slm chat` |
+| [**`slm_orchestrator`**](./slm_orchestrator) | Autonomous multi-agent router & topological DAG workflow engine powered by the `<35ms` 4-stage CascadeRouter and `ONNXPrefixEnumMasker` token-trie. | `pip install slm-orchestrator` |
+| [**`slm_rag`**](./slm_rag) | Local CPU Retrieval-Augmented Generation engine with 1024-d INT8 embeddings, cross-encoder reranking, context distillation, and `[1]` citation grounding. | `pip install slm-rag` |
+| [**`slm_summarizer`**](./slm_summarizer) | Local CPU text summarization agent with 256-token chunked prefill, Map-Reduce hierarchical folding, and key-entity verification. | `pip install slm-summarizer` |
+| [**`slm_text_to_sql`**](./slm_text_to_sql) | Pure-CPU Text-to-SQL agent powered by `Prem-1B-SQL` GGUF / `Qwen2.5-Coder` with read-only SQLite execution verification and Levenshtein column auto-healing. | `pip install slm-text-to-sql` |
 | [**`slm_cli_agent`**](./slm_cli_agent) | CPU-optimized command line helper translating language to safe executable commands. | `pip install -e ./slm_cli_agent` |
 | [**`slm_code_interpreter`**](./slm_code_interpreter) | Sandboxed Python execution context with auto self-correction traceback recovery loops. | `pip install -e ./slm_code_interpreter` |
 | [**`slm_git_repo_manager`**](./slm_git_repo_manager) | Git diff helper translating raw diff streams to conventional commits. | `pip install -e ./slm_git_repo_manager` |
@@ -205,12 +220,12 @@ for token in stream:
 
 ## Execution & Hardware Architecture
 
-All libraries in this monorepo are optimized for local CPU execution via **ONNX Runtime GenAI** and share efficient memory arenas to minimize resource overhead:
+All 26 libraries in this monorepo are orchestrated by the **10-Plane Pure-CPU Agent Harness (`slm_harness`)**, combining **Pure-CPU `llama.cpp` GGUF (`Q4_K_M`, `n_gpu_layers=0`)** and **Quantized INT4/INT8 CPU models** inside a shared **Watermark LRU `MemoryArena`**:
 
-*   **Architecture**: Quantized local SLM neural engines.
-*   **Privacy**: 100% offline edge execution with zero cloud calls or data telemetry.
-*   **Memory Footprint (RAM)**: **~1.5 GB to 2.5 GB** during active inference.
-*   **Disk Storage**: Shared model weight cache across libraries to prevent redundant downloads.
+*   **Hybrid Pure-CPU Runtime**: `GGUFCPUBackend` (`Qwen3-4B` / `Qwen3-8B` / `Prem-1B-SQL`) + `ONNXCPUBackend` (`Qwen3.5-0.8B` / `Qwen2.5-Coder` / `mxbai-embed-large` INT8 / `bge-reranker-base` INT8 / `Whisper` INT8 / `Florence-2` INT4) with physical P-core and SIMD (`ARM NEON` / `AVX2` / `AVX-512 VNNI`) thread auto-tuning.
+*   **Privacy**: 100% air-gapped offline execution with zero cloud calls, zero API keys, and zero data telemetry (`$0` cost).
+*   **Memory Footprint (RAM)**: Governed by `MemoryArena` across `lite` (**2.6 GB**), `balanced` (**4.7 GB** default), and `power` (**8.2 GB**) profiles with automatic OOM tier step-down (`8B -> 4B -> 3B -> 0.8B`).
+*   **Disk Storage**: Unified model weight cache (`~/.slm_harness/models`) with zero-copy session sharing across all 26 agents and an automated FP32 duplicate pruner (`./slm models --check-dups`).
 
 ---
 

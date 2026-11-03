@@ -21,6 +21,14 @@ except ImportError:
 # Quantized-only HuggingFace model catalog (< 5.5 GB total for `balanced` CPU suite)
 AGENT_MODELS: List[Dict[str, Any]] = [
     {
+        "name": "Qwen3 8B Q4_K_M GGUF (Power Deep Reasoning & Coding Engine)",
+        "kind": "gguf_file",
+        "repo": "bartowski/Qwen_Qwen3-8B-GGUF",
+        "filename": "Qwen_Qwen3-8B-Q4_K_M.gguf",
+        "dir": "gguf",
+        "profiles": ["power"],
+    },
+    {
         "name": "Qwen3 4B Instruct 2507 Q4_K_M GGUF (Primary Balanced CPU Reasoning & Coding Engine)",
         "kind": "gguf_file",
         "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
@@ -29,11 +37,11 @@ AGENT_MODELS: List[Dict[str, Any]] = [
         "profiles": ["balanced", "power"],
     },
     {
-        "name": "Qwen 3.5 0.8B Quantized ONNX (Fast Router, Lite Profile & Micro-Verifier)",
+        "name": "Qwen 3.5 0.8B Quantized ONNX (Fast Router & Micro-Verifier)",
         "kind": "snapshot",
         "repo": "onnx-community/Qwen3.5-0.8B-ONNX",
         "dir": "qwen3.5-0.8b-onnx",
-        "profiles": ["lite", "balanced", "power"],
+        "profiles": ["balanced", "power"],
         "allow_patterns": [
             "*.json",
             "*.jinja",
@@ -53,14 +61,14 @@ AGENT_MODELS: List[Dict[str, Any]] = [
         ],
     },
     {
-        "name": "Qwen 2.5 Coder Text-to-SQL Q4 ONNX (Specialist SQL AST Engine)",
+        "name": "Qwen 2.5 Coder Text-to-SQL INT8 ONNX (Specialist SQL AST Engine)",
         "kind": "snapshot",
         "repo": "spcv/qwen2.5_coder_text2sql_onnx",
         "dir": "qwen2.5_coder_text2sql_onnx",
         "profiles": ["lite", "balanced", "power"],
         "allow_patterns": [
             "*.json",
-            "onnx/model_q4.onnx*",
+            "onnx/model_quantized.onnx*",
         ],
     },
     {
@@ -137,14 +145,14 @@ AGENT_MODELS: List[Dict[str, Any]] = [
         ],
     },
     {
-        "name": "Qwen 2.5 Coder 1.5B Q4 ONNX (Fast Technical Specialist)",
+        "name": "Qwen 2.5 Coder 1.5B INT8 ONNX (Fast Technical & General CPU Engine — 37 tok/s)",
         "kind": "snapshot",
         "repo": "onnx-community/Qwen2.5-Coder-1.5B-Instruct",
         "dir": "qwen2.5-coder-1.5b-onnx",
-        "profiles": ["power"],
+        "profiles": ["lite", "balanced", "power"],
         "allow_patterns": [
             "*.json",
-            "onnx/model_q4.onnx*",
+            "onnx/model_quantized.onnx*",
         ],
     },
     {

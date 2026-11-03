@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .code_sql_json import VerificationOutcome
 
-_CITE_BRACKET_RE = re.compile(r"\[(\d+)\]")
+_CITE_BRACKET_RE = re.compile(r"(\*{1,2})?\[(\d+)\](\*{1,2})?")
 _NUMBER_TOKEN_RE = re.compile(r"\b\d+(?:,\d{3})*(?:\.\d+)?%?\b")
 
 
@@ -30,15 +30,20 @@ def verify_rag_citations(
     invalid_ids: List[int] = []
 
     def _clean_cite(match: re.Match[str]) -> str:
-        cid = int(match.group(1))
+        pre_stars = match.group(1) or ""
+        cid = int(match.group(2))
+        post_stars = match.group(3) or ""
         if 1 <= cid <= max_id:
             if cid not in used_ids:
                 used_ids.append(cid)
-            return f"[{cid}]"
+            return f"{pre_stars}[{cid}]{post_stars}"
         invalid_ids.append(cid)
         return ""
 
     cleaned = _CITE_BRACKET_RE.sub(_clean_cite, answer_text).strip()
+    cleaned = re.sub(r"\*{4,}", "", cleaned)
+    # Remove any dangling incomplete bullet line at the very end (e.g. "- [2026-06-01] -")
+    cleaned = re.sub(r"\n\s*[-*•]\s*(?:\[[0-9\-/]+\]\s*)?[-–:]?\s*$", "", cleaned).strip()
 
     # Check whether non-trivial numbers (> 10, excluding 1..max_id) in answer appear in evidence
     ev_corpus = " ".join(str(c.get("text") or "") for c in evidence_chunks).replace(",", "")

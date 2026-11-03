@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Systems Research &amp; Empirical Benchmarks | SLMAgents 2.0</title>
   <meta name="description" content="Technical research papers, controlled CPU RAG ablations, SLM quantization benchmarks, and 10-Plane Pure-CPU Agent Harness architecture studies from the SLMAgents engineering team.">
-  <link rel="stylesheet" href="style.css?v=55.0">
+  <link rel="stylesheet" href="style.css?v=62.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,27 +22,27 @@
 
   <style>
     .blog-container {
-      max-width: 900px;
+      max-width: 860px;
       margin: 0 auto;
       padding: 0 0 3rem 0;
     }
     .blog-card {
-      background: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.75rem;
-      margin-bottom: 1.25rem;
-      transition: border-color 0.15s ease;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #f1f5f9;
+      border-radius: 0;
+      padding: 2.25rem 0;
+      margin-bottom: 0;
     }
-    .blog-card:hover {
-      border-color: #a1a1aa;
+    .blog-card:first-of-type {
+      padding-top: 0.5rem;
     }
     .blog-title {
-      font-size: 1.35rem;
-      font-weight: 700;
-      line-height: 1.32;
-      margin: 0.6rem 0;
-      letter-spacing: -0.02em;
+      font-size: 1.5rem;
+      font-weight: 800;
+      line-height: 1.28;
+      margin: 0.5rem 0 0.65rem 0;
+      letter-spacing: -0.025em;
       color: var(--text-primary);
     }
     .blog-title a {
@@ -58,47 +58,50 @@
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 0.5rem;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.25rem;
     }
     .blog-tags {
       display: flex;
-      gap: 0.4rem;
+      gap: 0.75rem;
       flex-wrap: wrap;
     }
     .blog-tag {
       font-family: var(--font-mono);
       font-size: 0.7rem;
       font-weight: 600;
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      background: var(--bg-subtle);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
+      padding: 0;
+      background: transparent;
+      border: none;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
     .blog-excerpt {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      line-height: 1.65;
-      margin-bottom: 1.15rem;
+      font-size: 0.94rem;
+      color: #52525b;
+      line-height: 1.68;
+      margin-bottom: 1.25rem;
     }
     .metrics-bar {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 0.75rem;
-      background: #fafafa;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.85rem 1rem;
-      margin-bottom: 1.15rem;
+      gap: 1.25rem;
+      background: transparent;
+      border: none;
+      border-top: 1px solid #f1f5f9;
+      border-bottom: 1px solid #f1f5f9;
+      border-radius: 0;
+      padding: 0.95rem 0;
+      margin-bottom: 1.25rem;
     }
     .metric-val {
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       font-weight: 700;
       font-family: var(--font-mono);
       color: var(--text-primary);
     }
     .metric-lbl {
-      font-size: 0.7rem;
+      font-size: 0.72rem;
       color: var(--text-muted);
       font-weight: 500;
       margin-top: 2px;
@@ -109,8 +112,8 @@
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border);
+      padding-top: 0.25rem;
+      border-top: none;
     }
     .author-info {
       display: flex;
@@ -118,9 +121,9 @@
       gap: 0.65rem;
     }
     .author-avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 6px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
       background: #09090b;
       color: #ffffff;
       display: flex;
@@ -128,7 +131,7 @@
       justify-content: center;
       font-family: var(--font-mono);
       font-weight: 700;
-      font-size: 0.76rem;
+      font-size: 0.72rem;
     }
     @media (max-width: 768px) {
       .metrics-bar {
@@ -345,6 +348,6 @@
     </main>
   </div>
 
-  <script src="app.js?v=55.0"></script>
+  <script src="app.js?v=62.0"></script>
 </body>
 </html>
