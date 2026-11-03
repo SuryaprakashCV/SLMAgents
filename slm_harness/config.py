@@ -123,7 +123,7 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         est_ram_mb=1300,
         context_length=4096,
         quantization="int4",
-        fallback_model_id="qwen3.5-0.8b-onnx",
+        fallback_model_id="qwen2.5-coder-1.5b-onnx",
     ),
     "qwen2.5-math-1.5b-onnx": ModelSpec(
         role="math",
@@ -133,7 +133,7 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         est_ram_mb=1300,
         context_length=4096,
         quantization="int4",
-        fallback_model_id="qwen3.5-0.8b-onnx",
+        fallback_model_id="qwen2.5-coder-1.5b-onnx",
     ),
     "qwen2.5-text2sql-onnx": ModelSpec(
         role="sql",
@@ -143,7 +143,7 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         est_ram_mb=850,
         context_length=4096,
         quantization="int4",
-        fallback_model_id="qwen3.5-0.8b-onnx",
+        fallback_model_id="qwen2.5-coder-1.5b-onnx",
     ),
     "qwen3.5-0.8b-onnx": ModelSpec(
         role="router_fast",
@@ -153,7 +153,7 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         est_ram_mb=920,
         context_length=4096,
         quantization="int4",
-        fallback_model_id=None,
+        fallback_model_id="qwen2.5-coder-1.5b-onnx",
     ),
     "mxbai-embed-large-onnx": ModelSpec(
         role="embeddings",
@@ -218,7 +218,7 @@ PROFILE_PRESETS: Dict[CPUProfile, Dict[str, Any]] = {
             "primary": "qwen2.5-coder-1.5b-onnx",
             "router": "qwen2.5-coder-1.5b-onnx",
             "coding": "qwen2.5-coder-1.5b-onnx",
-            "sql": "qwen2.5-text2sql-onnx",
+            "sql": "qwen2.5-coder-1.5b-onnx",
             "math": "qwen2.5-coder-1.5b-onnx",
             "embeddings": "minilm-embed-onnx",
             "reranker": "bge-reranker-int8-onnx",
@@ -353,6 +353,16 @@ class HarnessConfig:
         # medium
         return ["qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen2.5-1.5b-onnx", "qwen3.5-0.8b-onnx"]
 
+    @staticmethod
+    def _has_weights_at(spec: ModelSpec, base_dir: str) -> bool:
+        target = spec.abs_path(base_dir)
+        if spec.backend == "gguf":
+            return os.path.isfile(target) and os.path.getsize(target) > 5 * 1024 * 1024
+        onnx_sub = os.path.join(target, "onnx")
+        if os.path.isdir(onnx_sub) and any(f.endswith(".onnx") for f in os.listdir(onnx_sub)):
+            return True
+        return os.path.isdir(target) and any(f.endswith(".onnx") for f in os.listdir(target))
+
     def resolve_model_for_reasoning(
         self,
         role: str,
@@ -365,26 +375,26 @@ class HarnessConfig:
             if not spec:
                 continue
             if spec.est_ram_mb <= max(1200, available_ram_mb + 600):
-                if os.path.exists(spec.abs_path(self.models_dir)):
+                if self._has_weights_at(spec, self.models_dir):
                     return spec
-                if os.path.exists(spec.abs_path(USER_MODELS_DIR)):
+                if self._has_weights_at(spec, USER_MODELS_DIR):
                     self.models_dir = USER_MODELS_DIR
                     return spec
         return self.resolve_model_spec(role)
 
     def resolve_model_spec(self, role: str) -> ModelSpec:
-        model_id = self.role_bindings.get(role) or self.role_bindings.get("primary", "qwen3-4b-gguf")
+        model_id = self.role_bindings.get(role) or self.role_bindings.get("primary", "qwen2.5-coder-1.5b-onnx")
         spec = MODEL_CATALOG.get(model_id)
         if spec is None:
-            spec = MODEL_CATALOG["qwen3.5-0.8b-onnx"]
+            spec = MODEL_CATALOG["qwen2.5-coder-1.5b-onnx"]
 
         # Walk fallback chain automatically if model weight file isn't present on disk
         visited = set()
         while spec and spec.model_id not in visited:
             visited.add(spec.model_id)
-            if os.path.exists(spec.abs_path(self.models_dir)):
+            if self._has_weights_at(spec, self.models_dir):
                 return spec
-            if os.path.exists(spec.abs_path(USER_MODELS_DIR)):
+            if self._has_weights_at(spec, USER_MODELS_DIR):
                 self.models_dir = USER_MODELS_DIR
                 return spec
             if spec.fallback_model_id and spec.fallback_model_id in MODEL_CATALOG:

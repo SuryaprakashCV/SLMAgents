@@ -186,17 +186,32 @@ def _load_onnx_dir_via_harness(model_dir: str) -> HarnessONNXModelHandle:
     rt = get_runtime()
     for spec in MODEL_CATALOG.values():
         if spec.backend == "onnx" and os.path.abspath(spec.abs_path(rt.config.models_dir)) == abspath:
-            backend = rt.arena.acquire(spec, rt._load_spec_instance)
-            return HarnessONNXModelHandle(backend)
+            if rt._is_model_on_disk(spec):
+                backend = rt.arena.acquire(spec, rt._load_spec_instance)
+                return HarnessONNXModelHandle(backend)
+            break
 
-    adhoc_spec = ModelSpec(
-        role="adhoc_onnx",
-        model_id=f"adhoc-{os.path.basename(abspath)}",
-        backend="onnx",
-        rel_path=abspath,
-        est_ram_mb=1400,
+    onnx_sub = os.path.join(abspath, "onnx")
+    has_local_onnx = (
+        os.path.isdir(onnx_sub) and any(f.endswith(".onnx") for f in os.listdir(onnx_sub))
+    ) or (
+        os.path.isdir(abspath) and any(f.endswith(".onnx") for f in os.listdir(abspath))
     )
-    backend = rt.arena.acquire(adhoc_spec, rt._load_spec_instance)
+    if has_local_onnx:
+        adhoc_spec = ModelSpec(
+            role="adhoc_onnx",
+            model_id=f"adhoc-{os.path.basename(abspath)}",
+            backend="onnx",
+            rel_path=abspath,
+            est_ram_mb=1400,
+        )
+        backend = rt.arena.acquire(adhoc_spec, rt._load_spec_instance)
+        return HarnessONNXModelHandle(backend)
+
+    fallback_spec = rt.ensure_capability_model("coding")
+    if fallback_spec.backend != "onnx":
+        fallback_spec = MODEL_CATALOG["qwen2.5-coder-1.5b-onnx"]
+    backend = rt.arena.acquire(fallback_spec, rt._load_spec_instance)
     return HarnessONNXModelHandle(backend)
 
 
@@ -245,13 +260,15 @@ def get_shared_genai(role: str = "onnx_primary") -> Tuple[HarnessONNXModelHandle
     install_smart_og_dispatch()
     rt = get_runtime()
     cfg = get_config()
-    onnx_id = cfg.role_bindings.get(role) or cfg.role_bindings.get("onnx_primary") or "qwen2.5-coder-3b-onnx"
-    spec = MODEL_CATALOG.get(onnx_id, MODEL_CATALOG["qwen3.5-0.8b-onnx"])
-    if spec.backend != "onnx" or not os.path.exists(spec.abs_path(cfg.models_dir)):
-        coder_spec = MODEL_CATALOG["qwen2.5-coder-3b-onnx"]
-        if os.path.exists(coder_spec.abs_path(cfg.models_dir)):
-            spec = coder_spec
+    onnx_id = cfg.role_bindings.get(role) or cfg.role_bindings.get("onnx_primary") or "qwen2.5-coder-1.5b-onnx"
+    spec = MODEL_CATALOG.get(onnx_id, MODEL_CATALOG["qwen2.5-coder-1.5b-onnx"])
+    if spec.backend != "onnx" or not rt._is_model_on_disk(spec):
+        for cand_id in ("qwen2.5-coder-3b-onnx", "qwen2.5-coder-1.5b-onnx", "qwen3.5-0.8b-onnx"):
+            cand = MODEL_CATALOG.get(cand_id)
+            if cand and rt._is_model_on_disk(cand):
+                spec = cand
+                break
         else:
-            spec = MODEL_CATALOG["qwen3.5-0.8b-onnx"]
+            spec = MODEL_CATALOG["qwen2.5-coder-1.5b-onnx"]
     backend: ONNXCPUBackend = rt.arena.acquire(spec, rt._load_spec_instance)
     return HarnessONNXModelHandle(backend), HarnessONNXTokenizerHandle(backend)

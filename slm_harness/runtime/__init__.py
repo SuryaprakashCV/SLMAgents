@@ -162,7 +162,7 @@ class HarnessRuntime:
         effort = (reasoning_effort or self.config.default_reasoning_effort.value or "medium").lower().strip()
         is_hosted_2vcpu = bool(os.environ.get("SPACE_ID") or self.config.profile.value == "lite" or topo.physical_cores <= 2)
         if is_hosted_2vcpu:
-            if role in ("embeddings", "reranker", "stt", "sql"):
+            if role in ("embeddings", "reranker", "stt"):
                 spec = self.config.resolve_model_spec(role)
                 if not self._is_model_on_disk(spec):
                     self._ensure_model_downloaded(spec, progress_callback=progress_callback)
@@ -237,14 +237,15 @@ class HarnessRuntime:
         try:
             return self.arena.acquire(spec, self._load_spec_instance)
         except Exception:
-            if spec.fallback_model_id and spec.fallback_model_id in MODEL_CATALOG:
-                fb = MODEL_CATALOG[spec.fallback_model_id]
-                if fb.backend != "gguf" or Llama is not None:
-                    try:
-                        return self.arena.acquire(fb, self._load_spec_instance)
-                    except Exception:
-                        pass
-            return self.arena.acquire(MODEL_CATALOG["qwen3.5-0.8b-onnx"], self._load_spec_instance)
+            for fb_id in (spec.fallback_model_id, "qwen2.5-coder-1.5b-onnx", "qwen3.5-0.8b-onnx"):
+                if fb_id and fb_id in MODEL_CATALOG and fb_id != spec.model_id:
+                    fb = MODEL_CATALOG[fb_id]
+                    if fb.backend != "gguf" or Llama is not None:
+                        try:
+                            return self.arena.acquire(fb, self._load_spec_instance)
+                        except Exception:
+                            pass
+            return self.arena.acquire(MODEL_CATALOG["qwen2.5-coder-1.5b-onnx"], self._load_spec_instance)
 
     def stream(
         self,
@@ -384,6 +385,7 @@ class HarnessRuntime:
                     from tokenizers import Tokenizer
 
                     for cand in (
+                        "qwen2.5-coder-1.5b-onnx",
                         "qwen3.5-0.8b-onnx",
                         "qwen2.5-coder-3b-onnx",
                         "qwen2.5_coder_text2sql_onnx",

@@ -399,7 +399,6 @@ class CascadeRouter:
             try:
                 res = get_runtime().generate(
                     role="router",
-                    model_id="qwen3.5-0.8b-onnx",
                     messages=[
                         {"role": "system", "content": "Select the single best specialist agent for the user request."},
                         {"role": "user", "content": q[:350]},
