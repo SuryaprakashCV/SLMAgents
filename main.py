@@ -18,15 +18,28 @@ import importlib
 
 # Setup sys.path first to resolve all 26 SLM Agent packages locally (supports PyInstaller frozen bundles & OTA central_sync)
 _CENTRAL_SYNC_DIR = os.path.expanduser("~/.slm_harness/central_sync")
-BASE_DIR = (
-    _CENTRAL_SYNC_DIR
-    if getattr(sys, "frozen", False) and os.path.isdir(os.path.join(_CENTRAL_SYNC_DIR, "website"))
-    else (
-        os.path.abspath(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))))
-        if getattr(sys, "frozen", False)
-        else os.path.dirname(os.path.abspath(__file__))
-    )
-)
+
+
+def _resolve_base_dir() -> str:
+    if not getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(__file__))
+    meipass = os.path.abspath(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))))
+    sync_chat = os.path.join(_CENTRAL_SYNC_DIR, "website", "chat.html")
+    mei_chat = os.path.join(meipass, "website", "chat.html")
+    if os.path.isfile(sync_chat):
+        try:
+            if os.path.isfile(mei_chat) and os.path.getmtime(mei_chat) > os.path.getmtime(sync_chat):
+                return meipass
+            with open(sync_chat, "r", encoding="utf-8", errors="ignore") as f:
+                if "btn-personalize-studio" not in f.read():
+                    return meipass
+            return _CENTRAL_SYNC_DIR
+        except Exception:
+            return meipass
+    return meipass
+
+
+BASE_DIR = _resolve_base_dir()
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 for folder in os.listdir(BASE_DIR):
@@ -3531,6 +3544,9 @@ AGENT_SLUG_TO_FOLDER = {
     "slm_translation": "slm_translation",
     "voice_agent": "slm_voice",
     "slm_voice": "slm_voice",
+    "personal_concierge": "slm_harness",
+    "personalization": "slm_harness",
+    "machine_control": "slm_harness",
     "harness": "slm_harness",
     "slm_harness": "slm_harness",
 }
@@ -3916,6 +3932,16 @@ async def push_central_repo_update(request: Request):
         return {"status": "error", "message": str(exc)}
 
 if app is not None:
+    @app.middleware("http")
+    async def _no_cache_html_js_css(request: Request, call_next):
+        resp = await call_next(request)
+        p = request.url.path.lower()
+        if p == "/" or p.endswith((".html", ".js", ".css")):
+            resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+        return resp
+
     try:
         from slm_harness.surfaces.api_server import mount_harness_routes
         mount_harness_routes(app)

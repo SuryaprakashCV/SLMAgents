@@ -243,7 +243,7 @@
                   </div>
                   <span class="os-size-tag">.dmg · 280 MB</span>
                 </div>
-                <p class="os-card-desc">Native macOS disk image with embedded Python 3.11, <code>llama-cpp-python</code>, ONNX Runtime, and all 26 agents.</p>
+                <p class="os-card-desc">Native macOS disk image with embedded Python 3.11, <code>llama-cpp-python</code>, ONNX Runtime, Opt-In Personalization Studio, Daily Concierge, Machine Control, and all 26 agents.</p>
                 <div class="os-spec-list">
                   <span>Arch: Apple Silicon (M1–M4) &amp; Intel</span>
                   <span>Target: /Applications/SLMAgents.app</span>
@@ -266,7 +266,7 @@
                   </div>
                   <span class="os-size-tag">.exe · 2.8 MB</span>
                 </div>
-                <p class="os-card-desc">Native 64-bit Windows Setup executable (<code>PE32+ .exe</code>) that provisions Python 3.11, <code>slm_harness</code>, and Desktop shortcut.</p>
+                <p class="os-card-desc">Native 64-bit Windows Setup executable (<code>PE32+ .exe</code>) that provisions Python 3.11, <code>slm_harness</code>, Opt-In Personalization Studio, Daily Concierge, and Desktop shortcut.</p>
                 <div class="os-spec-list">
                   <span>Arch: 64-bit Windows (x86_64)</span>
                   <span>Target: %LOCALAPPDATA%\SLMAgents</span>
@@ -286,7 +286,7 @@
                   </div>
                   <span class="os-size-tag">.AppImage · 3.4 MB</span>
                 </div>
-                <p class="os-card-desc">Standalone Linux desktop executable (<code>.AppImage</code>) for Ubuntu, Debian, Fedora, and Arch with <code>~/.local/bin/slm</code> launcher.</p>
+                <p class="os-card-desc">Standalone Linux desktop executable (<code>.AppImage</code>) for Ubuntu, Debian, Fedora, and Arch with Opt-In Personalization Studio, Daily Concierge, and <code>~/.local/bin/slm</code> launcher.</p>
                 <div class="os-spec-list">
                   <span>Arch: x86_64 &amp; ARM64 (aarch64)</span>
                   <span>Target: ~/.local/share/slmagents</span>
@@ -310,6 +310,7 @@
 
             <div class="builder-controls">
               <select id="home-agent-installer-select" class="builder-select" aria-label="Select Agent for Individual OS Installer" onchange="syncHomeAgentInstaller(this.value)">
+                <option value="personal_concierge" data-pkg="slm_harness">slm_harness — Personalization &amp; Daily Concierge</option>
                 <option value="rag" data-pkg="slm_rag">slm_rag — SLM RAG</option>
                 <option value="orchestrator" data-pkg="slm_orchestrator">slm_orchestrator — SLM Orchestrator</option>
                 <option value="sql" data-pkg="slm_text_to_sql">slm_text_to_sql — SLM Text-to-SQL</option>
@@ -1448,7 +1449,7 @@ print(answer)</code></pre>
     </div>
   </div>
 
-  <script src="app.js?v=100.0"></script>
+  <script src="app.js?v=109.0"></script>
   <script>
     function syncHomeAgentInstaller(agentSlug) {
       var mac = document.getElementById('home-agent-dl-mac');

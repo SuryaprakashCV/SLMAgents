@@ -24,15 +24,29 @@ import webbrowser
 from typing import Optional
 
 CENTRAL_SYNC_DIR = os.path.expanduser("~/.slm_harness/central_sync")
-REPO_ROOT = (
-    CENTRAL_SYNC_DIR
-    if getattr(sys, "frozen", False) and os.path.isfile(os.path.join(CENTRAL_SYNC_DIR, "main.py"))
-    else (
-        os.path.abspath(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))))
-        if getattr(sys, "frozen", False)
-        else os.path.dirname(os.path.abspath(__file__))
-    )
-)
+
+
+def _resolve_repo_root() -> str:
+    if not getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(__file__))
+    meipass = os.path.abspath(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))))
+    sync_main = os.path.join(CENTRAL_SYNC_DIR, "main.py")
+    sync_chat = os.path.join(CENTRAL_SYNC_DIR, "website", "chat.html")
+    mei_chat = os.path.join(meipass, "website", "chat.html")
+    if os.path.isfile(sync_main) and os.path.isfile(sync_chat):
+        try:
+            if os.path.isfile(mei_chat) and os.path.getmtime(mei_chat) > os.path.getmtime(sync_chat):
+                return meipass
+            with open(sync_chat, "r", encoding="utf-8", errors="ignore") as f:
+                if "btn-personalize-studio" not in f.read():
+                    return meipass
+            return CENTRAL_SYNC_DIR
+        except Exception:
+            return meipass
+    return meipass
+
+
+REPO_ROOT = _resolve_repo_root()
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
@@ -278,7 +292,14 @@ def run_desktop_app(
 
     # Start or attach to local server immediately (non-blocking)
     selected_port, already_alive = start_or_attach_server(host, port)
-    studio_url = f"http://{host}:{selected_port}/chat.html?desktop=1"
+    studio_url = f"http://{host}:{selected_port}/chat.html?desktop=1&v={int(time.time())}"
+
+    # If a stale Chrome --user-data-dir=desktop_window_profile window from an older build is still open, close it so the fresh native window takes focus
+    if platform.system().lower() == "darwin":
+        try:
+            subprocess.run(["pkill", "-f", "desktop_window_profile"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
 
     # Kick off non-blocking background model verification & Central Repo OTA sync
     ensure_models_bootstrapped_async(models_dir=models_dir, profile=active_profile, skip_download=skip_download)

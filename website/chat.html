@@ -50,6 +50,10 @@
     html.desktop-app-mode .btn-top-github-issue {
       display: none !important;
     }
+    html.desktop-app-mode #btn-personalize-studio,
+    html.desktop-app-mode #btn-sidebar-personalize {
+      display: inline-flex !important;
+    }
 
     /* Reasoning Effort Selector (Low / Medium / High) */
     .reasoning-effort-group {
@@ -251,12 +255,16 @@
     <aside class="chat-sidebar" id="chat-sidebar">
       
       <!-- Top Sidebar Action: Single Clean New Chat Button (No Duplicate Brand Logo) -->
-      <div class="sidebar-top-brand">
+      <div class="sidebar-top-brand" style="display: flex; flex-direction: column; gap: 8px;">
         <button type="button" class="btn-sidebar-new-chat-full" id="btn-new-chat" onclick="createNewChatSession()" title="Start New Conversation">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
           </svg>
           <span>New Chat</span>
+        </button>
+        <button type="button" id="btn-sidebar-personalize" onclick="openPersonalizeModal()" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant" style="display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 8px 12px; border-radius: 10px; font-size: 0.8rem; font-weight: 600; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; cursor: pointer; transition: all 0.15s ease;">
+          <span id="sidebar-personalize-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block; flex-shrink: 0;"></span>
+          <span>✨ Personalize &amp; Concierge</span>
         </button>
       </div>
 
@@ -366,6 +374,10 @@
               <div class="popover-divider"></div>
               <div class="popover-section-label">Workspace &amp; Session</div>
 
+              <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openPersonalizeModal()" id="btn-popover-personalize" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <span>✨ Personalization &amp; Concierge</span>
+              </button>
               <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openSkillsRepoModal()" id="btn-top-skills-repo" title="Open Local Skill Repository (.slm/skills/) &amp; AI Skill Creator">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                 <span>Skills Studio</span>
@@ -1103,6 +1115,6 @@
       }
     }
   </script>
-  <script src="app.js?v=108.0"></script>
+  <script src="app.js?v=109.0"></script>
 </body>
 </html>

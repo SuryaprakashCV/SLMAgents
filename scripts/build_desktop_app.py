@@ -253,6 +253,8 @@ def build_pyinstaller_frozen_bundle() -> str:
             f"--add-data=main.py{os.pathsep}.",
             f"--add-data=requirements.txt{os.pathsep}.",
         ]
+        if os.path.isdir(os.path.join(REPO_ROOT, ".slm", "skills")):
+            add_data_args.append(f"--add-data=.slm/skills{os.pathsep}.slm/skills")
         for entry in sorted(os.listdir(REPO_ROOT)):
             full_p = os.path.join(REPO_ROOT, entry)
             if os.path.isdir(full_p) and entry.startswith("slm_") and entry != "slm_harness":
@@ -277,6 +279,14 @@ def build_pyinstaller_frozen_bundle() -> str:
             "--hidden-import=reportlab",
             "--hidden-import=pypdf",
             "--hidden-import=huggingface_hub",
+            "--hidden-import=yt_dlp",
+            "--hidden-import=youtube_transcript_api",
+            "--hidden-import=rapidocr_onnxruntime",
+            "--hidden-import=cv2",
+            "--hidden-import=fitz",
+            "--hidden-import=slm_harness.tools.personal_concierge",
+            "--hidden-import=slm_harness.tools.media_doc_intelligence",
+            "--hidden-import=slm_harness.tools.machine_control",
             "--exclude-module=torch",
             "--exclude-module=torchvision",
             "--exclude-module=torchaudio",

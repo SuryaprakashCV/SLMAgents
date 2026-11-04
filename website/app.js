@@ -5531,7 +5531,7 @@ function ensureGlobalDownloadModal() {
             SLMAgents 2.0 Desktop &amp; CLI Installers
           </h3>
           <p style="margin: 4px 0 0 0; font-size: 0.81rem; color: #64748b;">
-            Zero pre-installed Python required · Includes 10-Plane Pure-CPU Harness (<code>slm_harness</code>) · Auto-provisions quantized CPU weights
+            Zero pre-installed Python required · Includes 10-Plane Pure-CPU Harness (<code>slm_harness</code>), Opt-In Personalization Studio, Daily Concierge &amp; Machine Control · Auto-provisions quantized CPU weights
           </p>
         </div>
         <button class="modal-close" onclick="closeDownloadModal()">&times;</button>
@@ -5586,6 +5586,7 @@ function ensureGlobalDownloadModal() {
           <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin-bottom: 10px;">Single-Agent Standalone Installers (26 Agents)</div>
           <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;">
             <select id="modal-agent-installer-select" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: 7px 14px; font-size: 0.82rem; font-weight: 600; color: #09090b; min-width: 240px; outline: none;" onchange="var v=this.value; document.getElementById('modal-agent-mac').href='/api/installers/download/agent-macos?agent='+v; document.getElementById('modal-agent-win').href='/api/installers/download/agent-windows?agent='+v; document.getElementById('modal-agent-lin').href='/api/installers/download/agent-linux?agent='+v;">
+              <option value="personal_concierge">slm_harness — Personalization &amp; Daily Concierge</option>
               <option value="rag">slm_rag — SLM RAG</option>
               <option value="orchestrator">slm_orchestrator — SLM Orchestrator</option>
               <option value="sql">slm_text_to_sql — SLM Text-to-SQL</option>
@@ -5698,16 +5699,25 @@ function applyPersonalizationToUI(data) {
   const creds = data.credentials || {};
   const enabled = !!prof.enabled;
 
-  // Update header button status dot
+  // Update header & sidebar button status dot
   const dot = document.getElementById("personalize-status-dot");
+  const sideDot = document.getElementById("sidebar-personalize-dot");
   const btn = document.getElementById("btn-personalize-studio");
+  const sideBtn = document.getElementById("btn-sidebar-personalize");
   const statusLbl = document.getElementById("pers-optin-status-label");
   if (dot) {
     dot.style.background = enabled ? "#10b981" : "#94a3b8";
   }
+  if (sideDot) {
+    sideDot.style.background = enabled ? "#10b981" : "#94a3b8";
+  }
   if (btn) {
     btn.style.borderColor = enabled ? "#10b981" : "#cbd5e1";
     btn.style.background = enabled ? "#f0fdf4" : "#ffffff";
+  }
+  if (sideBtn) {
+    sideBtn.style.borderColor = enabled ? "#10b981" : "#cbd5e1";
+    sideBtn.style.background = enabled ? "#f0fdf4" : "#ffffff";
   }
   if (statusLbl) {
     statusLbl.textContent = enabled ? "✓ Personalization Active (Opt-In)" : "Enable Personalization (Opt-In)";
