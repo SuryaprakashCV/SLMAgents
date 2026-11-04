@@ -98,7 +98,11 @@ _MACHINE_INTENT_PATTERNS = [
         re.compile(
             r"\b(?:find|search|locate|where\s+is|where\s+are|look\s+for|scan\s+for)\b.*\b(?:in\s+(?:my\s+|the\s+)?(?:machine|computer|mac|pc|laptop|system|disk|workspace|folder|directory|desktop|documents|downloads)|on\s+(?:my\s+|the\s+)?(?:machine|computer|mac|pc|laptop|system|disk|desktop))\b"
             r"|\b(?:search\s+(?:and\s+find|for)?|find\s+(?:out\s+)?(?:all\s+)?|locate|scan\s+for)\b.*\b(?:files?|folders?|director(?:y|ies)|documents?|pdfs?|spreadsheets?|scripts?|apps?|applications?|projects?|repos?|\*\.[a-z0-9]+)\b"
-            r"|\b(?:find|search|locate)\s+(?:for\s+)?['\"`]?([A-Za-z0-9_.\-]{3,})['\"`]?\s*$"
+            r"|\b(?:give\s+me\s+(?:the\s+)?path|what\s+is\s+(?:the\s+)?path|path\s+(?:for|of|to)|folder\s+path|directory\s+path)\b"
+            r"|\b(?:any\s+(?:similar\s+)?folders?|folders?\s+named\s+like\s+that|any\s+folder\s+named|any\s+files?\s+named|is\s+there\s+(?:a|any)\s+(?:folder|file|directory))\b"
+            r"|\b(?:search(?:ed)?\s+for\s+all\s+(?:combinations|variations)\s+of|all\s+(?:combinations|variations)\s+of)\b"
+            r"|\b(?:i\s+mean\s+in\s+(?:my\s+)?machine|what\s+is\s+the\s+command\s+you\s+ran)\b"
+            r"|\b(?:search|find|locate)\s+['\"`]?[A-Za-z0-9_.\-]+(?:\s+[A-Za-z0-9_.\-]+){0,3}['\"`]?\s+located\b"
             r"|\b(?:find|search)\s+files?\b",
             re.IGNORECASE | re.DOTALL,
         ),
@@ -123,6 +127,48 @@ _MACHINE_INTENT_PATTERNS = [
         ),
     ),
 ]
+
+
+def _quick_local_entity_exists(candidate_phrase: str) -> bool:
+    """
+    Fast (<2ms) check whether a candidate 1-3 word phrase (in any space/hyphen/underscore/compact
+    combination) matches an actual folder, file, or application in /Applications, ~/Documents,
+    ~/Desktop, ~/Downloads, or the workspace directory.
+    """
+    cand = (candidate_phrase or "").strip(" '\"\t\n.,?!")
+    if not cand or len(cand) < 3:
+        return False
+    tokens = [t.lower() for t in re.split(r"[\s_\-]+", cand) if len(t) >= 2]
+    if not tokens:
+        return False
+    # Ignore generic English question words
+    stop_words = {"the", "who", "what", "when", "why", "how", "is", "are", "for", "and", "with", "from", "news", "latest", "best", "top"}
+    if all(t in stop_words for t in tokens):
+        return False
+    variants = {
+        " ".join(tokens),
+        "".join(tokens),
+        "-".join(tokens),
+        "_".join(tokens),
+    }
+    home_dir = os.path.expanduser("~")
+    roots = [
+        "/Applications",
+        os.path.join(home_dir, "Documents"),
+        os.path.join(home_dir, "Desktop"),
+        os.path.join(home_dir, "Downloads"),
+    ]
+    for r in roots:
+        if not os.path.isdir(r):
+            continue
+        try:
+            for name in os.listdir(r):
+                n_low = name.lower()
+                if any(v in n_low for v in variants) or (len(tokens) >= 2 and all(t in n_low for t in tokens)):
+                    return True
+        except OSError:
+            pass
+    return False
 
 
 def detect_machine_control_intent(query: str) -> Optional[str]:
@@ -151,6 +197,19 @@ def detect_machine_control_intent(query: str) -> Optional[str]:
         return "multi_machine"
     if len(matched) == 1:
         return matched[0]
+
+    # Smart local-entity check: if user asks "search <X>", "find <X>", "locate <X>", or "where is <X>"
+    # and <X> (in any hyphen/space/underscore combination) actually exists on the machine, route to search_files!
+    m_bare = re.match(
+        r"^(?:please\s+|can\s+you\s+)?(?:find|search(?:\s+for)?|locate|where\s+is)\s+['\"`]?([A-Za-z0-9_.\-]+(?:\s+[A-Za-z0-9_.\-]+){0,3})['\"`]?(?:\s+located)?\s*[?.!]*$",
+        q,
+        re.IGNORECASE,
+    )
+    if m_bare:
+        cand_phrase = re.sub(r"\s+located$", "", m_bare.group(1), flags=re.IGNORECASE).strip()
+        if _quick_local_entity_exists(cand_phrase) or cand_phrase.lower().replace(" ", "") in ("slmagents", "slmagent", "slmminds", "slimeminds"):
+            return "search_files"
+
     return None
 
 
@@ -209,6 +268,7 @@ class MachineControlEngine:
         session_id: str = "default",
         attachments: Sequence[Any] = (),
         step_callback: Optional[Callable[[str, str], None]] = None,
+        session_context_text: str = "",
     ) -> MachineActionOutcome:
         """
         Inspects the user query, emits real-time thought steps via `step_callback(agent, thought_msg)`,
@@ -255,7 +315,7 @@ class MachineControlEngine:
         if single == "play_music":
             return self._handle_play_music(query, _think, thoughts)
         if single == "search_files":
-            return self._handle_search_files(query, _think, thoughts)
+            return self._handle_search_files(query, _think, thoughts, session_context_text=session_context_text)
         if single == "schedule_job":
             return self._handle_schedule_job(query, _think, thoughts)
         return self._handle_screen_traverse(query, _think, thoughts)
@@ -754,23 +814,42 @@ class MachineControlEngine:
         query: str,
         _think: Callable[[str, str], None],
         thoughts: List[str],
+        session_context_text: str = "",
     ) -> MachineActionOutcome:
-        q = (query or "").strip()
+        q = (query or "").strip(" '\"\t\n\u2018\u2019\u201c\u201d")
         os_sys = self.os_profile["system"]
 
         # 1. Extract glob, extension, or target keyword from natural language query
         ext_match = re.search(r"(\*\.[a-zA-Z0-9]+|\.[a-zA-Z0-9]{2,6})\b", q)
         kw_match = re.search(
-            r"\b(?:named|called|matching|containing)\s+['\"`]?([A-Za-z0-9_.*\-]+)['\"`]?",
+            r"\b(?:named|called|matching|containing)\s+['\"`]?([A-Za-z0-9_.*\-]+(?:\s+[A-Za-z0-9_.*\-]+){0,2})['\"`]?",
             q,
             re.IGNORECASE,
         )
+        if kw_match and kw_match.group(1).strip().lower() in ("like that", "that", "this", "it"):
+            kw_match = None
 
-        # Clean natural language phrasing like "find slmagents in my machine" -> "slmagents"
+        # Clean natural language phrasing like:
+        # - "find slmagents in my machine" -> "slmagents"
+        # - "give me path for creative fusion" -> "creative fusion"
+        # - "search creative fusion located" -> "creative fusion"
+        # - "you should havwe searched for all combinations of creative fusion" -> "creative fusion"
         cleaned_target = q
         cleaned_target = re.sub(
             r"^(?:please\s+|can\s+you\s+|could\s+you\s+|help\s+me\s+(?:to\s+)?)?"
-            r"(?:search\s+(?:and\s+find\s+|for\s+)?|find\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?|locate\s+(?:all\s+)?|where\s+(?:is|are)\s+(?:the\s+)?|look\s+for\s+|scan\s+for\s+)",
+            r"(?:you\s+should\s+hav(?:e|we)\s+searched\s+for\s+(?:all\s+(?:combinations|variations)\s+of\s+)?"
+            r"|search(?:ed)?\s+for\s+all\s+(?:combinations|variations)\s+of\s+"
+            r"|all\s+(?:combinations|variations)\s+of\s+"
+            r"|give\s+me\s+(?:the\s+)?path\s+(?:for|of|to)\s+"
+            r"|what\s+is\s+(?:the\s+)?path\s+(?:for|of|to)\s+"
+            r"|path\s+(?:for|of|to)\s+"
+            r"|is\s+there\s+(?:a\s+|any\s+)?(?:folder|file|directory)\s+(?:named|called)\s+"
+            r"|any\s+(?:similar\s+)?(?:folders?|files?|director(?:y|ies))\s*(?:named|called|for)?\s*"
+            r"|search\s+(?:and\s+find\s+|for\s+)?"
+            r"|find\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?"
+            r"|locate\s+(?:all\s+)?"
+            r"|where\s+(?:is|are)\s+(?:the\s+)?"
+            r"|look\s+for\s+|scan\s+for\s+)",
             "",
             cleaned_target,
             flags=re.IGNORECASE,
@@ -779,55 +858,116 @@ class MachineControlEngine:
             r"\b(?:in\s+(?:my\s+|the\s+|this\s+)?(?:machine|computer|mac|pc|laptop|system|disk|workspace|folder|directory|desktop|documents|downloads)"
             r"|on\s+(?:my\s+|the\s+|this\s+)?(?:machine|computer|mac|pc|laptop|system|disk|desktop)"
             r"|from\s+(?:my\s+|the\s+)?(?:machine|computer|mac|system|workspace)"
-            r"|and\s+give\s+me\s+.*|for\s+me)\b.*$",
+            r"|located|location|like\s+that|and\s+give\s+me\s+.*|for\s+me)\b.*$",
             "",
             cleaned_target,
             flags=re.IGNORECASE,
-        ).strip(" '\"\t\n.,?!")
+        ).strip(" '\"\t\n.,?!\u2018\u2019")
         cleaned_target = re.sub(
-            r"\b(?:all\s+|some\s+|the\s+)?(?:files?|folders?|director(?:y|ies)|projects?|repos?|applications?|apps?)\b",
+            r"\b(?:all\s+|some\s+|the\s+|similar\s+)?(?:files?|folders?|director(?:y|ies)|projects?|repos?|applications?|apps?|paths?)\b",
             "",
             cleaned_target,
             flags=re.IGNORECASE,
-        ).strip(" '\"\t\n.,?!")
+        ).strip(" '\"\t\n.,?!\u2018\u2019")
 
+        # If this is a follow-up query like "any folder named like that?", "any similar folders?", "i mean in my machine", or "what is the command you ran?"
+        generic_followups = {
+            "", "files", "file", "folders", "folder", "everything", "all",
+            "like that", "that", "similar", "i mean", "what is the command you ran",
+        }
+        if cleaned_target.lower() in generic_followups and session_context_text:
+            # Extract recent user search target from session_context_text
+            ctx_matches = re.findall(
+                r"(?:path\s+for|search(?:\s+for)?|where\s+is|combinations\s+of|named)\s+['\"`]?([A-Za-z0-9_\-]+(?:\s+[A-Za-z0-9_\-]+){0,2})['\"`]?",
+                session_context_text,
+                flags=re.IGNORECASE,
+            )
+            for cand in reversed(ctx_matches):
+                cand_c = re.sub(r"\b(?:located|in|my|machine|folder|folders|like|that)\b", "", cand, flags=re.IGNORECASE).strip()
+                if cand_c and cand_c.lower() not in generic_followups and len(cand_c) >= 3:
+                    cleaned_target = cand_c
+                    break
+
+        display_target = cleaned_target
         if ext_match and (not cleaned_target or ext_match.group(1) in cleaned_target):
             raw_kw = ext_match.group(1)
             pattern = raw_kw if raw_kw.startswith("*") else f"*{raw_kw}"
             keyword_clean = raw_kw.lstrip("*.")
-        elif kw_match and kw_match.group(1).lower() not in ("files", "file", "out", "all", "some", "machine", "my"):
-            raw_kw = kw_match.group(1)
+            display_target = pattern
+        elif kw_match and kw_match.group(1).lower() not in ("files", "file", "out", "all", "some", "machine", "my", "like that"):
+            raw_kw = kw_match.group(1).strip()
             pattern = raw_kw if "*" in raw_kw else f"*{raw_kw}*"
             keyword_clean = raw_kw.strip("*")
-        elif cleaned_target and cleaned_target.lower() not in ("files", "file", "folders", "folder", "everything", "all"):
-            # Handle multi-word targets like "slm agents" -> match both "slmagents" and "slm_agents" / "slm-agents"
+            display_target = raw_kw
+        elif cleaned_target and cleaned_target.lower() not in generic_followups:
             compact_kw = re.sub(r"\s+", "", cleaned_target)
             keyword_clean = compact_kw
             pattern = f"*{compact_kw}*"
+            display_target = cleaned_target
         else:
             pattern = "*.py" if "python" in q.lower() else ("*.xlsx" if "excel" in q.lower() else "*")
             keyword_clean = pattern.strip("*")
+            display_target = pattern
 
-        # Generate normalized variants so "slm agents", "slmagents", "slm_agents", "slm-agents" all match seamlessly
+        # Generate ALL combination variants so "creative fusion" matches:
+        # "creative fusion", "creativefusion", "creative-fusion", "creative_fusion", "*creative*fusion*", etc.
         kw_low = keyword_clean.lower()
+        tokens = [t.lower() for t in re.split(r"[\s_\-.]+", display_target.strip("*")) if len(t) >= 2]
         kw_variants = {kw_low}
-        if cleaned_target:
+        searched_combinations: List[str] = []
+        if tokens:
+            combo_list = [
+                " ".join(tokens),
+                "".join(tokens),
+                "-".join(tokens),
+                "_".join(tokens),
+                ".".join(tokens),
+            ]
+            if len(tokens) > 1:
+                combo_list.append("*" + "*".join(tokens) + "*")
+            for c in combo_list:
+                if c and c not in searched_combinations:
+                    searched_combinations.append(c)
+                kw_variants.add(c.strip("*"))
+        elif cleaned_target:
             ct_low = cleaned_target.lower()
-            kw_variants.add(ct_low)
-            kw_variants.add(ct_low.replace(" ", ""))
-            kw_variants.add(ct_low.replace(" ", "_"))
-            kw_variants.add(ct_low.replace(" ", "-"))
+            kw_variants.update({ct_low, ct_low.replace(" ", ""), ct_low.replace(" ", "_"), ct_low.replace(" ", "-")})
+            searched_combinations = sorted(kw_variants)
+
         if kw_low in ("slmagents", "slmagent", "slmminds", "slimeminds"):
             kw_variants.update({"slmagents", "slm_agents", "slm-agents", "slm_harness"})
+            for extra in ("slmagents", "slm-agents", "slm_agents", "slm_harness"):
+                if extra not in searched_combinations:
+                    searched_combinations.append(extra)
+
+        def _entry_matches(name_low: str) -> bool:
+            if fnmatch.fnmatch(name_low, pattern.lower()):
+                return True
+            if any(v and len(v) >= 2 and v in name_low for v in kw_variants):
+                return True
+            if len(tokens) >= 2 and all(t in name_low for t in tokens):
+                return True
+            return False
 
         _think(
-            f"Step 3 — Executing Native Machine & Workspace Search: Scanning machine directories, /Applications, and '{self.workspace_dir}' for '{keyword_clean or pattern}'...",
+            f"Step 3 — Executing Native Machine & Workspace Search: Scanning machine directories, /Applications, and '{self.workspace_dir}' across all combinations of '{display_target}' ({', '.join(searched_combinations[:5])})...",
             "slm_cli_agent",
         )
 
         home_dir = os.path.expanduser("~")
+        primary_tok = tokens[0] if tokens else (keyword_clean or pattern.strip("*"))
         if os_sys == "Darwin":
-            os_cmd = f'mdfind -name "{keyword_clean or pattern.strip("*")}" | head -n 25'
+            if len(tokens) >= 2:
+                kebab = "-".join(tokens)
+                space_q = " ".join(tokens)
+                compact_q = "".join(tokens)
+                os_cmd = (
+                    f'find "{home_dir}/Documents" "{home_dir}/Desktop" "{home_dir}/Downloads" "/Applications" -maxdepth 2 '
+                    f'\\( -iname "*{kebab}*" -o -iname "*{space_q}*" -o -iname "*{compact_q}*" -o -iname "*{"*".join(tokens)}*" \\) 2>/dev/null; '
+                    f'mdfind -name "{primary_tok}" | grep -iE "{tokens[-1]}" | head -n 25'
+                )
+            else:
+                os_cmd = f'mdfind -name "{keyword_clean or pattern.strip("*")}" | head -n 25'
         elif os_sys == "Windows":
             os_cmd = f'Get-ChildItem -Path "{home_dir}" -Filter "{pattern}" -Recurse -Depth 3 -ErrorAction SilentlyContinue'
         else:
@@ -873,10 +1013,10 @@ class MachineControlEngine:
 
         # 1. Check active workspace root itself if its name matches
         ws_base_low = os.path.basename(self.workspace_dir).lower()
-        if any(v and v in ws_base_low for v in kw_variants):
+        if _entry_matches(ws_base_low):
             _record_entry(self.workspace_dir, "Active Workspace Repository")
 
-        # 2. Check /Applications, ~/Documents, ~/Desktop, ~/Downloads, and workspace dist/
+        # 2. Check /Applications, ~/Applications, ~/Documents, ~/Desktop, ~/Downloads, and workspace dist/ (up to depth 2)
         machine_roots = [
             "/Applications",
             os.path.join(home_dir, "Applications"),
@@ -890,31 +1030,52 @@ class MachineControlEngine:
                 continue
             try:
                 for entry_name in sorted(os.listdir(mroot)):
+                    if entry_name.startswith("."):
+                        continue
+                    full_l1 = os.path.join(mroot, entry_name)
                     en_low = entry_name.lower()
-                    if fnmatch.fnmatch(en_low, pattern.lower()) or any(v and v in en_low for v in kw_variants):
-                        _record_entry(os.path.join(mroot, entry_name))
+                    if _entry_matches(en_low):
+                        _record_entry(full_l1)
+                    # Also check depth-2 children inside ~/Documents, ~/Desktop, ~/Downloads
+                    if os.path.isdir(full_l1) and not full_l1.endswith(".app") and mroot != "/Applications":
+                        try:
+                            for sub_name in sorted(os.listdir(full_l1))[:80]:
+                                if sub_name.startswith("."):
+                                    continue
+                                if _entry_matches(sub_name.lower()):
+                                    _record_entry(os.path.join(full_l1, sub_name))
+                        except OSError:
+                            pass
             except OSError:
                 pass
 
         # 3. Run fast native macOS Spotlight `mdfind -name` (capped at 1.5s) for real machine-wide discovery
-        if os_sys == "Darwin" and keyword_clean and keyword_clean != "*":
-            try:
-                sp = subprocess.run(
-                    ["mdfind", "-name", keyword_clean],
-                    capture_output=True,
-                    text=True,
-                    timeout=1.5,
-                )
-                if sp.returncode == 0 and sp.stdout:
-                    for line in sp.stdout.splitlines():
-                        cand_p = line.strip()
-                        if not cand_p or "/Library/Caches/" in cand_p or "/.Trash/" in cand_p or "/.gemini/" in cand_p:
-                            continue
-                        _record_entry(cand_p)
-                        if len(matched_dirs_and_apps) >= 25:
-                            break
-            except Exception:
-                pass
+        if os_sys == "Darwin" and primary_tok and primary_tok != "*":
+            mdfind_queries = [keyword_clean] if len(tokens) <= 1 else [primary_tok, "-".join(tokens), " ".join(tokens)]
+            seen_md_q: set[str] = set()
+            for mq in mdfind_queries:
+                if not mq or mq in seen_md_q:
+                    continue
+                seen_md_q.add(mq)
+                try:
+                    sp = subprocess.run(
+                        ["mdfind", "-name", mq],
+                        capture_output=True,
+                        text=True,
+                        timeout=1.2,
+                    )
+                    if sp.returncode == 0 and sp.stdout:
+                        for line in sp.stdout.splitlines():
+                            cand_p = line.strip()
+                            if not cand_p or "/Library/Caches/" in cand_p or "/.Trash/" in cand_p or "/.gemini/" in cand_p or "/node_modules/" in cand_p:
+                                continue
+                            base_low = os.path.basename(cand_p).lower()
+                            if _entry_matches(base_low) or _entry_matches(cand_p.lower()):
+                                _record_entry(cand_p)
+                            if len(matched_dirs_and_apps) >= 25:
+                                break
+                except Exception:
+                    pass
 
         # 4. Walk active workspace for matching subdirectories and files
         skip_dirs = {".git", ".venv", "__pycache__", "node_modules", "models", ".pytest_cache"}
@@ -923,11 +1084,11 @@ class MachineControlEngine:
             dirs[:] = [d for d in sorted(dirs) if d not in skip_dirs]
             for d in dirs:
                 d_low = d.lower()
-                if fnmatch.fnmatch(d_low, pattern.lower()) or any(v and len(v) >= 2 and v in d_low for v in kw_variants):
+                if _entry_matches(d_low):
                     _record_entry(os.path.join(root, d), "Workspace Directory")
             for fn in sorted(files):
                 fn_low = fn.lower()
-                if fnmatch.fnmatch(fn_low, pattern.lower()) or any(v and len(v) >= 2 and v in fn_low for v in kw_variants):
+                if _entry_matches(fn_low):
                     fp = os.path.join(root, fn)
                     _record_entry(fp, "File")
                     try:
@@ -960,9 +1121,12 @@ class MachineControlEngine:
             for item in all_items
         ) or "| *(no matching items found)* | - | - | - |"
 
+        combos_badges = " · ".join(f"`{c}`" for c in searched_combinations[:6]) if searched_combinations else f"`{pattern}`"
+
         md = (
-            f"### 🔍 Machine Search Results for **`{keyword_clean or pattern}`**\n\n"
-            f"Found **{total_found} matching item(s)** on your machine (`{self.os_profile['os_label']}`):\n\n"
+            f"### 🔍 Machine Search Results for **`{display_target}`**\n\n"
+            f"- **Searched Combinations:** {combos_badges}\n"
+            f"- **Matches Found:** **{total_found} item(s)** on `{self.os_profile['os_label']}`\n\n"
             f"| Full Machine Path | Type | Size | Last Modified |\n"
             f"| :--- | :--- | :--- | :--- |\n"
             f"{rows_md}\n\n"
@@ -977,7 +1141,8 @@ class MachineControlEngine:
             thoughts=thoughts,
             markdown_response=md,
             structured_data={
-                "query": keyword_clean or pattern,
+                "query": display_target,
+                "combinations": searched_combinations,
                 "pattern": pattern,
                 "total_found": total_found,
                 "matches": all_items,

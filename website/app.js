@@ -5677,6 +5677,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // Opt-In Personalization & Daily Concierge Studio (Profile, Vault, Dashboard)
 // ============================================================================
 
+const escapeHtml = escapeHtmlSafe;
 let _personalizeState = null;
 
 async function loadPersonalizationState() {
@@ -5700,6 +5701,7 @@ function applyPersonalizationToUI(data) {
   // Update header button status dot
   const dot = document.getElementById("personalize-status-dot");
   const btn = document.getElementById("btn-personalize-studio");
+  const statusLbl = document.getElementById("pers-optin-status-label");
   if (dot) {
     dot.style.background = enabled ? "#10b981" : "#94a3b8";
   }
@@ -5707,17 +5709,36 @@ function applyPersonalizationToUI(data) {
     btn.style.borderColor = enabled ? "#10b981" : "#cbd5e1";
     btn.style.background = enabled ? "#f0fdf4" : "#ffffff";
   }
+  if (statusLbl) {
+    statusLbl.textContent = enabled ? "✓ Personalization Active (Opt-In)" : "Enable Personalization (Opt-In)";
+  }
+
+  const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+
+  // Render tailored suggestions inside the modal preview box (always visible in modal)
+  const modalPreview = document.getElementById("pers-modal-suggestions-preview");
+  if (modalPreview) {
+    if (suggestions.length > 0) {
+      modalPreview.innerHTML = suggestions
+        .map((s) => {
+          const safePrompt = (s.prompt || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+          return `<button type="button" onclick="closePersonalizeModal(); applyQuickPrompt('${safePrompt}'); handleChatSubmit(new Event('submit'));" style="background:#ffffff;border:1px solid #cbd5e1;color:#0f172a;border-radius:999px;padding:5px 12px;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.background='#0f172a';this.style.color='#fff';" onmouseout="this.style.background='#ffffff';this.style.color='#0f172a';">${escapeHtmlSafe(s.label)}</button>`;
+        })
+        .join("");
+    } else {
+      modalPreview.innerHTML = `<span style="font-size:0.75rem;color:#64748b;">Save your profile below to generate tailored suggestions.</span>`;
+    }
+  }
 
   // Render Opt-In Personalized Smart Suggestion Chips above the composer ONLY when enabled
   const tray = document.getElementById("personalize-suggestions-tray");
   if (tray) {
-    const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
     if (enabled && suggestions.length > 0) {
       tray.style.display = "flex";
       tray.innerHTML = suggestions
         .map((s) => {
-          const safePrompt = (s.prompt || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
-          return `<button type="button" onclick="applyQuickPrompt('${safePrompt}'); handleChatSubmit(new Event('submit'));" style="background:#f8fafc;border:1px solid #cbd5e1;color:#0f172a;border-radius:999px;padding:4px 11px;font-size:0.74rem;font-weight:600;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.background='#0f172a';this.style.color='#fff';" onmouseout="this.style.background='#f8fafc';this.style.color='#0f172a';">${escapeHtml(s.label)}</button>`;
+          const safePrompt = (s.prompt || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+          return `<button type="button" onclick="applyQuickPrompt('${safePrompt}'); handleChatSubmit(new Event('submit'));" style="background:#f8fafc;border:1px solid #cbd5e1;color:#0f172a;border-radius:999px;padding:4px 11px;font-size:0.74rem;font-weight:600;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.background='#0f172a';this.style.color='#fff';" onmouseout="this.style.background='#f8fafc';this.style.color='#0f172a';">${escapeHtmlSafe(s.label)}</button>`;
         })
         .join("");
     } else {
@@ -5768,11 +5789,69 @@ function applyPersonalizationToUI(data) {
   }
 }
 
+window.applyPersonalizePreset = async function applyPersonalizePreset(presetKey) {
+  const presets = {
+    ai_eng: {
+      role: "Staff AI & LLM Systems Engineer",
+      exp: "5",
+      locations: "Bangalore, Remote, Hyderabad",
+      skills: "Python, Small Language Models (SLMs), ONNX Runtime, PyTorch, RAG, Multi-Agent Systems, FastAPI, SQL",
+      target_roles: "Staff AI Engineer, Principal ML Engineer, Applied AI Architect",
+      interests: "Small Language Models & Edge AI, Multi-Agent Harnesses, Open-Source LLMs, Systems Architecture",
+      goals: "Quantized ONNX & GGUF Optimization, Autonomous Agent Planning, Rust for AI Runtimes",
+    },
+    fullstack: {
+      role: "Senior Full-Stack & Distributed Systems Architect",
+      exp: "5",
+      locations: "Bangalore, Remote, Pune",
+      skills: "TypeScript, Python, React, Go, Kubernetes, PostgreSQL, Redis, Microservices, System Design",
+      target_roles: "Staff Software Engineer, Lead Full-Stack Engineer, Principal Systems Architect",
+      interests: "Distributed Systems, Cloud-Native Architecture, High-Performance Backends, Developer Tools",
+      goals: "AI-Native Web Architecture, Rust Backend Systems, High-Throughput Event Streaming",
+    },
+    data_sci: {
+      role: "Lead Data Scientist & Analytics Architect",
+      exp: "6",
+      locations: "Bangalore, Remote, Mumbai",
+      skills: "Python, SQL, Pandas, Machine Learning, Forecasting, Spark, Data Pipelines, Executive Dashboards",
+      target_roles: "Principal Data Scientist, Head of Analytics, Staff ML Scientist",
+      interests: "Applied Machine Learning, Data Engineering, Real-Time Analytics, FinTech & Enterprise AI",
+      goals: "Automated Feature Engineering, Agentic Data Analysis, Tabular Deep Learning",
+    },
+    founder: {
+      role: "AI Product & Engineering Leader / Founder",
+      exp: "8",
+      locations: "Bangalore, San Francisco, Remote",
+      skills: "AI Product Strategy, Systems Architecture, Python, Multi-Agent Workflows, GTM, Team Leadership",
+      target_roles: "VP of Engineering, Head of AI, Principal Architect, Founding Engineer",
+      interests: "AI Startups, Autonomous Agents, Enterprise SaaS, Venture & DeepTech Trends",
+      goals: "Zero-Cloud Edge AI Products, Autonomous Enterprise Concierge Systems",
+    },
+  };
+  const p = presets[presetKey];
+  if (!p) return;
+  const setVal = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.value = v;
+  };
+  setVal("pers-current-role", p.role);
+  setVal("pers-exp-years", p.exp);
+  setVal("pers-locations", p.locations);
+  setVal("pers-skills", p.skills);
+  setVal("pers-target-roles", p.target_roles);
+  setVal("pers-interests", p.interests);
+  setVal("pers-learning-goals", p.goals);
+  const optCheck = document.getElementById("pers-optin-enabled");
+  if (optCheck) optCheck.checked = true;
+  await savePersonalizationSettings(false, true);
+};
+
 window.openPersonalizeModal = async function openPersonalizeModal(defaultTab) {
   const modal = document.getElementById("personalize-modal-backdrop");
   if (!modal) return;
   modal.style.display = "flex";
   await loadPersonalizationState();
+  fetchCachedPersonalDashboard();
   if (defaultTab) {
     switchPersonalizeTab(defaultTab);
   }

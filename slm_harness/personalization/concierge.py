@@ -373,12 +373,14 @@ class PersonalConciergeEngine:
 
         return self.get_status_bundle()
 
-    def get_personalized_suggestions(self) -> List[Dict[str, str]]:
+    def get_personalized_suggestions(self, include_preview: bool = True) -> List[Dict[str, str]]:
         """
-        Returns personalized smart action chips ONLY when the user has opted into Personalization.
+        Returns personalized smart action chips tailored to the user's profile.
+        The main chat composer tray only displays them when `profile.enabled` is True,
+        while the Personalize Studio modal always previews them when opened.
         """
         prof = self.get_profile()
-        if not prof.get("enabled"):
+        if not prof.get("enabled") and not include_preview:
             return []
 
         role = prof.get("current_role") or "AI Engineer"

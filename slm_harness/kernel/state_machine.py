@@ -1057,6 +1057,7 @@ class TurnStateMachine:
                         session_id=session_id,
                         attachments=artifacts,
                         step_callback=_on_machine_thought,
+                        session_context_text=last_session_content,
                     )
                 final_text = mc_out.markdown_response
                 structured_out = mc_out.structured_data
