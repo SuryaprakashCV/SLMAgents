@@ -853,11 +853,17 @@
         <div id="pers-tab-profile">
           <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.8rem; color: #166534;">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
-              <span>👋 <strong>Let SLMAgents Understand Your Personal Profile:</strong> Answer below (or click quick tags) so SLMAgents can suggest relevant actions, Naukri/LinkedIn jobs, email reminders, and learning feeds.</span>
-              <button type="button" onclick="startConversationalPersonalizeInterview()" style="background: #15803d; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                💬 Interview Me in Chat Instead
-              </button>
+              <span>👋 <strong>Let SLMAgents Understand Your Personal Profile:</strong> Auto-link your local Google Chrome profiles &amp; email accounts or answer below for tailored suggestions, Naukri/LinkedIn jobs, and email reminders.</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button type="button" onclick="syncChromeProfilesToPersonalization(this)" style="background: #0f172a; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                  🌐 Sync Chrome Profiles &amp; Emails
+                </button>
+                <button type="button" onclick="startConversationalPersonalizeInterview()" style="background: #15803d; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                  💬 Interview Me in Chat
+                </button>
+              </div>
             </div>
+            <div id="pers-chrome-summary-bar" style="margin: 6px 0; padding: 7px 10px; background: #ffffff; border: 1px solid #86efac; border-radius: 8px; font-size: 0.75rem; color: #0f172a; display: none;"></div>
             <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-top: 6px; border-top: 1px dashed #86efac;">
               <span style="font-size: 0.73rem; font-weight: 700; color: #14532d;">Quick-Fill Presets:</span>
               <button type="button" onclick="applyPersonalizePreset('ai_eng')" style="background: #ffffff; color: #166534; border: 1px solid #86efac; border-radius: 999px; padding: 3px 10px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">🤖 AI / ML &amp; LLM Engineer</button>
@@ -923,6 +929,26 @@
 
         <!-- TAB 2: CONNECTED ACCOUNTS & LOCAL CREDENTIAL VAULT -->
         <div id="pers-tab-accounts" style="display: none;">
+          <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px 14px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+              <div>
+                <h4 style="margin: 0; font-size: 0.88rem; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+                  <span>🌐 Linked Google Chrome Profiles &amp; Multi-Account Directory</span>
+                  <span id="pers-chrome-count-badge" style="background: #dbeafe; color: #1e40af; border-radius: 999px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700;">Scanning...</span>
+                </h4>
+                <p style="margin: 2px 0 0 0; font-size: 0.74rem; color: #64748b;">
+                  Automatically pulls signed-in email addresses, Google Workspace domains, and saved portal usernames across all local Chrome profiles (`Default`, `Profile 1`, etc.).
+                </p>
+              </div>
+              <button type="button" onclick="syncChromeProfilesToPersonalization(this)" style="background: #0f172a; color: #ffffff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                🔄 Rescan &amp; Link Chrome Profiles
+              </button>
+            </div>
+            <div id="pers-chrome-profiles-container" style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-size: 0.77rem; color: #64748b;">Loading Chrome profiles...</div>
+            </div>
+          </div>
+
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.79rem; color: #1e40af;">
             🔒 <strong>100% Local Machine Vault (<code>.slm/vault/personal_vault.json</code> · <code>chmod 0600</code>):</strong> Credentials are encrypted locally on your machine and used only by your local agent to log into news/social sites, check IMAP email reminders, and assist with Naukri/LinkedIn applications.
           </div>
@@ -1115,6 +1141,6 @@
       }
     }
   </script>
-  <script src="app.js?v=109.0"></script>
+  <script src="app.js?v=110.0"></script>
 </body>
 </html>

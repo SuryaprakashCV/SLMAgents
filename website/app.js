@@ -5797,7 +5797,175 @@ function applyPersonalizationToUI(data) {
     setVal("cred-naukri-user", creds.naukri.username || "");
     if (creds.naukri.password) setVal("cred-naukri-pass", creds.naukri.password);
   }
+
+  // Render Chrome Multi-Profile & Account Directory if present
+  const cd = data.chrome_discovery;
+  if (cd) {
+    renderChromeProfilesDirectory(cd);
+  }
 }
+
+function renderChromeProfilesDirectory(cd) {
+  const profiles = Array.isArray(cd.profiles) ? cd.profiles : [];
+  const uniqueEmails = Array.isArray(cd.unique_emails) ? cd.unique_emails : [];
+  const siteAccounts = Array.isArray(cd.saved_site_accounts) ? cd.saved_site_accounts : [];
+
+  const summaryBar = document.getElementById("pers-chrome-summary-bar");
+  if (summaryBar) {
+    if (profiles.length > 0) {
+      summaryBar.style.display = "block";
+      const emailsHtml = uniqueEmails
+        .map((u) => `<code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-weight:600;color:#0f172a;">${escapeHtmlSafe(u.email)}</code>`)
+        .join(" · ");
+      summaryBar.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span>🔗 <strong>Linked with ${escapeHtmlSafe(cd.browser || "Google Chrome")}:</strong> <strong>${profiles.length} Profile(s)</strong> (<code>${profiles.map((p) => escapeHtmlSafe(p.profile_dir)).join(", ")}</code>) · <strong>${uniqueEmails.length} Email Account(s):</strong> ${emailsHtml}</span><button type="button" onclick="switchPersonalizeTab('accounts')" style="background:#0f172a;color:#fff;border:none;border-radius:999px;padding:3px 10px;font-size:0.71rem;font-weight:600;cursor:pointer;">View All Accounts &rarr;</button></div>`;
+    } else {
+      summaryBar.style.display = "none";
+    }
+  }
+
+  const countBadge = document.getElementById("pers-chrome-count-badge");
+  if (countBadge) {
+    countBadge.textContent = `${profiles.length} Profiles · ${uniqueEmails.length} Emails`;
+  }
+
+  const container = document.getElementById("pers-chrome-profiles-container");
+  if (!container) return;
+
+  if (profiles.length === 0) {
+    container.innerHTML = `<div style="font-size:0.77rem;color:#64748b;">No local Chrome profiles detected.</div>`;
+    return;
+  }
+
+  const profCards = profiles
+    .map((p) => {
+      const avatarHtml = p.avatar_data_url
+        ? `<img src="${p.avatar_data_url}" alt="${escapeHtmlSafe(p.profile_name)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid #cbd5e1;">`
+        : `<div style="width:32px;height:32px;border-radius:50%;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;">${escapeHtmlSafe((p.profile_name || "C").slice(0, 1).toUpperCase())}</div>`;
+
+      const portals = Array.isArray(p.top_portals) && p.top_portals.length > 0
+        ? p.top_portals.slice(0, 5).map((pt) => `<span style="background:#f1f5f9;color:#475569;border-radius:999px;padding:1px 7px;font-size:0.68rem;">${escapeHtmlSafe(pt.domain)}</span>`).join(" ")
+        : "";
+
+      const acctsRows = (Array.isArray(p.accounts) ? p.accounts : [])
+        .map((a) => {
+          const safeProf = (p.profile_dir || "Default").replace(/'/g, "\\'");
+          const safeGmail = (a.gmail_url || "https://mail.google.com").replace(/'/g, "\\'");
+          const safeCal = (a.calendar_url || "https://calendar.google.com").replace(/'/g, "\\'");
+          const safeEmail = (a.email || "").replace(/'/g, "\\'");
+          const safeName = (a.full_name || "").replace(/'/g, "\\'");
+          const badge = a.is_primary
+            ? `<span style="background:#dcfce7;color:#166534;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:700;">Primary</span>`
+            : `<span style="background:#e0f2fe;color:#0369a1;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:600;">authuser=${a.authuser_index}</span>`;
+          return `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+                <strong style="font-size:0.77rem;color:#0f172a;">${escapeHtmlSafe(a.email)}</strong>
+                <span style="font-size:0.73rem;color:#475569;">(${escapeHtmlSafe(a.full_name)})</span>
+                ${badge}
+                <span style="font-size:0.68rem;color:#64748b;background:#fff;border:1px solid #cbd5e1;padding:1px 6px;border-radius:999px;">${escapeHtmlSafe(a.account_type)}</span>
+              </div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                <button type="button" onclick="useChromeAccountInVault('${safeEmail}', '${safeName}')" style="background:#ffffff;color:#0f172a;border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:0.7rem;font-weight:600;cursor:pointer;">✓ Use in Profile</button>
+                <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeGmail}')" style="background:#0f172a;color:#ffffff;border:none;border-radius:6px;padding:3px 9px;font-size:0.7rem;font-weight:600;cursor:pointer;">✉️ Open Gmail</button>
+                <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeCal}')" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:0.7rem;font-weight:600;cursor:pointer;">📅 Calendar</button>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      return `
+        <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:9px;">
+              ${avatarHtml}
+              <div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <strong style="font-size:0.83rem;color:#0f172a;">${escapeHtmlSafe(p.profile_dir)} — ${escapeHtmlSafe(p.profile_name)}</strong>
+                  <span style="background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;border-radius:999px;padding:1px 8px;font-size:0.69rem;font-weight:600;">${escapeHtmlSafe(p.account_type)}</span>
+                </div>
+                <div style="font-size:0.73rem;color:#64748b;margin-top:1px;">
+                  Owner: <strong>${escapeHtmlSafe(p.primary_full_name)}</strong> (<code>${escapeHtmlSafe(p.primary_email)}</code>)${p.last_active ? ` · Active: ${escapeHtmlSafe(p.last_active)}` : ""}
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">${portals}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            ${acctsRows}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  let siteHtml = "";
+  if (siteAccounts.length > 0) {
+    const sitePills = siteAccounts
+      .slice(0, 10)
+      .map((sa) => {
+        const safeProf = (sa.profile_dir || "Default").replace(/'/g, "\\'");
+        const safeUrl = (sa.origin_url || "").replace(/'/g, "\\'");
+        return `<button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeUrl}')" title="Open ${escapeHtmlSafe(sa.origin_url)} in Chrome (${escapeHtmlSafe(sa.profile_dir)})" style="display:inline-flex;align-items:center;gap:5px;background:#ffffff;border:1px solid #cbd5e1;border-radius:999px;padding:4px 10px;font-size:0.72rem;color:#0f172a;cursor:pointer;"><strong>${escapeHtmlSafe(sa.domain)}</strong>: <code>${escapeHtmlSafe(sa.username)}</code> <span style="color:#64748b;font-size:0.67rem;">(${escapeHtmlSafe(sa.profile_dir)}) &nearr;</span></button>`;
+      })
+      .join("");
+    siteHtml = `
+      <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;padding:9px 12px;">
+        <div style="font-size:0.75rem;font-weight:700;color:#0f172a;margin-bottom:6px;">🔐 Saved Web Portal Accounts Across Chrome Profiles (Click to launch in profile)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">${sitePills}</div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = profCards + siteHtml;
+}
+
+window.syncChromeProfilesToPersonalization = async function syncChromeProfilesToPersonalization(btn) {
+  const orig = btn ? btn.textContent : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Syncing Chrome Profiles...";
+  }
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/personalize/chrome-profiles/sync"), {
+      method: "POST",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      applyPersonalizationToUI(data);
+      if (btn) btn.textContent = "✓ Chrome Profiles Linked!";
+    }
+  } catch (e) {
+    if (btn) btn.textContent = orig;
+  } finally {
+    if (btn) {
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = orig;
+      }, 2200);
+    }
+  }
+};
+
+window.launchChromeProfileAccount = async function launchChromeProfileAccount(profileDir, targetUrl) {
+  try {
+    await fetch(getApiEndpoint("/api/harness/personalize/chrome-profiles/launch"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile_dir: profileDir || "Default", url: targetUrl || "https://mail.google.com" }),
+    });
+  } catch (e) {
+    window.open(targetUrl || "https://mail.google.com", "_blank");
+  }
+};
+
+window.useChromeAccountInVault = async function useChromeAccountInVault(email, fullName) {
+  const emailEl = document.getElementById("cred-email-addr");
+  if (emailEl && email) emailEl.value = email;
+  const nameEl = document.getElementById("pers-full-name");
+  if (nameEl && fullName) nameEl.value = fullName;
+  await savePersonalizationSettings(false, true);
+};
 
 window.applyPersonalizePreset = async function applyPersonalizePreset(presetKey) {
   const presets = {

@@ -100,6 +100,15 @@ _CONCIERGE_INTENT_PATTERNS: List[Tuple[str, re.Pattern[str]]] = [
         ),
     ),
     (
+        "chrome_accounts",
+        re.compile(
+            r"\b(?:chrome\s+profiles?|link\s+with\s+chrome|pull\s+(?:all\s+)?(?:the\s+)?(?:email|account)s?.*?(?:chrome|profiles?)|"
+            r"accounts?\s+(?:available\s+)?(?:in|across|from|with)\s+(?:different\s+)?(?:chrome\s+)?profiles?|"
+            r"show\s+(?:my\s+)?chrome\s+(?:accounts?|emails?|profiles?)|scan\s+chrome\s+profiles?)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    ),
+    (
         "personalize_setup",
         re.compile(
             r"\b(?:personalize\s+my\s+(?:profile|settings|assistant|harness)|understand\s+my\s+personal\s+(?:profile|preferences|settings)|"
@@ -415,16 +424,396 @@ class PersonalConciergeEngine:
                 "prompt": f"Log into my news & social feeds and pull the most interesting developments today in {top_interest}.",
                 "category": "news",
             },
+            {
+                "label": "🌐 Chrome Profiles & Accounts",
+                "prompt": "Link with Chrome and pull all the email and account details available across my different Chrome profiles.",
+                "category": "chrome",
+            },
         ]
+
+    # ------------------------------------------------------------------
+    # 1B. CHROME MULTI-PROFILE & ACCOUNT DISCOVERY ENGINE
+    # ------------------------------------------------------------------
+    def _resolve_chrome_user_data_dirs(self) -> List[Tuple[str, str]]:
+        """Returns `(browser_name, user_data_dir)` for installed Chromium browsers."""
+        import platform
+
+        sys_name = platform.system().lower()
+        candidates: List[Tuple[str, str]] = []
+        if sys_name == "darwin":
+            candidates = [
+                ("Google Chrome", os.path.expanduser("~/Library/Application Support/Google/Chrome")),
+                ("Brave Browser", os.path.expanduser("~/Library/Application Support/BraveSoftware/Brave-Browser")),
+                ("Microsoft Edge", os.path.expanduser("~/Library/Application Support/Microsoft Edge")),
+                ("Chromium", os.path.expanduser("~/Library/Application Support/Chromium")),
+            ]
+        elif sys_name == "windows":
+            local_app = os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local"))
+            candidates = [
+                ("Google Chrome", os.path.join(local_app, "Google", "Chrome", "User Data")),
+                ("Brave Browser", os.path.join(local_app, "BraveSoftware", "Brave-Browser", "User Data")),
+                ("Microsoft Edge", os.path.join(local_app, "Microsoft", "Edge", "User Data")),
+            ]
+        else:
+            candidates = [
+                ("Google Chrome", os.path.expanduser("~/.config/google-chrome")),
+                ("Brave Browser", os.path.expanduser("~/.config/BraveSoftware/Brave-Browser")),
+                ("Chromium", os.path.expanduser("~/.config/chromium")),
+            ]
+        return [(b_name, b_dir) for b_name, b_dir in candidates if os.path.isdir(b_dir)]
+
+    def discover_chrome_profiles(self) -> Dict[str, Any]:
+        """
+        Discovers all local Chrome / Chromium profiles (`Default`, `Profile 1`, `Profile 3`, etc.)
+        and pulls non-secret account & email details across every profile:
+          - Profile Display Name, Primary Email (`user_name`), Full Name (`gaia_name`), Enterprise/Hosted Domain
+          - All signed-in secondary/linked accounts (`account_info` from `Preferences`) with direct `authuser` Gmail/Calendar/Drive URLs
+          - Non-secret saved site usernames (`origin_url`, `username_value` — never reading passwords or cookies)
+          - Top active workspace portals (`History` domain frequency)
+          - Profile avatar image (`Google Profile Picture.png`)
+        """
+        import shutil
+        import sqlite3
+        import tempfile
+        from urllib.parse import urlparse
+
+        browsers = self._resolve_chrome_user_data_dirs()
+        profiles_out: List[Dict[str, Any]] = []
+        unique_emails_map: Dict[str, Dict[str, Any]] = {}
+        saved_site_accounts: List[Dict[str, Any]] = []
+
+        for browser_name, user_data_dir in browsers:
+            local_state_path = os.path.join(user_data_dir, "Local State")
+            info_cache: Dict[str, Any] = {}
+            if os.path.isfile(local_state_path):
+                try:
+                    with open(local_state_path, "r", encoding="utf-8", errors="ignore") as f:
+                        ls_data = json.load(f)
+                    info_cache = (ls_data.get("profile") or {}).get("info_cache") or {}
+                except Exception:
+                    info_cache = {}
+
+            # Fallback if Local State info_cache is empty: scan Default and Profile * directories
+            if not info_cache:
+                for entry in sorted(os.listdir(user_data_dir)):
+                    if entry == "Default" or entry.startswith("Profile "):
+                        if os.path.isdir(os.path.join(user_data_dir, entry)):
+                            info_cache[entry] = {"name": entry}
+
+            for prof_dir, meta in sorted(info_cache.items(), key=lambda kv: (0 if kv[0] == "Default" else 1, kv[0])):
+                abs_prof_dir = os.path.join(user_data_dir, prof_dir)
+                if not os.path.isdir(abs_prof_dir):
+                    continue
+
+                prof_name = str(meta.get("name") or prof_dir).strip()
+                primary_email = str(meta.get("user_name") or "").strip()
+                primary_full_name = str(meta.get("gaia_name") or meta.get("gaia_given_name") or prof_name).strip()
+                hosted_domain = str(meta.get("hosted_domain") or "").strip()
+                if hosted_domain == "NO_HOSTED_DOMAIN":
+                    hosted_domain = ""
+
+                active_ts = meta.get("active_time")
+                active_str = ""
+                if isinstance(active_ts, (int, float)) and active_ts > 0:
+                    try:
+                        active_str = datetime.datetime.fromtimestamp(float(active_ts)).strftime("%Y-%m-%d %H:%M")
+                    except Exception:
+                        active_str = ""
+
+                # Avatar picture
+                avatar_data_url = ""
+                pic_path = os.path.join(abs_prof_dir, "Google Profile Picture.png")
+                if os.path.isfile(pic_path):
+                    try:
+                        if os.path.getsize(pic_path) <= 150 * 1024:
+                            with open(pic_path, "rb") as pf:
+                                avatar_data_url = "data:image/png;base64," + base64.b64encode(pf.read()).decode("ascii")
+                    except Exception:
+                        pass
+
+                # Read Preferences -> account_info for all signed-in accounts in this profile
+                accounts_in_profile: List[Dict[str, Any]] = []
+                seen_prof_emails: set[str] = set()
+                pref_path = os.path.join(abs_prof_dir, "Preferences")
+                if os.path.isfile(pref_path):
+                    try:
+                        with open(pref_path, "r", encoding="utf-8", errors="ignore") as pf:
+                            pref_data = json.load(pf)
+                        raw_accts = pref_data.get("account_info") or []
+                        for idx, acc in enumerate(raw_accts):
+                            if not isinstance(acc, dict):
+                                continue
+                            em = str(acc.get("email") or "").strip()
+                            if not em or em.lower() in seen_prof_emails:
+                                continue
+                            seen_prof_emails.add(em.lower())
+                            fn = str(acc.get("full_name") or acc.get("given_name") or em.split("@")[0]).strip()
+                            hd = str(acc.get("hd") or "").strip()
+                            if hd == "NO_HOSTED_DOMAIN":
+                                hd = ""
+                            if not hd and "@" in em and not em.lower().endswith(("@gmail.com", "@googlemail.com", "@yahoo.com", "@outlook.com", "@hotmail.com")):
+                                hd = em.split("@", 1)[1].lower()
+                            enc_em = urllib.parse.quote(em)
+                            acct_obj = {
+                                "authuser_index": idx,
+                                "email": em,
+                                "full_name": fn,
+                                "given_name": str(acc.get("given_name") or fn.split()[0]).strip(),
+                                "hosted_domain": hd,
+                                "account_type": f"Workspace ({hd})" if hd else "Personal Google",
+                                "is_primary": (em.lower() == primary_email.lower()) or (idx == 0),
+                                "locale": str(acc.get("locale") or "en"),
+                                "gmail_url": f"https://mail.google.com/mail/u/{idx}/?authuser={enc_em}",
+                                "calendar_url": f"https://calendar.google.com/calendar/u/{idx}/r?authuser={enc_em}",
+                                "drive_url": f"https://drive.google.com/drive/u/{idx}/?authuser={enc_em}",
+                            }
+                            accounts_in_profile.append(acct_obj)
+                    except Exception:
+                        pass
+
+                # Ensure primary_email from Local State is present even if Preferences account_info was empty
+                if primary_email and primary_email.lower() not in seen_prof_emails:
+                    seen_prof_emails.add(primary_email.lower())
+                    enc_em = urllib.parse.quote(primary_email)
+                    accounts_in_profile.insert(
+                        0,
+                        {
+                            "authuser_index": 0,
+                            "email": primary_email,
+                            "full_name": primary_full_name,
+                            "given_name": primary_full_name.split()[0] if primary_full_name else primary_email.split("@")[0],
+                            "hosted_domain": hosted_domain,
+                            "account_type": f"Workspace ({hosted_domain})" if hosted_domain else "Personal Google",
+                            "is_primary": True,
+                            "locale": "en",
+                            "gmail_url": f"https://mail.google.com/mail/u/0/?authuser={enc_em}",
+                            "calendar_url": f"https://calendar.google.com/calendar/u/0/r?authuser={enc_em}",
+                            "drive_url": f"https://drive.google.com/drive/u/0/?authuser={enc_em}",
+                        },
+                    )
+
+                for acct_obj in accounts_in_profile:
+                    em_low = acct_obj["email"].lower()
+                    if em_low not in unique_emails_map:
+                        unique_emails_map[em_low] = {
+                            "email": acct_obj["email"],
+                            "full_name": acct_obj["full_name"],
+                            "hosted_domain": acct_obj["hosted_domain"],
+                            "account_type": acct_obj["account_type"],
+                            "primary_profile_dir": prof_dir if acct_obj["is_primary"] else prof_dir,
+                            "primary_profile_name": prof_name,
+                            "profiles": [f"{prof_dir} ({prof_name})"],
+                            "gmail_url": acct_obj["gmail_url"],
+                        }
+                    else:
+                        tag = f"{prof_dir} ({prof_name})"
+                        if tag not in unique_emails_map[em_low]["profiles"]:
+                            unique_emails_map[em_low]["profiles"].append(tag)
+                        if acct_obj["is_primary"]:
+                            unique_emails_map[em_low]["primary_profile_dir"] = prof_dir
+                            unique_emails_map[em_low]["primary_profile_name"] = prof_name
+
+                # Non-secret saved portal usernames (origin_url + username_value ONLY; never password_value)
+                prof_site_accounts: List[Dict[str, str]] = []
+                login_db = os.path.join(abs_prof_dir, "Login Data")
+                if os.path.isfile(login_db):
+                    try:
+                        with tempfile.TemporaryDirectory() as tmp_d:
+                            tmp_db = os.path.join(tmp_d, "login_meta.db")
+                            shutil.copy2(login_db, tmp_db)
+                            conn = sqlite3.connect(tmp_db)
+                            rows = conn.execute(
+                                "SELECT origin_url, username_value FROM logins WHERE username_value != '' ORDER BY date_last_used DESC LIMIT 30"
+                            ).fetchall()
+                            conn.close()
+                            seen_site_u: set[Tuple[str, str]] = set()
+                            for orig_u, uname in rows:
+                                orig_s = str(orig_u or "").strip()
+                                uname_s = str(uname or "").strip()
+                                if not orig_s or not uname_s:
+                                    continue
+                                host = urlparse(orig_s).netloc.lower().replace("www.", "")
+                                if not host or host.startswith("localhost"):
+                                    continue
+                                key_su = (host, uname_s.lower())
+                                if key_su in seen_site_u:
+                                    continue
+                                seen_site_u.add(key_su)
+                                entry_sa = {
+                                    "domain": host,
+                                    "origin_url": orig_s,
+                                    "username": uname_s,
+                                    "profile_dir": prof_dir,
+                                    "profile_name": prof_name,
+                                }
+                                prof_site_accounts.append(entry_sa)
+                                saved_site_accounts.append(entry_sa)
+                    except Exception:
+                        pass
+
+                # Top active web portals from History (domain frequency only)
+                top_portals: List[Dict[str, Any]] = []
+                hist_db = os.path.join(abs_prof_dir, "History")
+                if os.path.isfile(hist_db):
+                    try:
+                        with tempfile.TemporaryDirectory() as tmp_d:
+                            tmp_h = os.path.join(tmp_d, "hist_meta.db")
+                            shutil.copy2(hist_db, tmp_h)
+                            conn = sqlite3.connect(tmp_h)
+                            rows = conn.execute(
+                                "SELECT url, visit_count FROM urls ORDER BY visit_count DESC LIMIT 60"
+                            ).fetchall()
+                            conn.close()
+                            dom_counts: Dict[str, int] = {}
+                            for u_str, vc in rows:
+                                host = urlparse(str(u_str or "")).netloc.lower().replace("www.", "")
+                                if not host or host in ("google.com", "search.google.com") or host.startswith(("127.0.0.1", "localhost")):
+                                    continue
+                                dom_counts[host] = dom_counts.get(host, 0) + int(vc or 1)
+                            for dom, cnt in sorted(dom_counts.items(), key=lambda x: -x[1])[:6]:
+                                top_portals.append({"domain": dom, "visits": cnt})
+                    except Exception:
+                        pass
+
+                profiles_out.append(
+                    {
+                        "browser": browser_name,
+                        "profile_dir": prof_dir,
+                        "profile_name": prof_name,
+                        "primary_email": primary_email or (accounts_in_profile[0]["email"] if accounts_in_profile else ""),
+                        "primary_full_name": primary_full_name,
+                        "hosted_domain": hosted_domain,
+                        "account_type": f"Workspace ({hosted_domain})" if hosted_domain else "Personal Account",
+                        "last_active": active_str,
+                        "avatar_data_url": avatar_data_url,
+                        "accounts": accounts_in_profile,
+                        "saved_site_accounts": prof_site_accounts,
+                        "top_portals": top_portals,
+                    }
+                )
+
+            if profiles_out:
+                break  # Primary Chrome installation discovered
+
+        unique_emails_list = list(unique_emails_map.values())
+        return {
+            "browser": profiles_out[0]["browser"] if profiles_out else "Google Chrome",
+            "total_profiles": len(profiles_out),
+            "total_unique_emails": len(unique_emails_list),
+            "total_site_accounts": len(saved_site_accounts),
+            "profiles": profiles_out,
+            "unique_emails": unique_emails_list,
+            "saved_site_accounts": saved_site_accounts,
+        }
+
+    def sync_chrome_profiles_to_personalization(self) -> Dict[str, Any]:
+        """
+        Pulls all Chrome profiles, signed-in email accounts, and portal usernames and links
+        them directly into the user's Personalization Profile & Local Credential Vault.
+        """
+        discovery = self.discover_chrome_profiles()
+        prof = self.get_profile()
+        profiles = discovery.get("profiles") or []
+        unique_emails = discovery.get("unique_emails") or []
+        site_accounts = discovery.get("saved_site_accounts") or []
+
+        if profiles:
+            primary_prof = profiles[0]
+            if not prof.get("full_name") and primary_prof.get("primary_full_name"):
+                prof["full_name"] = primary_prof["primary_full_name"]
+
+        prof["linked_chrome_profiles"] = [
+            {
+                "profile_dir": p["profile_dir"],
+                "profile_name": p["profile_name"],
+                "primary_email": p["primary_email"],
+                "primary_full_name": p["primary_full_name"],
+                "account_type": p["account_type"],
+                "emails": [a["email"] for a in (p.get("accounts") or [])],
+            }
+            for p in profiles
+        ]
+        prof["linked_emails"] = [u["email"] for u in unique_emails]
+        prof["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(self.profile_path, "w", encoding="utf-8") as f:
+            json.dump(prof, f, indent=2, ensure_ascii=False)
+
+        # Pre-populate non-secret usernames/emails into the Credential Vault if not set
+        cred_updates: Dict[str, Dict[str, str]] = {}
+        raw_vault = self.vault.load_raw()
+        if unique_emails and not (raw_vault.get("email") or {}).get("email"):
+            cred_updates["email"] = {
+                "email": unique_emails[0]["email"],
+                "imap_host": "imap.gmail.com",
+            }
+        for sa in site_accounts:
+            dom = sa.get("domain", "").lower()
+            uname = sa.get("username", "")
+            if "linkedin" in dom and not (raw_vault.get("linkedin") or {}).get("username"):
+                cred_updates["linkedin"] = {"username": uname}
+            elif "naukri" in dom and not (raw_vault.get("naukri") or {}).get("username"):
+                cred_updates["naukri"] = {"username": uname}
+            elif ("twitter" in dom or "x.com" in dom) and not (raw_vault.get("twitter") or {}).get("username"):
+                cred_updates["twitter"] = {"username": uname}
+
+        if cred_updates:
+            self.vault.save_credentials(cred_updates)
+
+        return self.get_status_bundle()
+
+    def launch_chrome_profile_url(
+        self,
+        profile_dir: str = "Default",
+        url: str = "https://mail.google.com",
+    ) -> Dict[str, Any]:
+        """Launches Google Chrome directly into `--profile-directory=<profile_dir>` at `url`."""
+        import platform
+        import subprocess
+        import webbrowser
+
+        clean_prof = str(profile_dir or "Default").strip()
+        target_url = str(url or "https://mail.google.com").strip()
+        sys_name = platform.system().lower()
+        try:
+            if sys_name == "darwin" and os.path.exists("/Applications/Google Chrome.app"):
+                subprocess.Popen(
+                    [
+                        "open",
+                        "-na",
+                        "Google Chrome",
+                        "--args",
+                        f"--profile-directory={clean_prof}",
+                        target_url,
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return {
+                    "ok": True,
+                    "profile_dir": clean_prof,
+                    "url": target_url,
+                    "message": f"Opened {target_url} in Google Chrome ({clean_prof}).",
+                }
+            webbrowser.open(target_url)
+            return {"ok": True, "profile_dir": clean_prof, "url": target_url, "message": f"Opened {target_url}."}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def get_status_bundle(self) -> Dict[str, Any]:
         prof = self.get_profile()
+        chrome_discovery = self.discover_chrome_profiles()
+        # Automatically enrich full_name & linked_emails in memory if not yet saved
+        if not prof.get("full_name") and chrome_discovery.get("profiles"):
+            prof["full_name"] = chrome_discovery["profiles"][0].get("primary_full_name", "")
+        if not prof.get("linked_emails") and chrome_discovery.get("unique_emails"):
+            prof["linked_emails"] = [u["email"] for u in chrome_discovery["unique_emails"]]
         vault_summary = self.vault.get_masked_summary()
         suggestions = self.get_personalized_suggestions()
         dashboard = self.get_cached_dashboard()
         return {
             "profile": prof,
             "credentials": vault_summary,
+            "chrome_discovery": chrome_discovery,
             "suggestions": suggestions,
             "has_dashboard": bool(dashboard),
             "dashboard_updated_at": dashboard.get("generated_at", "") if dashboard else "",
@@ -679,11 +1068,13 @@ class PersonalConciergeEngine:
                 imap_status = f"IMAP connection note for `{email_addr}` ({str(exc)[:70]}) — showing tracked priority inbox & reminders."
 
         pending_replies = [e for e in tracked_list if e.get("status") in ("needs_reply", "follow_up_due")]
+        chrome_disc = self.discover_chrome_profiles()
         return {
             "imap_status": imap_status,
             "total_tracked": len(tracked_list),
             "pending_count": len(pending_replies),
             "emails": tracked_list[:10],
+            "chrome_discovery": chrome_disc,
         }
 
     def add_or_update_email_reminder(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1122,6 +1513,26 @@ class PersonalConciergeEngine:
             f"Step 1 — Personal Concierge Context Loaded: Profile='{prof.get('current_role')}' · Opt-In={'Active' if prof.get('enabled') else 'On-Demand'} · Intent={intent}",
         )
 
+        if intent == "chrome_accounts":
+            _think(
+                "slm_personal_concierge",
+                "Step 2 — Scanning local Google Chrome / Chromium profiles (`Local State` & per-profile `Preferences`) for signed-in email and portal accounts...",
+            )
+            bundle = self.sync_chrome_profiles_to_personalization()
+            cd = bundle.get("chrome_discovery") or self.discover_chrome_profiles()
+            _think(
+                "slm_personal_concierge",
+                f"Step 3 — Discovered {cd.get('total_profiles', 0)} Chrome profile(s), {cd.get('total_unique_emails', 0)} unique email account(s), and {cd.get('total_site_accounts', 0)} saved portal username(s).",
+            )
+            md = self._format_chrome_profiles_markdown(cd)
+            return ConciergeOutcome(
+                action_type="chrome_accounts",
+                thoughts=thoughts,
+                markdown_response=md,
+                structured_data=cd,
+                agent_id="slm_personal_concierge",
+            )
+
         if intent == "email_tracker":
             eb = self.track_emails_and_reminders(step_callback=_think)
             _think(
@@ -1225,6 +1636,62 @@ class PersonalConciergeEngine:
     # ------------------------------------------------------------------
     # MARKDOWN FORMATTERS FOR CHAT RENDERING
     # ------------------------------------------------------------------
+    def _format_chrome_profiles_markdown(self, cd: Dict[str, Any]) -> str:
+        profiles = cd.get("profiles") or []
+        unique_emails = cd.get("unique_emails") or []
+        site_accounts = cd.get("saved_site_accounts") or []
+
+        prof_rows = []
+        for p in profiles:
+            accts = p.get("accounts") or []
+            emails_str = ", ".join(f"`{a['email']}`" for a in accts) or f"`{p.get('primary_email', '-')}`"
+            portals_str = ", ".join(f"`{pt['domain']}` ({pt['visits']})" for pt in (p.get("top_portals") or [])[:4]) or "-"
+            prof_rows.append(
+                f"| **`{p.get('profile_dir')}`** ({p.get('profile_name')}) | **{p.get('primary_full_name')}** (`{p.get('primary_email')}`) | `{p.get('account_type')}` | {emails_str} | {portals_str} |"
+            )
+        prof_table = "\n".join(prof_rows) or "| - | - | - | - | - |"
+
+        acct_rows = []
+        for p in profiles:
+            p_label = f"`{p.get('profile_dir')}` ({p.get('profile_name')})"
+            for a in p.get("accounts") or []:
+                role_tag = "🟢 **Primary**" if a.get("is_primary") else f"🔵 Secondary (`authuser={a.get('authuser_index')}`)"
+                acct_rows.append(
+                    f"| {p_label} | **`{a.get('email')}`** | {a.get('full_name')} | `{a.get('account_type')}` | {role_tag} | [Open Gmail]({a.get('gmail_url')}) · [Calendar]({a.get('calendar_url')}) |"
+                )
+        acct_table = "\n".join(acct_rows) or "| - | - | - | - | - | - |"
+
+        site_rows = []
+        for sa in site_accounts[:15]:
+            site_rows.append(
+                f"| **`{sa.get('domain')}`** | `{sa.get('username')}` | `{sa.get('profile_dir')}` ({sa.get('profile_name')}) | [Open Portal]({sa.get('origin_url')}) |"
+            )
+        site_section = ""
+        if site_rows:
+            site_section = (
+                "\n\n#### 🔐 Saved Web Portal Accounts Across Chrome Profiles\n"
+                "| Website / Portal | Account Username / Email | Chrome Profile | Direct Link |\n"
+                "| :--- | :--- | :--- | :--- |\n"
+                + "\n".join(site_rows)
+            )
+
+        return (
+            f"### 🌐 Linked Google Chrome Profiles & Multi-Account Directory\n\n"
+            f"- **Browser Detected:** `{cd.get('browser', 'Google Chrome')}`\n"
+            f"- **Chrome Profiles Linked:** **{cd.get('total_profiles', 0)} profile(s)** (`{', '.join(p.get('profile_dir', '') for p in profiles)}`)\n"
+            f"- **Unique Email Accounts Pulled:** **{cd.get('total_unique_emails', 0)} email(s)** (`{', '.join(u.get('email', '') for u in unique_emails)}`)\n"
+            f"- **Saved Web Portal Accounts:** **{cd.get('total_site_accounts', 0)} account(s)**\n\n"
+            f"#### 👤 1. Chrome Profiles Overview\n"
+            f"| Chrome Profile | Primary Owner & Email | Account Type | All Signed-In Emails in Profile | Top Active Workspaces |\n"
+            f"| :--- | :--- | :--- | :--- | :--- |\n"
+            f"{prof_table}\n\n"
+            f"#### 📧 2. Complete Email & Google Workspace Accounts Roster Across Profiles\n"
+            f"| Chrome Profile | Email Address | Full Name | Domain / Type | Profile Slot | Quick Launch |\n"
+            f"| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            f"{acct_table}"
+            f"{site_section}"
+        )
+
     def _format_email_report_markdown(self, eb: Dict[str, Any]) -> str:
         rows = []
         for em in eb.get("emails", []):
@@ -1236,6 +1703,22 @@ class PersonalConciergeEngine:
                 f"| {badge} | `{em.get('sender', '')[:42]}` | **{em.get('subject', '')}** | {status} | {em.get('reminder_note', '')} |"
             )
         table_md = "\n".join(rows) or "| - | - | - | - | - |"
+
+        cd = eb.get("chrome_discovery") or {}
+        chrome_emails_md = ""
+        if cd.get("unique_emails"):
+            ce_rows = []
+            for u in cd.get("unique_emails") or []:
+                ce_rows.append(
+                    f"| **`{u.get('email')}`** | {u.get('full_name')} | `{u.get('account_type')}` | `{', '.join(u.get('profiles') or [])}` | [Open Gmail Inbox]({u.get('gmail_url')}) |"
+                )
+            chrome_emails_md = (
+                f"#### 🌐 Linked Chrome Profile Email Accounts ({len(ce_rows)} Accounts Active)\n"
+                f"| Email Account | Account Holder | Type | Signed-In Chrome Profile(s) | Quick Inbox |\n"
+                f"| :--- | :--- | :--- | :--- | :--- |\n"
+                + "\n".join(ce_rows)
+                + "\n\n"
+            )
 
         drafts_md = []
         for em in eb.get("emails", [])[:3]:
@@ -1250,6 +1733,7 @@ class PersonalConciergeEngine:
             f"### 📧 Intelligent Email Tracker & Reply Reminders\n\n"
             f"- **Connection Status:** {eb.get('imap_status')}\n"
             f"- **Actionable Reminders:** **{eb.get('pending_count', 0)} important email(s)** awaiting your reply or follow-up\n\n"
+            f"{chrome_emails_md}"
             f"| Priority | Sender | Subject | Status | Reminder Action |\n"
             f"| :--- | :--- | :--- | :--- | :--- |\n"
             f"{table_md}\n\n"

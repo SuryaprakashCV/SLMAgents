@@ -1235,6 +1235,32 @@ def mount_harness_routes(app: FastAPI) -> None:
             pass
         return get_concierge_engine().add_or_update_email_reminder(body)
 
+    @app.get("/api/harness/personalize/chrome-profiles")
+    async def get_chrome_profiles_discovery() -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        return get_concierge_engine().discover_chrome_profiles()
+
+    @app.post("/api/harness/personalize/chrome-profiles/sync")
+    async def sync_chrome_profiles_endpoint() -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        return get_concierge_engine().sync_chrome_profiles_to_personalization()
+
+    @app.post("/api/harness/personalize/chrome-profiles/launch")
+    async def launch_chrome_profile_endpoint(request: Request) -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+        return get_concierge_engine().launch_chrome_profile_url(
+            profile_dir=str(body.get("profile_dir") or "Default"),
+            url=str(body.get("url") or "https://mail.google.com"),
+        )
+
     # -----------------------------------------------------------------------
     # OpenAI `/v1` Compatible Local CPU Endpoints
     # -----------------------------------------------------------------------
