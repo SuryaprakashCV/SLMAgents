@@ -613,10 +613,28 @@ class CPUVisionEngine:
     def extract_ocr(self, image_path: str) -> Dict[str, Any]:
         ocr = self._ensure_ocr()
         if ocr is None:
-            return {"text": "", "lines": [], "avg_confidence": 0.0}
-        res, _ = ocr(image_path)
+            return {"text": "", "lines": [], "items": [], "avg_confidence": 0.0}
+        res = None
+        try:
+            if Image is not None:
+                im = Image.open(image_path)
+                if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+                    rgba = im.convert("RGBA")
+                    bg = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+                    composited = Image.alpha_composite(bg, rgba).convert("RGB")
+                    arr_bgr = np.asarray(composited)[:, :, ::-1].copy()
+                    res, _ = ocr(arr_bgr)
+                else:
+                    res, _ = ocr(image_path)
+            else:
+                res, _ = ocr(image_path)
+        except Exception:
+            try:
+                res, _ = ocr(image_path)
+            except Exception:
+                res = None
         if not res:
-            return {"text": "", "lines": [], "avg_confidence": 0.0}
+            return {"text": "", "lines": [], "items": [], "avg_confidence": 0.0}
 
         # Sort lines top-to-bottom, left-to-right by polygon centroid
         parsed_items: List[Tuple[float, float, str, float]] = []
@@ -628,8 +646,8 @@ class CPUVisionEngine:
                 try:
                     ys = [pt[1] for pt in box]
                     xs = [pt[0] for pt in box]
-                    y_top = min(ys)
-                    x_left = min(xs)
+                    y_top = float(min(ys))
+                    x_left = float(min(xs))
                 except Exception:
                     y_top, x_left = 0.0, 0.0
                 # Bucket rows within 14px vertical tolerance
@@ -638,10 +656,15 @@ class CPUVisionEngine:
 
         parsed_items.sort(key=lambda x: (x[0], x[1]))
         lines = [it[2] for it in parsed_items]
+        structured_items = [
+            {"y": round(it[0], 1), "x": round(it[1], 1), "text": it[2], "confidence": round(it[3], 3)}
+            for it in parsed_items
+        ]
         avg_conf = sum(it[3] for it in parsed_items) / len(parsed_items) if parsed_items else 0.0
         return {
             "text": "\n".join(lines),
             "lines": lines,
+            "items": structured_items,
             "avg_confidence": round(avg_conf, 3),
         }
 
@@ -717,6 +740,7 @@ class CPUVisionEngine:
             return {
                 "answer": ocr_info["text"] or f"[No visible text detected in {os.path.basename(image_path)}]",
                 "ocr_text": ocr_info["text"],
+                "ocr_info": ocr_info,
                 "engine": "rapidocr-cpu",
             }
 
@@ -802,6 +826,7 @@ class CPUVisionEngine:
                         return {
                             "answer": vl_answer,
                             "ocr_text": ocr_info["text"],
+                            "ocr_info": ocr_info,
                             "engine": "qwen2-vl-2b-onnx-cpu+rapidocr",
                         }
             except Exception:
@@ -823,6 +848,7 @@ class CPUVisionEngine:
         return {
             "answer": fallback_txt,
             "ocr_text": ocr_info["text"],
+            "ocr_info": ocr_info,
             "engine": "rapidocr-cpu",
         }
 

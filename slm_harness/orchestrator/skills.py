@@ -1739,32 +1739,37 @@ if __name__ == "__main__":
         if agent_name == "slm_voice":
             audio_art = next((a for a in artifacts if a.kind == "audio"), None)
             if audio_art:
-                transcript = rt.transcribe_audio(audio_art.source_path) or ""
-                ans = rt.generate(
-                    role="primary",
-                    reasoning_effort=effort,
-                    progress_callback=_on_download_progress,
-                    messages=[
-                        {"role": "system", "content": "Respond naturally and helpfully to the user's transcribed voice message."},
-                        {"role": "user", "content": transcript or user_query},
-                    ],
-                    max_tokens=512,
-                    cancel_token=cancel_token,
+                from ..tools.media_doc_intelligence import MediaDocIntelligenceEngine
+
+                md_out = MediaDocIntelligenceEngine().analyze_audio_file(
+                    audio_art.source_path,
+                    user_query=user_query,
+                    display_name=audio_art.name,
                 )
-                body = f"**Whisper CPU Transcript:** {transcript}\n\n{ans.text}"
-                return HandoffEnvelope(node_id=agent_name, agent=agent_name, summary=transcript[:160], output_text=body)
+                return HandoffEnvelope(
+                    node_id=agent_name,
+                    agent=agent_name,
+                    summary=md_out.markdown_response[:180],
+                    output_text=md_out.markdown_response,
+                    structured_data=md_out.structured_data,
+                )
 
         if agent_name == "slm_vision_parser":
             img_art = next((a for a in artifacts if a.kind == "image"), None)
             if img_art:
-                ocr_only = "ocr" in user_query.lower() or "extract text" in user_query.lower()
-                vis = rt.analyze_image(img_art.source_path, prompt=user_query, ocr_only=ocr_only)
+                from ..tools.media_doc_intelligence import MediaDocIntelligenceEngine
+
+                md_out = MediaDocIntelligenceEngine().analyze_image_file(
+                    img_art.source_path,
+                    user_query=user_query,
+                    display_name=img_art.name,
+                )
                 return HandoffEnvelope(
                     node_id=agent_name,
                     agent=agent_name,
-                    summary=vis["answer"][:180],
-                    output_text=vis["answer"],
-                    structured_data=vis,
+                    summary=md_out.markdown_response[:180],
+                    output_text=md_out.markdown_response,
+                    structured_data=md_out.structured_data,
                 )
 
         if agent_name == "slm_embeddings":

@@ -498,16 +498,42 @@ class TurnStateMachine:
                 proc_mem.extract_and_store_implicit_facts(user_query, workspace=self.config.workspace_dir)
 
             if artifacts:
+                first_kind = artifacts[0].kind
                 doc_names = ", ".join(a.name for a in artifacts[:2])
-                self.bus.emit(
-                    EventType.STEP_STARTED,
-                    rid,
-                    session_id,
-                    agent="slm_document_parser",
-                    message=f"Reading '{doc_names}' and extracting structured sections, key achievements, and metrics...",
-                )
+                if first_kind == "image":
+                    self.bus.emit(
+                        EventType.STEP_STARTED,
+                        rid,
+                        session_id,
+                        agent="slm_vision_parser",
+                        message=f"Inspecting image attachment '{doc_names}' (visual geometry, colorimetry, layout & RapidOCR)...",
+                    )
+                elif first_kind == "audio":
+                    self.bus.emit(
+                        EventType.STEP_STARTED,
+                        rid,
+                        session_id,
+                        agent="slm_voice",
+                        message=f"Inspecting audio attachment '{doc_names}' (acoustic waveform, pitch F0 & Whisper ONNX STT)...",
+                    )
+                elif first_kind == "video":
+                    self.bus.emit(
+                        EventType.STEP_STARTED,
+                        rid,
+                        session_id,
+                        agent="slm_vision_parser",
+                        message=f"Inspecting video attachment '{doc_names}' (keyframe OCR, scene lighting & Whisper audio track)...",
+                    )
+                else:
+                    self.bus.emit(
+                        EventType.STEP_STARTED,
+                        rid,
+                        session_id,
+                        agent="slm_document_parser",
+                        message=f"Reading '{doc_names}' and extracting structured sections, key achievements, and metrics...",
+                    )
                 for art in artifacts:
-                    if art.stored_text_path and os.path.isfile(art.stored_text_path):
+                    if art.kind in ("pdf", "text", "csv", "excel") and art.stored_text_path and os.path.isfile(art.stored_text_path):
                         try:
                             with open(art.stored_text_path, "r", encoding="utf-8", errors="ignore") as af:
                                 doc_txt = af.read(12000).strip()
@@ -986,6 +1012,7 @@ class TurnStateMachine:
             )
             video_art = next((a for a in artifacts if a.kind == "video"), None)
             audio_art = next((a for a in artifacts if a.kind == "audio"), None)
+            image_art = next((a for a in artifacts if a.kind == "image"), None)
             doc_art = next((a for a in artifacts if a.kind in ("pdf", "text")), None)
 
             q_low_turn = (user_query or "").lower()
@@ -1025,7 +1052,8 @@ class TurnStateMachine:
                     online_video_url
                     or video_art is not None
                     or audio_art is not None
-                    or (local_media_hit and local_media_hit[1] in ("video", "audio"))
+                    or image_art is not None
+                    or (local_media_hit and local_media_hit[1] in ("video", "audio", "image"))
                     or is_deep_doc_read_turn
                 )
             )
@@ -1130,6 +1158,16 @@ class TurnStateMachine:
                             a_path,
                             user_query=user_query,
                             display_name=a_name,
+                            step_callback=_on_media_thought,
+                        )
+                    elif image_art is not None or (local_media_hit and local_media_hit[1] == "image"):
+                        route_dec.primary_agent = "slm_vision_parser"
+                        i_path = image_art.source_path if image_art is not None else local_media_hit[0]
+                        i_name = image_art.name if image_art is not None else os.path.basename(i_path)
+                        md_out = md_engine.analyze_image_file(
+                            i_path,
+                            user_query=user_query,
+                            display_name=i_name,
                             step_callback=_on_media_thought,
                         )
                     else:

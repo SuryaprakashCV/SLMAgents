@@ -876,17 +876,26 @@ class MachineControlEngine:
             "like that", "that", "similar", "i mean", "what is the command you ran",
         }
         if cleaned_target.lower() in generic_followups and session_context_text:
-            # Extract recent user search target from session_context_text
-            ctx_matches = re.findall(
-                r"(?:path\s+for|search(?:\s+for)?|where\s+is|combinations\s+of|named)\s+['\"`]?([A-Za-z0-9_\-]+(?:\s+[A-Za-z0-9_\-]+){0,2})['\"`]?",
-                session_context_text,
-                flags=re.IGNORECASE,
-            )
-            for cand in reversed(ctx_matches):
-                cand_c = re.sub(r"\b(?:located|in|my|machine|folder|folders|like|that)\b", "", cand, flags=re.IGNORECASE).strip()
-                if cand_c and cand_c.lower() not in generic_followups and len(cand_c) >= 3:
-                    cleaned_target = cand_c
-                    break
+            # 1. First check explicit previous Machine Search Results header in session history
+            prev_hdr = re.findall(r"Machine Search Results for \*\*`([^`]+)`\*\*", session_context_text)
+            if prev_hdr:
+                cleaned_target = prev_hdr[-1].strip()
+            else:
+                ctx_matches = re.findall(
+                    r"(?:path\s+for|search(?:\s+for)?|where\s+is|combinations\s+of|named)\s+['\"`]?([A-Za-z0-9_\-]+(?:\s+[A-Za-z0-9_\-]+){0,2})['\"`]?",
+                    session_context_text,
+                    flags=re.IGNORECASE,
+                )
+                for cand in reversed(ctx_matches):
+                    cand_c = re.sub(
+                        r"\b(?:located|in|my|machine|folder|folders|like|that|query|results|for)\b",
+                        "",
+                        cand,
+                        flags=re.IGNORECASE,
+                    ).strip()
+                    if cand_c and cand_c.lower() not in generic_followups and len(cand_c) >= 3:
+                        cleaned_target = cand_c
+                        break
 
         display_target = cleaned_target
         if ext_match and (not cleaned_target or ext_match.group(1) in cleaned_target):

@@ -28,3 +28,5 @@ numpy
 pydantic
 youtube-transcript-api
 yt-dlp
+rapidocr-onnxruntime
+opencv-python-headless

@@ -1,11 +1,13 @@
 FROM python:3.10-slim
 
-# Install system dependencies (git, compilers, and OpenMP runtime for ONNX Runtime CPU)
+# Install system dependencies (git, compilers, ffmpeg, and OpenMP runtime for ONNX Runtime CPU)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     g++ \
     git \
     libgomp1 \
+    libglib2.0-0 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
