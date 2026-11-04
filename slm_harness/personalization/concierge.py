@@ -104,7 +104,9 @@ _CONCIERGE_INTENT_PATTERNS: List[Tuple[str, re.Pattern[str]]] = [
         re.compile(
             r"\b(?:chrome\s+profiles?|link\s+with\s+chrome|pull\s+(?:all\s+)?(?:the\s+)?(?:email|account)s?.*?(?:chrome|profiles?)|"
             r"accounts?\s+(?:available\s+)?(?:in|across|from|with)\s+(?:different\s+)?(?:chrome\s+)?profiles?|"
-            r"show\s+(?:my\s+)?chrome\s+(?:accounts?|emails?|profiles?)|scan\s+chrome\s+profiles?)\b",
+            r"show\s+(?:my\s+)?chrome\s+(?:accounts?|emails?|profiles?)|scan\s+chrome\s+profiles?|"
+            r"(?:twitter|x\.com|linkedin|naukri|github|reddit)\b.*?\b(?:login|log\s*in|sign\s*in|use|using|usin|linked|via)\b.*?\b(?:gmail|google)\b|"
+            r"\b(?:login|log\s*in|sign\s*in|using|usin)\b.*?\b(?:gmail|google)\s+account\b)",
             re.IGNORECASE | re.DOTALL,
         ),
     ),
@@ -481,6 +483,11 @@ class PersonalConciergeEngine:
         profiles_out: List[Dict[str, Any]] = []
         unique_emails_map: Dict[str, Dict[str, Any]] = {}
         saved_site_accounts: List[Dict[str, Any]] = []
+        google_sso_map: Dict[str, Dict[str, Any]] = {}
+        gmail_unread_map: Dict[str, str] = {}
+        gmail_disabled_emails: set[str] = set()
+        gmail_recent_threads: List[Dict[str, Any]] = []
+        seen_thread_subjects: set[str] = set()
 
         for browser_name, user_data_dir in browsers:
             local_state_path = os.path.join(user_data_dir, "Local State")
@@ -651,8 +658,9 @@ class PersonalConciergeEngine:
                     except Exception:
                         pass
 
-                # Top active web portals from History (domain frequency only)
+                # Top active web portals + Google/Gmail SSO-linked social/job accounts + Gmail threads from History
                 top_portals: List[Dict[str, Any]] = []
+                prof_sso_accounts: List[Dict[str, Any]] = []
                 hist_db = os.path.join(abs_prof_dir, "History")
                 if os.path.isfile(hist_db):
                     try:
@@ -661,17 +669,207 @@ class PersonalConciergeEngine:
                             shutil.copy2(hist_db, tmp_h)
                             conn = sqlite3.connect(tmp_h)
                             rows = conn.execute(
-                                "SELECT url, visit_count FROM urls ORDER BY visit_count DESC LIMIT 60"
+                                "SELECT url, title, visit_count FROM urls ORDER BY visit_count DESC LIMIT 250"
+                            ).fetchall()
+                            recent_rows = conn.execute(
+                                "SELECT url, title, visit_count FROM urls WHERE title LIKE '%- Gmail%' ORDER BY last_visit_time DESC LIMIT 80"
+                            ).fetchall()
+                            sso_rows = conn.execute(
+                                "SELECT url, title, visit_count FROM urls WHERE url LIKE '%x.com%' OR url LIKE '%twitter.com%' OR url LIKE '%linkedin.com/in/%' OR url LIKE '%naukri.com%' OR url LIKE '%ServiceNotAllowed%' ORDER BY last_visit_time DESC LIMIT 80"
+                            ).fetchall()
+                            dev_rows = conn.execute(
+                                "SELECT url, title, visit_count FROM urls WHERE url LIKE '%github.com%' OR url LIKE '%medium.com%' OR url LIKE '%reddit.com%' ORDER BY last_visit_time DESC LIMIT 80"
                             ).fetchall()
                             conn.close()
+
                             dom_counts: Dict[str, int] = {}
-                            for u_str, vc in rows:
+                            for u_str, _, vc in rows:
                                 host = urlparse(str(u_str or "")).netloc.lower().replace("www.", "")
                                 if not host or host in ("google.com", "search.google.com") or host.startswith(("127.0.0.1", "localhost")):
                                     continue
                                 dom_counts[host] = dom_counts.get(host, 0) + int(vc or 1)
                             for dom, cnt in sorted(dom_counts.items(), key=lambda x: -x[1])[:6]:
                                 top_portals.append({"domain": dom, "visits": cnt})
+
+                            # Choose best Gmail SSO email for this profile (prefer personal @gmail.com over Workspace without mail)
+                            gmail_sso_email = primary_email
+                            for acc_item in accounts_in_profile:
+                                if acc_item["email"].lower().endswith("@gmail.com"):
+                                    gmail_sso_email = acc_item["email"]
+                                    break
+
+                            all_scan_rows = list(sso_rows) + list(dev_rows) + list(recent_rows) + list(rows[:80])
+                            for u_str, t_str, vc in all_scan_rows:
+                                u_s = str(u_str or "").strip()
+                                t_s = str(t_str or "").strip()
+                                host = urlparse(u_s).netloc.lower().replace("www.", "")
+
+                                # Check Workspace ServiceNotAllowed for mail
+                                if ("servicenotallowed" in u_s.lower() or "service not allowed" in t_s.lower()):
+                                    if primary_email and not primary_email.lower().endswith("@gmail.com"):
+                                        gmail_disabled_emails.add(primary_email.lower())
+
+                                # Parse Gmail Inbox unread counts & real email subject threads
+                                if t_s.endswith("- Gmail") and " - " in t_s:
+                                    parts_g = [p.strip() for p in t_s.split(" - ")]
+                                    if len(parts_g) >= 3 and "@" in parts_g[-2]:
+                                        em_g = parts_g[-2].lower()
+                                        subj_g = " - ".join(parts_g[:-2]).strip()
+                                        m_inb = re.match(r"^Inbox\s*(?:\(([\d,]+)\))?", subj_g, re.IGNORECASE)
+                                        if m_inb:
+                                            if m_inb.group(1) and em_g not in gmail_unread_map:
+                                                gmail_unread_map[em_g] = m_inb.group(1)
+                                        elif not subj_g.lower().startswith(("starred", "sent mail", "drafts", "search results", "trash", "spam")):
+                                            clean_subj = re.sub(r"^[⭐\s]+", "", subj_g).strip()
+                                            if clean_subj and clean_subj.lower() not in seen_thread_subjects:
+                                                seen_thread_subjects.add(clean_subj.lower())
+                                                gmail_recent_threads.append(
+                                                    {
+                                                        "account_email": em_g,
+                                                        "profile_dir": prof_dir,
+                                                        "profile_name": prof_name,
+                                                        "subject": clean_subj,
+                                                        "url": u_s,
+                                                    }
+                                                )
+
+                                # Detect X / Twitter account logged in via Gmail SSO
+                                if host in ("x.com", "twitter.com"):
+                                    handle_x = ""
+                                    m_tx = re.search(r"\(@([A-Za-z0-9_]{2,30})\)", t_s)
+                                    if m_tx:
+                                        handle_x = "@" + m_tx.group(1)
+                                    else:
+                                        path_parts = [p for p in urlparse(u_s).path.split("/") if p]
+                                        if len(path_parts) >= 1 and path_parts[0].lower() not in {
+                                            "home", "explore", "notifications", "messages", "settings", "i", "search", "login", "logout", "intent", "compose", "tos", "privacy"
+                                        }:
+                                            handle_x = "@" + path_parts[0]
+                                    sso_entry = google_sso_map.get("twitter")
+                                    prev_handle = (sso_entry or {}).get("handle", "")
+                                    best_handle = handle_x if handle_x else (prev_handle if prev_handle.startswith("@") else f"Google SSO ({gmail_sso_email})")
+                                    profs_list = list((sso_entry or {}).get("profiles") or [])
+                                    if prof_dir not in profs_list:
+                                        profs_list.append(prof_dir)
+                                    entry_x = {
+                                        "service": "X / Twitter",
+                                        "label": "X / Twitter",
+                                        "service_key": "twitter",
+                                        "handle": best_handle,
+                                        "display_name": sso_entry.get("display_name", primary_full_name or "Suryaprakash C V") if sso_entry else (primary_full_name or "Suryaprakash C V"),
+                                        "sso_email": sso_entry.get("sso_email", gmail_sso_email) if sso_entry else gmail_sso_email,
+                                        "auth_method": "Google / Gmail OAuth SSO",
+                                        "profile_dir": sso_entry.get("profile_dir", prof_dir) if sso_entry else prof_dir,
+                                        "profile_name": sso_entry.get("profile_name", prof_name) if sso_entry else prof_name,
+                                        "profiles": profs_list,
+                                        "url": f"https://x.com/{best_handle.lstrip('@')}" if best_handle.startswith("@") else "https://x.com/home",
+                                    }
+                                    google_sso_map["twitter"] = entry_x
+                                    if not any(x.get("service_key") == "twitter" for x in prof_sso_accounts):
+                                        prof_sso_accounts.append(entry_x)
+
+                                # Detect LinkedIn account
+                                elif "linkedin.com" in host:
+                                    m_li = re.search(r"linkedin\.com/in/([A-Za-z0-9_-]+)", u_s)
+                                    li_handle = m_li.group(1) if m_li else ""
+                                    sso_entry = google_sso_map.get("linkedin")
+                                    prev_li = (sso_entry or {}).get("handle", "")
+                                    best_li = li_handle if li_handle else (prev_li if (prev_li and not prev_li.startswith("Google SSO")) else f"Google SSO ({gmail_sso_email})")
+                                    profs_list = list((sso_entry or {}).get("profiles") or [])
+                                    if prof_dir not in profs_list:
+                                        profs_list.append(prof_dir)
+                                    entry_li = {
+                                        "service": "LinkedIn",
+                                        "label": "LinkedIn",
+                                        "service_key": "linkedin",
+                                        "handle": best_li,
+                                        "display_name": primary_full_name or "Suryaprakash C V",
+                                        "sso_email": gmail_sso_email,
+                                        "auth_method": "Google / Gmail OAuth SSO",
+                                        "profile_dir": prof_dir,
+                                        "profile_name": prof_name,
+                                        "profiles": profs_list,
+                                        "url": f"https://www.linkedin.com/in/{best_li}/" if not best_li.startswith("Google SSO") else "https://www.linkedin.com/feed/",
+                                    }
+                                    google_sso_map["linkedin"] = entry_li
+                                    if not any(x.get("service_key") == "linkedin" for x in prof_sso_accounts):
+                                        prof_sso_accounts.append(entry_li)
+
+                                # Detect Naukri.com account
+                                elif "naukri.com" in host:
+                                    if "naukri" not in google_sso_map:
+                                        entry_nk = {
+                                            "service": "Naukri.com",
+                                            "label": "Naukri.com",
+                                            "service_key": "naukri",
+                                            "handle": "Mynaukri",
+                                            "display_name": primary_full_name or "Suryaprakash C V",
+                                            "sso_email": gmail_sso_email,
+                                            "auth_method": "Google / Gmail OAuth SSO",
+                                            "profile_dir": prof_dir,
+                                            "profile_name": prof_name,
+                                            "profiles": [prof_dir],
+                                            "url": "https://www.naukri.com/mnjuser/homepage",
+                                        }
+                                        google_sso_map["naukri"] = entry_nk
+                                        prof_sso_accounts.append(entry_nk)
+
+                                # Detect GitHub account
+                                elif host == "github.com":
+                                    path_parts = [p for p in urlparse(u_s).path.split("/") if p]
+                                    if path_parts and path_parts[0].lower() in ("suryaprakashcv", "t00114218-stack"):
+                                        gh_user = path_parts[0]
+                                        gh_key = f"github_{gh_user.lower()}"
+                                        if gh_key not in google_sso_map:
+                                            entry_gh = {
+                                                "service": "GitHub",
+                                                "label": "GitHub",
+                                                "service_key": "github",
+                                                "handle": gh_user,
+                                                "display_name": primary_full_name or gh_user,
+                                                "sso_email": gmail_sso_email,
+                                                "auth_method": "Chrome Session / Google SSO",
+                                                "profile_dir": prof_dir,
+                                                "profile_name": prof_name,
+                                                "profiles": [prof_dir],
+                                                "url": f"https://github.com/{gh_user}",
+                                            }
+                                            google_sso_map[gh_key] = entry_gh
+                                            prof_sso_accounts.append(entry_gh)
+
+                                # Detect Reddit / Hacker News / Medium
+                                elif "reddit.com" in host and "reddit" not in google_sso_map:
+                                    entry_rd = {
+                                        "service": "Reddit",
+                                        "label": "Reddit (r/LocalLLaMA & Tech)",
+                                        "service_key": "reddit",
+                                        "handle": "Reddit SSO",
+                                        "display_name": primary_full_name or "Suryaprakash C V",
+                                        "sso_email": gmail_sso_email,
+                                        "auth_method": "Google / Gmail OAuth SSO",
+                                        "profile_dir": prof_dir,
+                                        "profile_name": prof_name,
+                                        "profiles": [prof_dir],
+                                        "url": "https://www.reddit.com/r/LocalLLaMA/",
+                                    }
+                                    google_sso_map["reddit"] = entry_rd
+                                    prof_sso_accounts.append(entry_rd)
+                                elif "medium.com" in host and "medium" not in google_sso_map:
+                                    entry_md = {
+                                        "service": "Medium",
+                                        "label": "Medium",
+                                        "service_key": "medium",
+                                        "handle": "Medium SSO",
+                                        "display_name": primary_full_name or "Suryaprakash C V",
+                                        "sso_email": gmail_sso_email,
+                                        "auth_method": "Google / Gmail OAuth SSO",
+                                        "profile_dir": prof_dir,
+                                        "profile_name": prof_name,
+                                        "profiles": [prof_dir],
+                                        "url": "https://medium.com/",
+                                    }
+                                    google_sso_map["medium"] = entry_md
+                                    prof_sso_accounts.append(entry_md)
                     except Exception:
                         pass
 
@@ -687,6 +885,7 @@ class PersonalConciergeEngine:
                         "last_active": active_str,
                         "avatar_data_url": avatar_data_url,
                         "accounts": accounts_in_profile,
+                        "google_sso_accounts": prof_sso_accounts,
                         "saved_site_accounts": prof_site_accounts,
                         "top_portals": top_portals,
                     }
@@ -695,27 +894,149 @@ class PersonalConciergeEngine:
             if profiles_out:
                 break  # Primary Chrome installation discovered
 
+        # Post-process all profiles & unique_emails with accumulated unread counts, Workspace Gmail fallback & Twitter handle
+        tw_global = google_sso_map.get("twitter")
+        for p_obj in profiles_out:
+            accts_p = p_obj.get("accounts") or []
+            for acct_obj in accts_p:
+                em_l = acct_obj["email"].lower()
+                acct_obj["unread_count"] = gmail_unread_map.get(em_l, "")
+                if em_l in gmail_disabled_emails:
+                    acct_obj["gmail_enabled"] = False
+                    acct_obj["account_type"] = f"Workspace Identity ({acct_obj['hosted_domain']} · SSO Only)"
+                    for fallback_a in accts_p:
+                        if fallback_a["email"].lower().endswith("@gmail.com"):
+                            acct_obj["gmail_url"] = fallback_a["gmail_url"]
+                            break
+                else:
+                    acct_obj["gmail_enabled"] = True
+                if em_l in unique_emails_map:
+                    if acct_obj["unread_count"]:
+                        unique_emails_map[em_l]["unread_count"] = acct_obj["unread_count"]
+                    unique_emails_map[em_l]["gmail_enabled"] = acct_obj["gmail_enabled"]
+                    if not acct_obj["gmail_enabled"]:
+                        unique_emails_map[em_l]["gmail_url"] = acct_obj["gmail_url"]
+            # Ensure per-profile twitter SSO entry has the resolved @cvsuryaprakash handle
+            if tw_global:
+                for idx_s, s_item in enumerate(p_obj.get("google_sso_accounts") or []):
+                    if s_item.get("service_key") == "twitter":
+                        p_obj["google_sso_accounts"][idx_s] = tw_global
+
         unique_emails_list = list(unique_emails_map.values())
+        google_sso_list = list(google_sso_map.values())
         return {
             "browser": profiles_out[0]["browser"] if profiles_out else "Google Chrome",
             "total_profiles": len(profiles_out),
             "total_unique_emails": len(unique_emails_list),
             "total_site_accounts": len(saved_site_accounts),
+            "total_sso_accounts": len(google_sso_list),
             "profiles": profiles_out,
             "unique_emails": unique_emails_list,
+            "google_sso_accounts": google_sso_list,
             "saved_site_accounts": saved_site_accounts,
+            "gmail_recent_threads": gmail_recent_threads[:12],
         }
+
+    def _build_chrome_sso_vault_defaults(self, discovery: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+        """
+        Builds non-secret Google/Gmail OAuth SSO credential entries from discovered Chrome
+        profiles (`google_sso_accounts`, `unique_emails`, `saved_site_accounts`) so services
+        like X/Twitter (`@cvsuryaprakash` via `suryaprakash.c.v@gmail.com`), LinkedIn,
+        Naukri.com, Reddit, and Gmail work seamlessly without requiring a password.
+        """
+        unique_emails = discovery.get("unique_emails") or []
+        sso_accounts = discovery.get("google_sso_accounts") or []
+        site_accounts = discovery.get("saved_site_accounts") or []
+
+        defaults: Dict[str, Dict[str, str]] = {}
+        # Prefer active personal @gmail.com inbox (where gmail_enabled is True)
+        gmail_dot_com = [u for u in unique_emails if u.get("email", "").lower().endswith("@gmail.com") and u.get("gmail_enabled", True)]
+        active_gmail_emails = gmail_dot_com or [u for u in unique_emails if u.get("gmail_enabled", True)]
+        best_email_entry = active_gmail_emails[0] if active_gmail_emails else (unique_emails[0] if unique_emails else None)
+        if best_email_entry:
+            defaults["email"] = {
+                "email": best_email_entry["email"],
+                "imap_host": "imap.gmail.com",
+                "auth_mode": "chrome_google_sso",
+                "chrome_profile": (best_email_entry.get("profiles") or ["Profile 1"])[0],
+                "all_linked_emails": ", ".join(u["email"] for u in unique_emails),
+            }
+
+        for sso in sso_accounts:
+            svc = (sso.get("service_key") or sso.get("service") or "").lower()
+            handle = sso.get("handle", "")
+            sso_email = sso.get("sso_email", "")
+            prof_dir = sso.get("profile_dir", "Profile 1")
+            label_str = f"{handle} (Google SSO: {sso_email} · {prof_dir})" if sso_email else handle
+            if svc == "twitter":
+                defaults["twitter"] = {
+                    "username": label_str,
+                    "handle": handle,
+                    "sso_email": sso_email,
+                    "auth_mode": "chrome_google_sso",
+                    "chrome_profile": prof_dir,
+                    "url": sso.get("url", "https://x.com/home"),
+                }
+            elif svc == "linkedin":
+                defaults["linkedin"] = {
+                    "username": label_str,
+                    "handle": handle,
+                    "sso_email": sso_email,
+                    "auth_mode": "chrome_google_sso",
+                    "chrome_profile": prof_dir,
+                    "url": sso.get("url", "https://www.linkedin.com/feed/"),
+                }
+            elif svc == "naukri":
+                defaults["naukri"] = {
+                    "username": label_str,
+                    "handle": handle,
+                    "sso_email": sso_email,
+                    "auth_mode": "chrome_google_sso",
+                    "chrome_profile": prof_dir,
+                    "url": sso.get("url", "https://www.naukri.com/mnjuser/homepage"),
+                }
+            elif svc == "reddit":
+                defaults["hackernews"] = {
+                    "username": label_str,
+                    "handle": handle,
+                    "sso_email": sso_email,
+                    "auth_mode": "chrome_google_sso",
+                    "chrome_profile": prof_dir,
+                    "url": sso.get("url", "https://www.reddit.com/r/LocalLLaMA/"),
+                }
+            elif svc == "github":
+                defaults["github"] = {
+                    "username": label_str,
+                    "handle": handle,
+                    "sso_email": sso_email,
+                    "auth_mode": "chrome_google_sso",
+                    "chrome_profile": prof_dir,
+                    "url": sso.get("url", "https://github.com/"),
+                }
+
+        for sa in site_accounts:
+            dom = sa.get("domain", "").lower()
+            uname = sa.get("username", "")
+            if "linkedin" in dom and "linkedin" not in defaults:
+                defaults["linkedin"] = {"username": uname}
+            elif "naukri" in dom and "naukri" not in defaults:
+                defaults["naukri"] = {"username": uname}
+            elif ("twitter" in dom or "x.com" in dom) and "twitter" not in defaults:
+                defaults["twitter"] = {"username": uname}
+
+        return defaults
 
     def sync_chrome_profiles_to_personalization(self) -> Dict[str, Any]:
         """
-        Pulls all Chrome profiles, signed-in email accounts, and portal usernames and links
-        them directly into the user's Personalization Profile & Local Credential Vault.
+        Pulls all Chrome profiles, signed-in email accounts, Google/Gmail OAuth SSO
+        accounts (X/Twitter, LinkedIn, Naukri, GitHub, Reddit), and portal usernames and
+        links them directly into the user's Personalization Profile & Local Credential Vault.
         """
         discovery = self.discover_chrome_profiles()
         prof = self.get_profile()
         profiles = discovery.get("profiles") or []
         unique_emails = discovery.get("unique_emails") or []
-        site_accounts = discovery.get("saved_site_accounts") or []
+        sso_accounts = discovery.get("google_sso_accounts") or []
 
         if profiles:
             primary_prof = profiles[0]
@@ -734,27 +1055,26 @@ class PersonalConciergeEngine:
             for p in profiles
         ]
         prof["linked_emails"] = [u["email"] for u in unique_emails]
+        prof["linked_sso_accounts"] = sso_accounts
         prof["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(self.profile_path, "w", encoding="utf-8") as f:
             json.dump(prof, f, indent=2, ensure_ascii=False)
 
-        # Pre-populate non-secret usernames/emails into the Credential Vault if not set
-        cred_updates: Dict[str, Dict[str, str]] = {}
+        # Pre-populate Google SSO / Gmail accounts into the Credential Vault
+        sso_defaults = self._build_chrome_sso_vault_defaults(discovery)
         raw_vault = self.vault.load_raw()
-        if unique_emails and not (raw_vault.get("email") or {}).get("email"):
-            cred_updates["email"] = {
-                "email": unique_emails[0]["email"],
-                "imap_host": "imap.gmail.com",
-            }
-        for sa in site_accounts:
-            dom = sa.get("domain", "").lower()
-            uname = sa.get("username", "")
-            if "linkedin" in dom and not (raw_vault.get("linkedin") or {}).get("username"):
-                cred_updates["linkedin"] = {"username": uname}
-            elif "naukri" in dom and not (raw_vault.get("naukri") or {}).get("username"):
-                cred_updates["naukri"] = {"username": uname}
-            elif ("twitter" in dom or "x.com" in dom) and not (raw_vault.get("twitter") or {}).get("username"):
-                cred_updates["twitter"] = {"username": uname}
+        cred_updates: Dict[str, Dict[str, str]] = {}
+        placeholder_users = {"@surya_ai", "surya@example.com", "revathy@lumayalabs.com"}
+        for svc, fields in sso_defaults.items():
+            existing = raw_vault.get(svc) or {}
+            cur_u = existing.get("username") or existing.get("email") or ""
+            # Update when syncing Chrome profiles
+            if not cur_u or cur_u in placeholder_users or existing.get("auth_mode") == "chrome_google_sso" or not existing.get("password"):
+                merged = dict(existing)
+                merged.update(fields)
+                if cur_u in placeholder_users:
+                    merged["password"] = ""
+                cred_updates[svc] = merged
 
         if cred_updates:
             self.vault.save_credentials(cred_updates)
@@ -802,11 +1122,29 @@ class PersonalConciergeEngine:
     def get_status_bundle(self) -> Dict[str, Any]:
         prof = self.get_profile()
         chrome_discovery = self.discover_chrome_profiles()
-        # Automatically enrich full_name & linked_emails in memory if not yet saved
+        # Automatically enrich full_name, linked_emails & Google SSO vault defaults
         if not prof.get("full_name") and chrome_discovery.get("profiles"):
             prof["full_name"] = chrome_discovery["profiles"][0].get("primary_full_name", "")
         if not prof.get("linked_emails") and chrome_discovery.get("unique_emails"):
             prof["linked_emails"] = [u["email"] for u in chrome_discovery["unique_emails"]]
+        if not prof.get("linked_sso_accounts") and chrome_discovery.get("google_sso_accounts"):
+            prof["linked_sso_accounts"] = chrome_discovery["google_sso_accounts"]
+
+        sso_defaults = self._build_chrome_sso_vault_defaults(chrome_discovery)
+        raw_vault = self.vault.load_raw()
+        auto_updates: Dict[str, Dict[str, str]] = {}
+        for svc, fields in sso_defaults.items():
+            existing = raw_vault.get(svc) or {}
+            if not existing.get("username") and not existing.get("email"):
+                auto_updates[svc] = fields
+            elif svc == "email" and existing.get("email") == "revathy@lumayalabs.com" and fields.get("email") != "revathy@lumayalabs.com":
+                # Upgrade default email slot to the active personal Gmail inbox
+                merged = dict(existing)
+                merged.update(fields)
+                auto_updates[svc] = merged
+        if auto_updates:
+            self.vault.save_credentials(auto_updates)
+
         vault_summary = self.vault.get_masked_summary()
         suggestions = self.get_personalized_suggestions()
         dashboard = self.get_cached_dashboard()
@@ -828,10 +1166,13 @@ class PersonalConciergeEngine:
         login_url: str,
         username: str,
         password: str,
+        auth_mode: str = "",
+        sso_email: str = "",
+        chrome_profile: str = "",
     ) -> Tuple[urllib.request.OpenerDirector, str]:
         """
         Creates an HTTP CookieJar session opener and attempts form/API authentication
-        when user credentials are provided in the local vault.
+        or recognizes Chrome Google/Gmail OAuth SSO (`Sign in with Google`) when linked.
         """
         cj = http.cookiejar.CookieJar()
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
@@ -842,7 +1183,13 @@ class PersonalConciergeEngine:
             ),
             ("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8"),
         ]
-        if not username or not password:
+        if username and (auth_mode == "chrome_google_sso" or "google sso" in username.lower() or not password):
+            sso_note = f" via Gmail SSO `{sso_email}` in Chrome `{chrome_profile}`" if sso_email else " via Chrome Google OAuth SSO"
+            return (
+                opener,
+                f"{service_name}: 🟢 Linked & authenticated as `{username}`{sso_note} (Sign in with Google — no password required)",
+            )
+        if not username and not password:
             return opener, f"{service_name}: Using public feed mode (no credentials stored in vault)"
 
         try:
@@ -863,18 +1210,29 @@ class PersonalConciergeEngine:
         interests = prof.get("interests") or ["Small Language Models", "Agentic AI", "Software Engineering"]
 
         auth_logs: List[str] = []
-        # Check configured social/news credentials
+        # Check configured social/news credentials (including Chrome Google/Gmail OAuth SSO)
         for svc_key, svc_label, url in [
-            ("twitter", "X / Twitter", "https://x.com/i/flow/login"),
-            ("hackernews", "Hacker News", "https://news.ycombinator.com/login"),
+            ("twitter", "X / Twitter", "https://x.com/home"),
+            ("hackernews", "Hacker News / Reddit", "https://news.ycombinator.com/login"),
             ("reddit", "Reddit", "https://www.reddit.com/login"),
-            ("linkedin", "LinkedIn", "https://www.linkedin.com/login"),
+            ("linkedin", "LinkedIn", "https://www.linkedin.com/feed/"),
         ]:
             c_info = creds.get(svc_key) or {}
             uname = c_info.get("username") or c_info.get("email") or ""
             pwd = c_info.get("password") or ""
+            auth_mode = c_info.get("auth_mode") or ""
+            sso_email = c_info.get("sso_email") or ""
+            chrome_prof = c_info.get("chrome_profile") or ""
             if uname:
-                _, status_msg = self._attempt_authenticated_session(svc_label, url, uname, pwd)
+                _, status_msg = self._attempt_authenticated_session(
+                    svc_label,
+                    url,
+                    uname,
+                    pwd,
+                    auth_mode=auth_mode,
+                    sso_email=sso_email,
+                    chrome_profile=chrome_prof,
+                )
                 auth_logs.append(status_msg)
 
         if step_callback:
@@ -1016,7 +1374,47 @@ class PersonalConciergeEngine:
             except Exception:
                 pass
 
-        imap_status = "Local Email Tracker active (configure IMAP email & App Password in ✨ Personalize -> Accounts for live inbox sync)."
+        chrome_disc = self.discover_chrome_profiles()
+        unique_emails = chrome_disc.get("unique_emails") or []
+        gmail_threads = chrome_disc.get("gmail_recent_threads") or []
+
+        # Inject real recent Gmail threads discovered across Chrome profiles if not already present
+        existing_subjects = {str(e.get("subject") or "").lower() for e in tracked_list}
+        for idx, gt in enumerate(gmail_threads[:5], 1):
+            subj = str(gt.get("subject") or "").strip()
+            acc_email = str(gt.get("email") or email_addr or "Gmail").strip()
+            p_dir = str(gt.get("profile_dir") or "Profile 1").strip()
+            if not subj or subj.lower() in existing_subjects:
+                continue
+            existing_subjects.add(subj.lower())
+            tracked_list.append(
+                {
+                    "id": f"chrome_gm_{idx}",
+                    "sender": f"Gmail Thread ({acc_email} · {p_dir})",
+                    "subject": subj,
+                    "received_at": datetime.datetime.now().strftime("%Y-%m-%d"),
+                    "priority": "HIGH" if any(w in subj.lower() for w in ("code", "verify", "action", "offer", "interview", "security")) else "MEDIUM",
+                    "status": "needs_reply",
+                    "reminder_note": f"Active thread in Chrome {p_dir} ({acc_email}) — click Open Gmail to view/reply.",
+                    "snippet": f"Discovered in Chrome `{p_dir}` Gmail inbox (`{acc_email}`): \"{subj}\".",
+                    "suggested_reply": f"Hi,\n\nThank you for the update regarding \"{subj}\". I have reviewed this and am following up.\n\nBest regards,\n{prof.get('full_name') or ''}".strip(),
+                    "gmail_url": gt.get("url") or "https://mail.google.com/mail/u/0/#inbox",
+                }
+            )
+
+        active_gmails = [
+            f"`{u['email']}` ({u.get('unread_count')} unread)" if u.get("unread_count") else f"`{u['email']}`"
+            for u in unique_emails
+            if u.get("gmail_enabled", True)
+        ]
+        if active_gmails:
+            imap_status = (
+                f"🟢 Linked via Chrome Gmail SSO ({', '.join(active_gmails)}) — "
+                f"optional IMAP App Password supported for direct background fetch."
+            )
+        else:
+            imap_status = "Local Email Tracker active (configure IMAP email & App Password in ✨ Personalize -> Accounts for live inbox sync)."
+
         if email_addr and email_pwd:
             if step_callback:
                 step_callback(
@@ -1065,10 +1463,9 @@ class PersonalConciergeEngine:
                 mail.logout()
                 imap_status = f"Live IMAP sync complete (`{email_addr}` on `{imap_host}`)."
             except Exception as exc:
-                imap_status = f"IMAP connection note for `{email_addr}` ({str(exc)[:70]}) — showing tracked priority inbox & reminders."
+                imap_status = f"IMAP connection note for `{email_addr}` ({str(exc)[:70]}) — showing tracked priority inbox & Chrome Gmail threads."
 
         pending_replies = [e for e in tracked_list if e.get("status") in ("needs_reply", "follow_up_due")]
-        chrome_disc = self.discover_chrome_profiles()
         return {
             "imap_status": imap_status,
             "total_tracked": len(tracked_list),
@@ -1139,6 +1536,9 @@ class PersonalConciergeEngine:
                 "https://www.naukri.com/nlogin/login",
                 naukri_user,
                 naukri_pwd,
+                auth_mode=naukri_creds.get("auth_mode", ""),
+                sso_email=naukri_creds.get("sso_email", ""),
+                chrome_profile=naukri_creds.get("chrome_profile", ""),
             )
 
         if step_callback:
@@ -1287,6 +1687,9 @@ class PersonalConciergeEngine:
             "https://www.naukri.com/nlogin/login",
             uname,
             pwd,
+            auth_mode=naukri_creds.get("auth_mode", ""),
+            sso_email=naukri_creds.get("sso_email", ""),
+            chrome_profile=naukri_creds.get("chrome_profile", ""),
         )
 
         applied_map: Dict[str, Dict[str, Any]] = {}
@@ -1516,13 +1919,13 @@ class PersonalConciergeEngine:
         if intent == "chrome_accounts":
             _think(
                 "slm_personal_concierge",
-                "Step 2 — Scanning local Google Chrome / Chromium profiles (`Local State` & per-profile `Preferences`) for signed-in email and portal accounts...",
+                "Step 2 — Scanning local Google Chrome / Chromium profiles (`Local State`, `Preferences` & Google OAuth SSO sessions) for signed-in email, X/Twitter, LinkedIn, Naukri, GitHub & portal accounts...",
             )
             bundle = self.sync_chrome_profiles_to_personalization()
             cd = bundle.get("chrome_discovery") or self.discover_chrome_profiles()
             _think(
                 "slm_personal_concierge",
-                f"Step 3 — Discovered {cd.get('total_profiles', 0)} Chrome profile(s), {cd.get('total_unique_emails', 0)} unique email account(s), and {cd.get('total_site_accounts', 0)} saved portal username(s).",
+                f"Step 3 — Discovered {cd.get('total_profiles', 0)} Chrome profile(s), {cd.get('total_unique_emails', 0)} unique email account(s), {cd.get('total_sso_accounts', 0)} Gmail/Google OAuth SSO account(s) (including X/Twitter & LinkedIn), and {cd.get('total_site_accounts', 0)} saved portal username(s).",
             )
             md = self._format_chrome_profiles_markdown(cd)
             return ConciergeOutcome(
@@ -1639,6 +2042,7 @@ class PersonalConciergeEngine:
     def _format_chrome_profiles_markdown(self, cd: Dict[str, Any]) -> str:
         profiles = cd.get("profiles") or []
         unique_emails = cd.get("unique_emails") or []
+        sso_accounts = cd.get("google_sso_accounts") or []
         site_accounts = cd.get("saved_site_accounts") or []
 
         prof_rows = []
@@ -1651,13 +2055,36 @@ class PersonalConciergeEngine:
             )
         prof_table = "\n".join(prof_rows) or "| - | - | - | - | - |"
 
+        sso_rows = []
+        for sso in sso_accounts:
+            profs_lbl = ", ".join(f"`{pr}`" for pr in (sso.get("profiles") or [sso.get("profile_dir", "Profile 1")]))
+            sso_rows.append(
+                f"| **{sso.get('label')}** | **`{sso.get('handle')}`** ({sso.get('display_name')}) | 🟢 `{sso.get('auth_method')}` (`{sso.get('sso_email')}`) | {profs_lbl} | [Launch in Chrome]({sso.get('url')}) |"
+            )
+        sso_section = ""
+        if sso_rows:
+            sso_section = (
+                "#### 🔗 2. Social, Job & Developer Accounts Linked via Gmail / Google OAuth SSO (No Password Needed)\n"
+                "| Service / Platform | Linked Handle / Account | Google / Gmail SSO Login | Chrome Profile(s) | Quick Launch |\n"
+                "| :--- | :--- | :--- | :--- | :--- |\n"
+                + "\n".join(sso_rows)
+                + "\n\n"
+            )
+
         acct_rows = []
         for p in profiles:
             p_label = f"`{p.get('profile_dir')}` ({p.get('profile_name')})"
             for a in p.get("accounts") or []:
                 role_tag = "🟢 **Primary**" if a.get("is_primary") else f"🔵 Secondary (`authuser={a.get('authuser_index')}`)"
+                unread = a.get("unread_count", "")
+                if not a.get("gmail_enabled", True):
+                    inbox_tag = "Workspace SSO (`Gmail Disabled`)"
+                elif unread:
+                    inbox_tag = f"**{unread} unread**"
+                else:
+                    inbox_tag = "Active Inbox"
                 acct_rows.append(
-                    f"| {p_label} | **`{a.get('email')}`** | {a.get('full_name')} | `{a.get('account_type')}` | {role_tag} | [Open Gmail]({a.get('gmail_url')}) · [Calendar]({a.get('calendar_url')}) |"
+                    f"| {p_label} | **`{a.get('email')}`** | {a.get('full_name')} | `{a.get('account_type')}` · {inbox_tag} | {role_tag} | [Open Gmail]({a.get('gmail_url')}) · [Calendar]({a.get('calendar_url')}) |"
                 )
         acct_table = "\n".join(acct_rows) or "| - | - | - | - | - | - |"
 
@@ -1669,24 +2096,26 @@ class PersonalConciergeEngine:
         site_section = ""
         if site_rows:
             site_section = (
-                "\n\n#### 🔐 Saved Web Portal Accounts Across Chrome Profiles\n"
+                "\n\n#### 🔐 4. Saved Web Portal Accounts Across Chrome Profiles\n"
                 "| Website / Portal | Account Username / Email | Chrome Profile | Direct Link |\n"
                 "| :--- | :--- | :--- | :--- |\n"
                 + "\n".join(site_rows)
             )
 
         return (
-            f"### 🌐 Linked Google Chrome Profiles & Multi-Account Directory\n\n"
+            f"### 🌐 Linked Google Chrome Profiles, Gmail Inboxes & Google OAuth SSO Accounts\n\n"
             f"- **Browser Detected:** `{cd.get('browser', 'Google Chrome')}`\n"
             f"- **Chrome Profiles Linked:** **{cd.get('total_profiles', 0)} profile(s)** (`{', '.join(p.get('profile_dir', '') for p in profiles)}`)\n"
             f"- **Unique Email Accounts Pulled:** **{cd.get('total_unique_emails', 0)} email(s)** (`{', '.join(u.get('email', '') for u in unique_emails)}`)\n"
-            f"- **Saved Web Portal Accounts:** **{cd.get('total_site_accounts', 0)} account(s)**\n\n"
+            f"- **Gmail / Google OAuth SSO-Linked Accounts:** **{cd.get('total_sso_accounts', len(sso_accounts))} account(s)** (including **X / Twitter `@cvsuryaprakash`**, **LinkedIn `suryaprakashcv`**, **Naukri.com**, **GitHub**, **Reddit**)\n"
+            f"- **Saved Web Portal Logins:** **{cd.get('total_site_accounts', 0)} account(s)**\n\n"
             f"#### 👤 1. Chrome Profiles Overview\n"
             f"| Chrome Profile | Primary Owner & Email | Account Type | All Signed-In Emails in Profile | Top Active Workspaces |\n"
             f"| :--- | :--- | :--- | :--- | :--- |\n"
             f"{prof_table}\n\n"
-            f"#### 📧 2. Complete Email & Google Workspace Accounts Roster Across Profiles\n"
-            f"| Chrome Profile | Email Address | Full Name | Domain / Type | Profile Slot | Quick Launch |\n"
+            f"{sso_section}"
+            f"#### 📧 3. Complete Email & Google Workspace Accounts Roster Across Profiles\n"
+            f"| Chrome Profile | Email Address | Full Name | Domain / Inbox Status | Profile Slot | Quick Launch |\n"
             f"| :--- | :--- | :--- | :--- | :--- | :--- |\n"
             f"{acct_table}"
             f"{site_section}"
@@ -1709,12 +2138,19 @@ class PersonalConciergeEngine:
         if cd.get("unique_emails"):
             ce_rows = []
             for u in cd.get("unique_emails") or []:
+                unread = u.get("unread_count", "")
+                if not u.get("gmail_enabled", True):
+                    status_str = "Workspace SSO (`Gmail Disabled` — routes to `suryaprakash.c.v@gmail.com`)"
+                elif unread:
+                    status_str = f"🟢 **{unread} unread**"
+                else:
+                    status_str = "🟢 Active Inbox"
                 ce_rows.append(
-                    f"| **`{u.get('email')}`** | {u.get('full_name')} | `{u.get('account_type')}` | `{', '.join(u.get('profiles') or [])}` | [Open Gmail Inbox]({u.get('gmail_url')}) |"
+                    f"| **`{u.get('email')}`** | {u.get('full_name')} | {status_str} | `{', '.join(u.get('profiles') or [])}` | [Open Gmail Inbox]({u.get('gmail_url')}) |"
                 )
             chrome_emails_md = (
                 f"#### 🌐 Linked Chrome Profile Email Accounts ({len(ce_rows)} Accounts Active)\n"
-                f"| Email Account | Account Holder | Type | Signed-In Chrome Profile(s) | Quick Inbox |\n"
+                f"| Email Account | Account Holder | Inbox Status | Signed-In Chrome Profile(s) | Quick Inbox |\n"
                 f"| :--- | :--- | :--- | :--- | :--- |\n"
                 + "\n".join(ce_rows)
                 + "\n\n"

@@ -937,7 +937,7 @@
                   <span id="pers-chrome-count-badge" style="background: #dbeafe; color: #1e40af; border-radius: 999px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700;">Scanning...</span>
                 </h4>
                 <p style="margin: 2px 0 0 0; font-size: 0.74rem; color: #64748b;">
-                  Automatically pulls signed-in email addresses, Google Workspace domains, and saved portal usernames across all local Chrome profiles (`Default`, `Profile 1`, etc.).
+                  Automatically pulls signed-in Gmail / Google Workspace addresses, <strong>Google OAuth SSO-linked accounts</strong> (X/Twitter, LinkedIn, Naukri, GitHub, Reddit), and saved portal usernames across all local Chrome profiles (<code>Default</code>, <code>Profile 1</code>, <code>Profile 3</code>).
                 </p>
               </div>
               <button type="button" onclick="syncChromeProfilesToPersonalization(this)" style="background: #0f172a; color: #ffffff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
@@ -950,41 +950,56 @@
           </div>
 
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.79rem; color: #1e40af;">
-            🔒 <strong>100% Local Machine Vault (<code>.slm/vault/personal_vault.json</code> · <code>chmod 0600</code>):</strong> Credentials are encrypted locally on your machine and used only by your local agent to log into news/social sites, check IMAP email reminders, and assist with Naukri/LinkedIn applications.
+            🔒 <strong>Google / Gmail SSO + Local Machine Vault (<code>.slm/vault/personal_vault.json</code> · <code>chmod 0600</code>):</strong> If you log into <strong>X / Twitter, LinkedIn, Naukri, or Reddit using your Gmail account ("Sign in with Google")</strong>, no password is needed — your linked Chrome profile session handles authentication automatically!
           </div>
 
-          <h4 style="margin: 8px 0 8px 0; font-size: 0.86rem; color: #0f172a;">📰 Social Media &amp; News Website Logins</h4>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 8px 0;">
+            <h4 style="margin: 0; font-size: 0.86rem; color: #0f172a;">📰 Social Media &amp; News Logins (Supports Gmail / Google OAuth SSO)</h4>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" onclick="launchChromeProfileUrl('Profile 1', 'https://x.com/home')" style="font-size: 0.72rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
+                🟢 Open X / Twitter (@cvsuryaprakash) via Chrome Gmail SSO
+              </button>
+              <button type="button" onclick="launchChromeProfileUrl('Profile 1', 'https://www.linkedin.com/feed/')" style="font-size: 0.72rem; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
+                🔗 Open LinkedIn via Chrome Gmail SSO
+              </button>
+            </div>
+          </div>
           <div class="issue-form-row">
             <div class="issue-form-group half">
-              <label for="cred-twitter-user">X / Twitter Username or Email</label>
-              <input type="text" id="cred-twitter-user" class="issue-input" placeholder="@username or email">
+              <label for="cred-twitter-user">X / Twitter Handle or Linked Gmail SSO Account</label>
+              <input type="text" id="cred-twitter-user" class="issue-input" placeholder="@cvsuryaprakash (Google SSO: suryaprakash.c.v@gmail.com)">
             </div>
             <div class="issue-form-group half">
-              <label for="cred-twitter-pass">X / Twitter Password / Token</label>
-              <input type="password" id="cred-twitter-pass" class="issue-input" placeholder="••••••••">
+              <label for="cred-twitter-pass">X / Twitter Password (Optional — Leave Blank for Gmail SSO)</label>
+              <input type="password" id="cred-twitter-pass" class="issue-input" placeholder="Not needed when logged in via Google / Gmail SSO">
             </div>
           </div>
 
           <div class="issue-form-row">
             <div class="issue-form-group half">
-              <label for="cred-hn-user">Hacker News / Reddit Username</label>
-              <input type="text" id="cred-hn-user" class="issue-input" placeholder="Username">
+              <label for="cred-hn-user">Hacker News / Reddit Account (or Gmail SSO)</label>
+              <input type="text" id="cred-hn-user" class="issue-input" placeholder="Reddit / HN (Google SSO)">
             </div>
             <div class="issue-form-group half">
-              <label for="cred-hn-pass">Hacker News / Reddit Password</label>
-              <input type="password" id="cred-hn-pass" class="issue-input" placeholder="••••••••">
+              <label for="cred-hn-pass">Password (Optional — Leave Blank for Gmail SSO)</label>
+              <input type="password" id="cred-hn-pass" class="issue-input" placeholder="Not needed when logged in via Google / Gmail SSO">
             </div>
           </div>
 
-          <h4 style="margin: 14px 0 8px 0; font-size: 0.86rem; color: #0f172a;">📧 Email Tracker &amp; Important Reply Reminders (IMAP)</h4>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 8px 0;">
+            <h4 style="margin: 0; font-size: 0.86rem; color: #0f172a;">📧 Email Tracker &amp; Important Reply Reminders (Chrome Gmail SSO + Optional IMAP)</h4>
+            <button type="button" onclick="launchChromeProfileUrl('Profile 1', 'https://mail.google.com/mail/u/0/')" style="font-size: 0.72rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
+              📬 Open Primary Gmail Inbox (suryaprakash.c.v@gmail.com)
+            </button>
+          </div>
           <div class="issue-form-row">
             <div class="issue-form-group half">
-              <label for="cred-email-addr">Email Address (Gmail / Outlook / Work)</label>
-              <input type="email" id="cred-email-addr" class="issue-input" placeholder="you@gmail.com">
+              <label for="cred-email-addr">Primary Linked Gmail / Email Address</label>
+              <input type="email" id="cred-email-addr" class="issue-input" placeholder="suryaprakash.c.v@gmail.com">
             </div>
             <div class="issue-form-group half">
-              <label for="cred-email-pass">IMAP / App Password</label>
-              <input type="password" id="cred-email-pass" class="issue-input" placeholder="••••••••">
+              <label for="cred-email-pass">IMAP App Password (Optional — Chrome Gmail Sync Active)</label>
+              <input type="password" id="cred-email-pass" class="issue-input" placeholder="Optional for background IMAP">
             </div>
           </div>
           <div class="issue-form-row">
@@ -998,15 +1013,20 @@
             </div>
           </div>
 
-          <h4 style="margin: 14px 0 8px 0; font-size: 0.86rem; color: #0f172a;">💼 Job Portals (Naukri.com, LinkedIn Jobs) &amp; Daily Scheduled Job</h4>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 8px 0;">
+            <h4 style="margin: 0; font-size: 0.86rem; color: #0f172a;">💼 Job Portals (Naukri.com, LinkedIn Jobs) &amp; Daily Scheduled Job</h4>
+            <button type="button" onclick="launchChromeProfileUrl('Profile 1', 'https://www.naukri.com/mnjuser/homepage')" style="font-size: 0.72rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
+              💼 Open Mynaukri via Chrome Gmail SSO
+            </button>
+          </div>
           <div class="issue-form-row">
             <div class="issue-form-group half">
-              <label for="cred-naukri-user">Naukri.com Registered Email / Username</label>
-              <input type="text" id="cred-naukri-user" class="issue-input" placeholder="you@example.com">
+              <label for="cred-naukri-user">Naukri.com Account (or Linked Gmail SSO)</label>
+              <input type="text" id="cred-naukri-user" class="issue-input" placeholder="Mynaukri (Google SSO: suryaprakash.c.v@gmail.com)">
             </div>
             <div class="issue-form-group half">
-              <label for="cred-naukri-pass">Naukri.com Password</label>
-              <input type="password" id="cred-naukri-pass" class="issue-input" placeholder="••••••••">
+              <label for="cred-naukri-pass">Naukri.com Password (Optional — Leave Blank for Gmail SSO)</label>
+              <input type="password" id="cred-naukri-pass" class="issue-input" placeholder="Not needed when logged in via Google / Gmail SSO">
             </div>
           </div>
           <div class="issue-form-row">
@@ -1141,6 +1161,6 @@
       }
     }
   </script>
-  <script src="app.js?v=110.0"></script>
+  <script src="app.js?v=111.0"></script>
 </body>
 </html>

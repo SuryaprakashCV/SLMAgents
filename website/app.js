@@ -5808,6 +5808,7 @@ function applyPersonalizationToUI(data) {
 function renderChromeProfilesDirectory(cd) {
   const profiles = Array.isArray(cd.profiles) ? cd.profiles : [];
   const uniqueEmails = Array.isArray(cd.unique_emails) ? cd.unique_emails : [];
+  const ssoAccounts = Array.isArray(cd.google_sso_accounts) ? cd.google_sso_accounts : [];
   const siteAccounts = Array.isArray(cd.saved_site_accounts) ? cd.saved_site_accounts : [];
 
   const summaryBar = document.getElementById("pers-chrome-summary-bar");
@@ -5815,9 +5816,15 @@ function renderChromeProfilesDirectory(cd) {
     if (profiles.length > 0) {
       summaryBar.style.display = "block";
       const emailsHtml = uniqueEmails
-        .map((u) => `<code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-weight:600;color:#0f172a;">${escapeHtmlSafe(u.email)}</code>`)
+        .map((u) => {
+          const unreadBadge = u.unread_count ? ` <span style="color:#059669;font-size:0.68rem;">(${escapeHtmlSafe(u.unread_count)} unread)</span>` : "";
+          return `<code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-weight:600;color:#0f172a;">${escapeHtmlSafe(u.email)}</code>${unreadBadge}`;
+        })
         .join(" · ");
-      summaryBar.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span>🔗 <strong>Linked with ${escapeHtmlSafe(cd.browser || "Google Chrome")}:</strong> <strong>${profiles.length} Profile(s)</strong> (<code>${profiles.map((p) => escapeHtmlSafe(p.profile_dir)).join(", ")}</code>) · <strong>${uniqueEmails.length} Email Account(s):</strong> ${emailsHtml}</span><button type="button" onclick="switchPersonalizeTab('accounts')" style="background:#0f172a;color:#fff;border:none;border-radius:999px;padding:3px 10px;font-size:0.71rem;font-weight:600;cursor:pointer;">View All Accounts &rarr;</button></div>`;
+      const ssoSummary = ssoAccounts.length > 0
+        ? ` · <strong>Gmail SSO:</strong> ` + ssoAccounts.slice(0, 4).map((s) => `<span style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:1px 6px;border-radius:4px;font-size:0.7rem;font-weight:600;">${escapeHtmlSafe(s.label)}: ${escapeHtmlSafe(s.handle)}</span>`).join(" ")
+        : "";
+      summaryBar.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span>🔗 <strong>Linked with ${escapeHtmlSafe(cd.browser || "Google Chrome")}:</strong> <strong>${profiles.length} Profile(s)</strong> (<code>${profiles.map((p) => escapeHtmlSafe(p.profile_dir)).join(", ")}</code>) · <strong>${uniqueEmails.length} Email(s):</strong> ${emailsHtml}${ssoSummary}</span><button type="button" onclick="switchPersonalizeTab('accounts')" style="background:#0f172a;color:#fff;border:none;border-radius:999px;padding:3px 10px;font-size:0.71rem;font-weight:600;cursor:pointer;">View All Accounts &rarr;</button></div>`;
     } else {
       summaryBar.style.display = "none";
     }
@@ -5825,7 +5832,7 @@ function renderChromeProfilesDirectory(cd) {
 
   const countBadge = document.getElementById("pers-chrome-count-badge");
   if (countBadge) {
-    countBadge.textContent = `${profiles.length} Profiles · ${uniqueEmails.length} Emails`;
+    countBadge.textContent = `${profiles.length} Profiles · ${uniqueEmails.length} Emails · ${ssoAccounts.length} Gmail SSO`;
   }
 
   const container = document.getElementById("pers-chrome-profiles-container");
@@ -5834,6 +5841,36 @@ function renderChromeProfilesDirectory(cd) {
   if (profiles.length === 0) {
     container.innerHTML = `<div style="font-size:0.77rem;color:#64748b;">No local Chrome profiles detected.</div>`;
     return;
+  }
+
+  let ssoHtml = "";
+  if (ssoAccounts.length > 0) {
+    const ssoCards = ssoAccounts
+      .map((s) => {
+        const safeProf = (s.profile_dir || "Profile 1").replace(/'/g, "\\'");
+        const safeUrl = (s.url || "https://x.com/home").replace(/'/g, "\\'");
+        const profsBadge = Array.isArray(s.profiles) ? s.profiles.join(", ") : (s.profile_dir || "Profile 1");
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+              <span style="background:#059669;color:#fff;padding:2px 7px;border-radius:999px;font-size:0.68rem;font-weight:700;">🟢 Gmail SSO</span>
+              <strong style="font-size:0.79rem;color:#0f172a;">${escapeHtmlSafe(s.label)}:</strong>
+              <code style="background:#ffffff;border:1px solid #86efac;padding:1px 7px;border-radius:5px;font-size:0.76rem;font-weight:700;color:#065f46;">${escapeHtmlSafe(s.handle)}</code>
+              <span style="font-size:0.72rem;color:#334155;">via <strong>${escapeHtmlSafe(s.sso_email)}</strong> (<code>${escapeHtmlSafe(profsBadge)}</code>) — <em>No password required</em></span>
+            </div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeUrl}')" style="background:#0f172a;color:#ffffff;border:none;border-radius:6px;padding:4px 10px;font-size:0.71rem;font-weight:600;cursor:pointer;">🚀 Launch ${escapeHtmlSafe(s.label)} in Chrome SSO</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+    ssoHtml = `
+      <div style="background:#ffffff;border:1.5px solid #86efac;border-radius:10px;padding:10px 12px;">
+        <div style="font-size:0.78rem;font-weight:700;color:#065f46;margin-bottom:7px;">🔗 Social, Job &amp; Developer Accounts Linked via Gmail / Google OAuth SSO ("Sign in with Google")</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">${ssoCards}</div>
+      </div>
+    `;
   }
 
   const profCards = profiles
@@ -5856,12 +5893,16 @@ function renderChromeProfilesDirectory(cd) {
           const badge = a.is_primary
             ? `<span style="background:#dcfce7;color:#166534;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:700;">Primary</span>`
             : `<span style="background:#e0f2fe;color:#0369a1;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:600;">authuser=${a.authuser_index}</span>`;
+          const unreadTag = a.gmail_enabled === false
+            ? `<span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:600;">SSO Only (Gmail Disabled)</span>`
+            : (a.unread_count ? `<span style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:700;">📬 ${escapeHtmlSafe(a.unread_count)} unread</span>` : "");
           return `
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;flex-wrap:wrap;">
               <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
                 <strong style="font-size:0.77rem;color:#0f172a;">${escapeHtmlSafe(a.email)}</strong>
                 <span style="font-size:0.73rem;color:#475569;">(${escapeHtmlSafe(a.full_name)})</span>
                 ${badge}
+                ${unreadTag}
                 <span style="font-size:0.68rem;color:#64748b;background:#fff;border:1px solid #cbd5e1;padding:1px 6px;border-radius:999px;">${escapeHtmlSafe(a.account_type)}</span>
               </div>
               <div style="display:flex;gap:5px;flex-wrap:wrap;">
@@ -5917,8 +5958,12 @@ function renderChromeProfilesDirectory(cd) {
     `;
   }
 
-  container.innerHTML = profCards + siteHtml;
+  container.innerHTML = ssoHtml + profCards + siteHtml;
 }
+
+window.launchChromeProfileUrl = function launchChromeProfileUrl(profileDir, targetUrl) {
+  return window.launchChromeProfileAccount(profileDir, targetUrl);
+};
 
 window.syncChromeProfilesToPersonalization = async function syncChromeProfilesToPersonalization(btn) {
   const orig = btn ? btn.textContent : "";
