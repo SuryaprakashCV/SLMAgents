@@ -4918,7 +4918,7 @@ function setupDownloadLinkInterceptor() {
     const lowerHref = rawHref.toLowerCase();
     const linkLabel = (link.innerText || link.textContent || "").toLowerCase();
 
-    // 2. Intercept ANY hallucinated download link (e.g. designstudio.slma.ground.com/suryaprakash-cv-v9-docx, example.com, etc.)
+    // 2. Intercept ANY hallucinated download link (e.g. designstudio.slma.ground.com/resume-v9-docx, example.com, etc.)
     // and compile + download the requested file 100% locally on the spot!
     const isHallucinatedOrExportLink = (
       lowerHref.includes("example.") ||
@@ -5847,19 +5847,24 @@ function renderChromeProfilesDirectory(cd) {
   if (ssoAccounts.length > 0) {
     const ssoCards = ssoAccounts
       .map((s) => {
-        const safeProf = (s.profile_dir || "Profile 1").replace(/'/g, "\\'");
+        const safeProf = (s.profile_dir || "Default").replace(/'/g, "\\'");
         const safeUrl = (s.url || "https://x.com/home").replace(/'/g, "\\'");
-        const profsBadge = Array.isArray(s.profiles) ? s.profiles.join(", ") : (s.profile_dir || "Profile 1");
+        const profsBadge = Array.isArray(s.profiles) ? s.profiles.join(", ") : (s.profile_dir || "Default");
+        const cookiesArr = Array.isArray(s.auth_cookies) ? s.auth_cookies.slice(0, 4) : [];
+        const cookiesTag = cookiesArr.length > 0
+          ? `<span style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:1px 6px;border-radius:4px;font-size:0.68rem;font-weight:600;">🍪 Cookies: ${escapeHtmlSafe(cookiesArr.join(", "))} (${escapeHtmlSafe(s.cookie_count || cookiesArr.length)})</span>`
+          : (s.cookie_count ? `<span style="background:#e0f2fe;color:#0369a1;padding:1px 6px;border-radius:4px;font-size:0.68rem;">🍪 ${escapeHtmlSafe(s.cookie_count)} cookies</span>` : "");
         return `
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-              <span style="background:#059669;color:#fff;padding:2px 7px;border-radius:999px;font-size:0.68rem;font-weight:700;">🟢 Gmail SSO</span>
+              <span style="background:#059669;color:#fff;padding:2px 7px;border-radius:999px;font-size:0.68rem;font-weight:700;">🟢 Auto-Login</span>
               <strong style="font-size:0.79rem;color:#0f172a;">${escapeHtmlSafe(s.label)}:</strong>
               <code style="background:#ffffff;border:1px solid #86efac;padding:1px 7px;border-radius:5px;font-size:0.76rem;font-weight:700;color:#065f46;">${escapeHtmlSafe(s.handle)}</code>
-              <span style="font-size:0.72rem;color:#334155;">via <strong>${escapeHtmlSafe(s.sso_email)}</strong> (<code>${escapeHtmlSafe(profsBadge)}</code>) — <em>No password required</em></span>
+              ${cookiesTag}
+              <span style="font-size:0.72rem;color:#334155;">via <strong>${escapeHtmlSafe(s.sso_email || "Chrome Session")}</strong> (<code>${escapeHtmlSafe(profsBadge)}</code>)</span>
             </div>
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
-              <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeUrl}')" style="background:#0f172a;color:#ffffff;border:none;border-radius:6px;padding:4px 10px;font-size:0.71rem;font-weight:600;cursor:pointer;">🚀 Launch ${escapeHtmlSafe(s.label)} in Chrome SSO</button>
+              <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeUrl}')" style="background:#0f172a;color:#ffffff;border:none;border-radius:6px;padding:4px 10px;font-size:0.71rem;font-weight:600;cursor:pointer;">🚀 Launch ${escapeHtmlSafe(s.label)} in Chrome</button>
             </div>
           </div>
         `;
@@ -5867,7 +5872,7 @@ function renderChromeProfilesDirectory(cd) {
       .join("");
     ssoHtml = `
       <div style="background:#ffffff;border:1.5px solid #86efac;border-radius:10px;padding:10px 12px;">
-        <div style="font-size:0.78rem;font-weight:700;color:#065f46;margin-bottom:7px;">🔗 Social, Job &amp; Developer Accounts Linked via Gmail / Google OAuth SSO ("Sign in with Google")</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#065f46;margin-bottom:7px;">🔗 Auto-Authenticated Social, Job &amp; Developer Sessions (Pulled from Chrome Cookies, Login Data &amp; Google SSO)</div>
         <div style="display:flex;flex-direction:column;gap:6px;">${ssoCards}</div>
       </div>
     `;

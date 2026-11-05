@@ -887,7 +887,7 @@
           <div class="issue-form-row">
             <div class="issue-form-group half">
               <label for="pers-full-name">1. What is your name?</label>
-              <input type="text" id="pers-full-name" class="issue-input" placeholder="e.g., Surya Prakash">
+              <input type="text" id="pers-full-name" class="issue-input" placeholder="Auto-filled from Chrome profile or enter your name">
             </div>
             <div class="issue-form-group half">
               <label for="pers-current-role">2. What is your current role or focus?</label>
@@ -950,55 +950,55 @@
           </div>
 
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.79rem; color: #1e40af;">
-            🔒 <strong>Google / Gmail SSO + Local Machine Vault (<code>.slm/vault/personal_vault.json</code> · <code>chmod 0600</code>):</strong> If you log into <strong>X / Twitter, LinkedIn, Naukri, or Reddit using your Gmail account ("Sign in with Google")</strong>, no password is needed — your linked Chrome profile session handles authentication automatically!
+            🔒 <strong>Auto-Login via Chrome Cookies, Google SSO &amp; Local Vault (<code>.slm/vault/personal_vault.json</code> · <code>chmod 0600</code>):</strong> Automatically pulls active session cookies (<code>Cookies</code>), saved credentials (<code>Login Data</code>), and Google OAuth SSO sessions across your Chrome profiles to auto-login and pull details.
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 8px 0;">
-            <h4 style="margin: 0; font-size: 0.86rem; color: #0f172a;">📰 Social Media &amp; News Logins (Supports Gmail / Google OAuth SSO)</h4>
+            <h4 style="margin: 0; font-size: 0.86rem; color: #0f172a;">📰 Social Media &amp; News Logins (Auto-Pulled from Chrome Cookies / SSO / Vault)</h4>
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-              <button type="button" onclick="launchChromeProfileUrl('Profile 1', 'https://x.com/home')" style="font-size: 0.72rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
-                🟢 Open X / Twitter (@cvsuryaprakash) via Chrome Gmail SSO
+              <button type="button" onclick="launchChromeProfileUrl('Default', 'https://x.com/home')" style="font-size: 0.72rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
+                🟢 Auto-Login &amp; Open X / Twitter via Chrome Session
               </button>
-              <button type="button" onclick="launchChromeProfileUrl('Profile 1', 'https://www.linkedin.com/feed/')" style="font-size: 0.72rem; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
-                🔗 Open LinkedIn via Chrome Gmail SSO
+              <button type="button" onclick="launchChromeProfileUrl('Default', 'https://www.linkedin.com/feed/')" style="font-size: 0.72rem; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
+                🔗 Auto-Login &amp; Open LinkedIn via Chrome Session
               </button>
             </div>
           </div>
           <div class="issue-form-row">
             <div class="issue-form-group half">
-              <label for="cred-twitter-user">X / Twitter Handle or Linked Gmail SSO Account</label>
-              <input type="text" id="cred-twitter-user" class="issue-input" placeholder="@cvsuryaprakash (Google SSO: suryaprakash.c.v@gmail.com)">
+              <label for="cred-twitter-user">X / Twitter Handle or Linked Google SSO Account</label>
+              <input type="text" id="cred-twitter-user" class="issue-input" placeholder="Auto-filled from Chrome session or @username">
             </div>
             <div class="issue-form-group half">
-              <label for="cred-twitter-pass">X / Twitter Password (Optional — Leave Blank for Gmail SSO)</label>
-              <input type="password" id="cred-twitter-pass" class="issue-input" placeholder="Not needed when logged in via Google / Gmail SSO">
+              <label for="cred-twitter-pass">X / Twitter Password (Optional — Auto-Handled via Chrome Cookies / SSO)</label>
+              <input type="password" id="cred-twitter-pass" class="issue-input" placeholder="Auto-filled via Chrome cookies / Login Data">
             </div>
           </div>
 
           <div class="issue-form-row">
             <div class="issue-form-group half">
-              <label for="cred-hn-user">Hacker News / Reddit Account (or Gmail SSO)</label>
-              <input type="text" id="cred-hn-user" class="issue-input" placeholder="Reddit / HN (Google SSO)">
+              <label for="cred-hn-user">Hacker News / Reddit Account (or Chrome Session)</label>
+              <input type="text" id="cred-hn-user" class="issue-input" placeholder="Auto-filled from Chrome session or username">
             </div>
             <div class="issue-form-group half">
-              <label for="cred-hn-pass">Password (Optional — Leave Blank for Gmail SSO)</label>
-              <input type="password" id="cred-hn-pass" class="issue-input" placeholder="Not needed when logged in via Google / Gmail SSO">
+              <label for="cred-hn-pass">Password (Optional — Auto-Handled via Chrome Cookies / SSO)</label>
+              <input type="password" id="cred-hn-pass" class="issue-input" placeholder="Auto-filled via Chrome cookies / Login Data">
             </div>
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 8px 0;">
-            <h4 style="margin: 0; font-size: 0.86rem; color: #0f172a;">📧 Email Tracker &amp; Important Reply Reminders (Chrome Gmail SSO + Optional IMAP)</h4>
-            <button type="button" onclick="launchChromeProfileUrl('Profile 1', 'https://mail.google.com/mail/u/0/')" style="font-size: 0.72rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
-              📬 Open Primary Gmail Inbox (suryaprakash.c.v@gmail.com)
+            <h4 style="margin: 0; font-size: 0.86rem; color: #0f172a;">📧 Email Tracker &amp; Important Reply Reminders (Chrome Gmail Session + Optional IMAP)</h4>
+            <button type="button" onclick="launchChromeProfileUrl('Default', 'https://mail.google.com/mail/u/0/')" style="font-size: 0.72rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
+              📬 Open Linked Primary Gmail Inbox
             </button>
           </div>
           <div class="issue-form-row">
             <div class="issue-form-group half">
               <label for="cred-email-addr">Primary Linked Gmail / Email Address</label>
-              <input type="email" id="cred-email-addr" class="issue-input" placeholder="suryaprakash.c.v@gmail.com">
+              <input type="email" id="cred-email-addr" class="issue-input" placeholder="Auto-filled from signed-in Chrome profile">
             </div>
             <div class="issue-form-group half">
-              <label for="cred-email-pass">IMAP App Password (Optional — Chrome Gmail Sync Active)</label>
+              <label for="cred-email-pass">IMAP App Password (Optional — Chrome Gmail Session Active)</label>
               <input type="password" id="cred-email-pass" class="issue-input" placeholder="Optional for background IMAP">
             </div>
           </div>
@@ -1015,18 +1015,18 @@
 
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 8px 0;">
             <h4 style="margin: 0; font-size: 0.86rem; color: #0f172a;">💼 Job Portals (Naukri.com, LinkedIn Jobs) &amp; Daily Scheduled Job</h4>
-            <button type="button" onclick="launchChromeProfileUrl('Profile 1', 'https://www.naukri.com/mnjuser/homepage')" style="font-size: 0.72rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
-              💼 Open Mynaukri via Chrome Gmail SSO
+            <button type="button" onclick="launchChromeProfileUrl('Default', 'https://www.naukri.com/mnjuser/homepage')" style="font-size: 0.72rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 3px 9px; font-weight: 600; cursor: pointer;">
+              💼 Auto-Login &amp; Open Naukri.com via Chrome Session
             </button>
           </div>
           <div class="issue-form-row">
             <div class="issue-form-group half">
-              <label for="cred-naukri-user">Naukri.com Account (or Linked Gmail SSO)</label>
-              <input type="text" id="cred-naukri-user" class="issue-input" placeholder="Mynaukri (Google SSO: suryaprakash.c.v@gmail.com)">
+              <label for="cred-naukri-user">Naukri.com Account (or Linked Chrome Session)</label>
+              <input type="text" id="cred-naukri-user" class="issue-input" placeholder="Auto-filled from Chrome session or username">
             </div>
             <div class="issue-form-group half">
-              <label for="cred-naukri-pass">Naukri.com Password (Optional — Leave Blank for Gmail SSO)</label>
-              <input type="password" id="cred-naukri-pass" class="issue-input" placeholder="Not needed when logged in via Google / Gmail SSO">
+              <label for="cred-naukri-pass">Naukri.com Password (Optional — Auto-Handled via Chrome Cookies / SSO)</label>
+              <input type="password" id="cred-naukri-pass" class="issue-input" placeholder="Auto-filled via Chrome cookies / Login Data">
             </div>
           </div>
           <div class="issue-form-row">
@@ -1161,6 +1161,6 @@
       }
     }
   </script>
-  <script src="app.js?v=111.0"></script>
+  <script src="app.js?v=112.0"></script>
 </body>
 </html>
