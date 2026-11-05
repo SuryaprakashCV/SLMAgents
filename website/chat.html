@@ -314,20 +314,11 @@
             </svg>
           </button>
 
-          <!-- Custom Modern Agent Selector Dropdown with SVG Icons -->
-          <div class="custom-agent-dropdown" id="custom-agent-dropdown">
-            <button type="button" class="custom-agent-btn" id="custom-agent-btn" onclick="toggleAgentDropdown(event)" title="Choose an agent to try">
-              <span class="agent-btn-icon" id="selected-agent-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
-              </span>
-              <span class="agent-btn-text" id="selected-agent-name">Auto-Orchestrator</span>
-              <svg class="agent-btn-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-
-            <!-- Dropdown Menu Panel -->
-            <div class="custom-agent-menu" id="custom-agent-menu" style="display: none;">
-              <!-- Populated dynamically by app.js with exact left menu SVGs -->
-            </div>
+          <!-- Agent routing is automatic; keep hidden state input for orchestrator -->
+          <div class="custom-agent-dropdown" id="custom-agent-dropdown" style="display: none !important;">
+            <span id="selected-agent-icon"></span>
+            <span id="selected-agent-name">Auto-Orchestrator</span>
+            <div class="custom-agent-menu" id="custom-agent-menu" style="display: none;"></div>
             <input type="hidden" id="chat-agent-override" value="auto">
           </div>
         </div>

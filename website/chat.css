@@ -514,8 +514,9 @@ html.desktop-app-mode .chat-app-container {
   color: var(--text-primary);
 }
 
-/* Agent Dropdown Pill */
+/* Agent Dropdown Pill (Hidden — Automatic Orchestration) */
 .custom-agent-dropdown {
+  display: none !important;
   position: relative;
 }
 
