@@ -121,12 +121,36 @@ _CONCIERGE_INTENT_PATTERNS: List[Tuple[str, re.Pattern[str]]] = [
 ]
 
 
+def is_web_cloud_environment() -> bool:
+    """
+    Returns True when running in a hosted web/cloud environment (e.g., Hugging Face Spaces,
+    Render, Vercel, Railway, or when SLM_WEB_ONLY=1 is set).
+    Personalization & Chrome account linking are strictly local desktop features and are
+    disabled on hosted web deployments.
+    """
+    for env_key in (
+        "SPACE_ID",
+        "SPACE_AUTHOR_NAME",
+        "HF_SPACE",
+        "RENDER",
+        "VERCEL",
+        "RAILWAY_ENVIRONMENT",
+        "SLM_WEB_ONLY",
+    ):
+        if os.environ.get(env_key):
+            return True
+    return False
+
+
 def detect_concierge_intent(query: str) -> Optional[str]:
     """
     Returns the concierge intent key (`daily_dashboard`, `email_tracker`, `job_assistant`,
     `learning_opportunities`, `personalize_setup`, or `multi_concierge`) if the user query
     requests a Personal Concierge workflow; otherwise `None`.
+    Disabled automatically on hosted web/cloud deployments.
     """
+    if is_web_cloud_environment():
+        return None
     q = (query or "").strip()
     if not q:
         return None

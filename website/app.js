@@ -5675,17 +5675,48 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ============================================================================
-// Opt-In Personalization & Daily Concierge Studio (Profile, Vault, Dashboard)
+// Opt-In Personalization & Daily Concierge Studio (Desktop App Only)
 // ============================================================================
 
 const escapeHtml = escapeHtmlSafe;
 let _personalizeState = null;
 
+function isPersonalizationDesktopMode() {
+  const host = (window.location.hostname || "").toLowerCase();
+  const isRemoteWebHost = (
+    host.includes("huggingface.co") ||
+    host.includes("hf.space") ||
+    host.includes("github.io") ||
+    host.includes("slmagents.ai")
+  );
+  if (isRemoteWebHost) return false;
+  return (
+    document.documentElement.classList.contains("desktop-app-mode") ||
+    window.location.search.indexOf("desktop=1") !== -1 ||
+    !!window.pywebview
+  );
+}
+
+function hideAllPersonalizationUI() {
+  ["btn-personalize-studio", "btn-sidebar-personalize", "btn-popover-personalize", "personalize-suggestions-tray", "personalize-modal-backdrop"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+  });
+}
+
 async function loadPersonalizationState() {
+  if (!isPersonalizationDesktopMode()) {
+    hideAllPersonalizationUI();
+    return;
+  }
   try {
     const res = await fetch(getApiEndpoint("/api/harness/personalize"));
     if (!res.ok) return;
     const data = await res.json();
+    if (data && data.web_disabled) {
+      hideAllPersonalizationUI();
+      return;
+    }
     _personalizeState = data;
     applyPersonalizationToUI(data);
   } catch (e) {
@@ -5694,6 +5725,10 @@ async function loadPersonalizationState() {
 }
 
 function applyPersonalizationToUI(data) {
+  if (!isPersonalizationDesktopMode()) {
+    hideAllPersonalizationUI();
+    return;
+  }
   if (!data || !data.profile) return;
   const prof = data.profile;
   const creds = data.credentials || {};
@@ -6075,6 +6110,10 @@ window.applyPersonalizePreset = async function applyPersonalizePreset(presetKey)
 };
 
 window.openPersonalizeModal = async function openPersonalizeModal(defaultTab) {
+  if (!isPersonalizationDesktopMode()) {
+    hideAllPersonalizationUI();
+    return;
+  }
   const modal = document.getElementById("personalize-modal-backdrop");
   if (!modal) return;
   modal.style.display = "flex";

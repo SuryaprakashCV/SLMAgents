@@ -854,7 +854,7 @@ def _build_complete_cv_presentation_markdown(src_info: Dict[str, Any]) -> str:
     directly from parsed CV metadata & career history (`src_info`), ensuring 100% coverage
     of candidate profile, core competencies, all career roles (2009–Present), patents, and education.
     """
-    cand_name = src_info.get("name") or "Suryaprakash C.V."
+    cand_name = src_info.get("name") or "Candidate Profile"
     role_title = src_info.get("role_title") or "Principal Architect | Generative AI & Agentic Systems"
     contacts = " | ".join(src_info.get("contact_items") or [])
     profile = src_info.get("profile") or ""
@@ -1262,7 +1262,7 @@ def review_and_correct_document_loop(
         repairs_made: List[str] = []
 
         # 2a. Ensure Candidate Name & Contact Header exist at top of pure_md
-        cand_name = src_info.get("name") or ("Suryaprakash C.V." if "suryaprakash" in c_low else "")
+        cand_name = src_info.get("name") or ""
         if cand_name and cand_name.lower().split()[0] not in pure_md[:220].lower():
             role_lbl = src_info.get("role_title") or "Principal Architect | Generative AI & Agentic Systems"
             contact_line = " | ".join(src_info.get("contact_items") or [])

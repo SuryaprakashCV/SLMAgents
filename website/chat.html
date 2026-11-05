@@ -46,6 +46,14 @@
   }
   </script>
   <style>
+    /* Personalization is strictly for the Installed Desktop App — hidden on the Web Version */
+    #btn-personalize-studio,
+    #btn-sidebar-personalize,
+    #btn-popover-personalize,
+    html:not(.desktop-app-mode) #personalize-suggestions-tray,
+    html:not(.desktop-app-mode) #personalize-modal-backdrop {
+      display: none !important;
+    }
     html.desktop-app-mode .web-only-nav,
     html.desktop-app-mode .btn-top-github-issue {
       display: none !important;
@@ -53,6 +61,9 @@
     html.desktop-app-mode #btn-personalize-studio,
     html.desktop-app-mode #btn-sidebar-personalize {
       display: inline-flex !important;
+    }
+    html.desktop-app-mode #btn-popover-personalize {
+      display: flex !important;
     }
 
     /* Reasoning Effort Selector (Low / Medium / High) */
@@ -262,7 +273,7 @@
           </svg>
           <span>New Chat</span>
         </button>
-        <button type="button" id="btn-sidebar-personalize" onclick="openPersonalizeModal()" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant" style="display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 8px 12px; border-radius: 10px; font-size: 0.8rem; font-weight: 600; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; cursor: pointer; transition: all 0.15s ease;">
+        <button type="button" id="btn-sidebar-personalize" onclick="openPersonalizeModal()" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant" style="display: none; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 8px 12px; border-radius: 10px; font-size: 0.8rem; font-weight: 600; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; cursor: pointer; transition: all 0.15s ease;">
           <span id="sidebar-personalize-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block; flex-shrink: 0;"></span>
           <span>✨ Personalize &amp; Concierge</span>
         </button>
@@ -334,8 +345,8 @@
             CPU Ready
           </span>
 
-          <!-- Strictly Opt-In Personalization & Daily Concierge Button -->
-          <button type="button" class="btn-harness-top" id="btn-personalize-studio" onclick="openPersonalizeModal()" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; cursor: pointer;">
+          <!-- Strictly Opt-In Personalization & Daily Concierge Button (Desktop App Only) -->
+          <button type="button" class="btn-harness-top" id="btn-personalize-studio" onclick="openPersonalizeModal()" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant" style="display: none; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; cursor: pointer;">
             <span id="personalize-status-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
             <span>✨ Personalize</span>
           </button>
@@ -374,7 +385,7 @@
               <div class="popover-divider"></div>
               <div class="popover-section-label">Workspace &amp; Session</div>
 
-              <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openPersonalizeModal()" id="btn-popover-personalize" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant">
+              <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openPersonalizeModal()" id="btn-popover-personalize" style="display: none;" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 <span>✨ Personalization &amp; Concierge</span>
               </button>
@@ -1161,6 +1172,6 @@
       }
     }
   </script>
-  <script src="app.js?v=112.0"></script>
+  <script src="app.js?v=113.0"></script>
 </body>
 </html>

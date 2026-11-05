@@ -42,6 +42,12 @@ leaderboard/**/data/*verification*.jsonl
 leaderboard/**/output/
 test_*.py
 
+# Local Personalization, Credential Vault & Scheduled Jobs (Never Commit)
+.slm/personal_profile.json
+.slm/vault/
+.slm/concierge/
+.slm/scheduled_jobs.json
+
 
 
 
