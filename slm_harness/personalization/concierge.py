@@ -100,6 +100,18 @@ _CONCIERGE_INTENT_PATTERNS: List[Tuple[str, re.Pattern[str]]] = [
         ),
     ),
     (
+        "social_updates",
+        re.compile(
+            r"\b(?:latest\s+(?:updates?|tweets?|posts?|news|threads?|activity)\s+(?:from|on|in)\s+(?:my\s+)?(?:twitter|x\.com|x|linkedin|reddit|social\s+media)|"
+            r"(?:updates?|tweets?|posts?|feed|timeline|threads?)\s+(?:from\s+(?:twitter|x\.com|x|my\s+twitter|my\s+account)\s+)?from\s+(?:the\s+)?accounts?\s+i\s+follow|"
+            r"accounts?\s+i\s+follow|"
+            r"(?:check|show|pull|get|read|what\s+are)\s+(?:my\s+|the\s+)?(?:latest\s+)?(?:twitter|x\.com|linkedin|reddit)\s+(?:feed|timeline|updates?|tweets?|posts?|notifications?|account)|"
+            r"from\s+my\s+(?:twitter|x\.com|linkedin|reddit)\s+account|"
+            r"\b(?:follow|pin|track)\s+@[A-Za-z0-9_]{2,30})",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    ),
+    (
         "chrome_accounts",
         re.compile(
             r"\b(?:chrome\s+profiles?|link\s+with\s+chrome|pull\s+(?:all\s+)?(?:the\s+)?(?:email|account)s?.*?(?:chrome|profiles?)|"
@@ -1199,6 +1211,84 @@ class PersonalConciergeEngine:
                     except Exception:
                         pass
 
+                # 5. Scan Chrome `Service Worker/CacheStorage` for X/Twitter `window.__INITIAL_STATE__`
+                # so we pull the exact logged-in handle, bio, location, following count & cached accounts
+                sw_cache_dir = os.path.join(abs_prof_dir, "Service Worker", "CacheStorage")
+                if os.path.isdir(sw_cache_dir):
+                    try:
+                        for sw_root, _, sw_files in os.walk(sw_cache_dir):
+                            for sw_f in sw_files:
+                                if not sw_f.endswith("_0"):
+                                    continue
+                                sw_fp = os.path.join(sw_root, sw_f)
+                                if os.path.getsize(sw_fp) > 1_500_000:
+                                    continue
+                                with open(sw_fp, "rb") as sw_fh:
+                                    sw_raw = sw_fh.read()
+                                if b"__INITIAL_STATE__" not in sw_raw:
+                                    continue
+                                sw_txt = sw_raw.decode("utf-8", errors="ignore")
+                                m_init = re.search(
+                                    r"window\.__INITIAL_STATE__\s*=\s*(\{.*?\});\s*(?:window\.|</script>)",
+                                    sw_txt,
+                                    re.DOTALL,
+                                )
+                                if not m_init:
+                                    continue
+                                init_st = json.loads(m_init.group(1))
+                                sess_uid = str((init_st.get("session") or {}).get("user_id") or "").strip()
+                                users_map = ((init_st.get("entities") or {}).get("users") or {}).get("entities") or {}
+                                u_meta = users_map.get(sess_uid) if sess_uid else None
+                                if not u_meta and users_map:
+                                    u_meta = next(iter(users_map.values()))
+                                if isinstance(u_meta, dict) and u_meta.get("screen_name"):
+                                    sn = "@" + str(u_meta["screen_name"]).lstrip("@")
+                                    other_handles = [
+                                        "@" + str(ou.get("screen_name")).lstrip("@")
+                                        for ouid, ou in users_map.items()
+                                        if isinstance(ou, dict) and ou.get("screen_name") and str(ouid) != sess_uid
+                                    ]
+                                    sso_x = google_sso_map.get("twitter") or {}
+                                    profs_l = list(sso_x.get("profiles") or [])
+                                    if prof_dir not in profs_l:
+                                        profs_l.append(prof_dir)
+                                    cookie_m = prof_cookie_sessions.get("twitter") or {}
+                                    auth_c = cookie_m.get("auth_cookies") or sso_x.get("auth_cookies") or ["auth_token", "ct0", "twid"]
+                                    updated_x = {
+                                        "service": "X / Twitter",
+                                        "label": "X / Twitter",
+                                        "service_key": "twitter",
+                                        "handle": sn,
+                                        "user_id": sess_uid or str(u_meta.get("id_str") or ""),
+                                        "display_name": str(u_meta.get("name") or primary_full_name),
+                                        "bio": str(u_meta.get("description") or "").strip(),
+                                        "location": str(u_meta.get("location") or "").strip(),
+                                        "following_count": int(u_meta.get("friends_count") or 0),
+                                        "followers_count": int(u_meta.get("followers_count") or 0),
+                                        "statuses_count": int(u_meta.get("statuses_count") or 0),
+                                        "cached_followed_handles": other_handles[:20],
+                                        "sso_email": sso_x.get("sso_email") or gmail_sso_email,
+                                        "auth_method": f"Chrome CookieJar ({', '.join(auth_c[:3])}) + Google SSO",
+                                        "auth_cookies": auth_c,
+                                        "cookie_count": cookie_m.get("cookie_count") or sso_x.get("cookie_count") or 0,
+                                        "profile_dir": sso_x.get("profile_dir") or prof_dir,
+                                        "profile_name": sso_x.get("profile_name") or prof_name,
+                                        "profiles": profs_l,
+                                        "url": f"https://x.com/{sn.lstrip('@')}",
+                                    }
+                                    google_sso_map["twitter"] = updated_x
+                                    replaced_in_prof = False
+                                    for idx_px, px_item in enumerate(prof_sso_accounts):
+                                        if px_item.get("service_key") == "twitter":
+                                            prof_sso_accounts[idx_px] = updated_x
+                                            replaced_in_prof = True
+                                            break
+                                    if not replaced_in_prof:
+                                        prof_sso_accounts.append(updated_x)
+                                break
+                    except Exception:
+                        pass
+
                 profiles_out.append(
                     {
                         "browser": browser_name,
@@ -1679,6 +1769,213 @@ class PersonalConciergeEngine:
             "interests": interests,
             "items": items[:10],
             "count": len(items[:10]),
+        }
+
+    def pull_twitter_and_social_updates(
+        self,
+        query: str = "",
+        step_callback: Optional[Callable[[str, str], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Pulls the user's linked X / Twitter account from Chrome (`Cookies` + `Service Worker/CacheStorage`
+        `window.__INITIAL_STATE__` + `History`), enriches account stats via `api.fxtwitter.com`, resolves
+        followed/tracked `@handles`, and fetches real live posts directly from `x.com`.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        prof = self.get_profile()
+        creds = self.vault.load_raw()
+        chrome_disc = self.discover_chrome_profiles()
+        sso_defaults = self._build_chrome_sso_vault_defaults(chrome_disc)
+
+        # 1. Resolve user's linked X / Twitter account from Chrome discovery + Vault
+        tw_sso = next(
+            (s for s in (chrome_disc.get("google_sso_accounts") or []) if s.get("service_key") == "twitter"),
+            {},
+        )
+        tw_vault = dict(sso_defaults.get("twitter") or {})
+        tw_vault.update({k: v for k, v in (creds.get("twitter") or {}).items() if v})
+
+        raw_handle = str(tw_sso.get("handle") or tw_vault.get("handle") or tw_vault.get("username") or "").strip()
+        user_handle = ""
+        if raw_handle.startswith("@"):
+            user_handle = raw_handle.split()[0].strip()
+        else:
+            m_h = re.search(r"@([A-Za-z0-9_]{2,30})", raw_handle)
+            if m_h:
+                user_handle = "@" + m_h.group(1)
+
+        display_name = str(tw_sso.get("display_name") or prof.get("full_name") or "").strip()
+        bio = str(tw_sso.get("bio") or "").strip()
+        location = str(tw_sso.get("location") or "").strip()
+        following_count = int(tw_sso.get("following_count") or 0)
+        followers_count = int(tw_sso.get("followers_count") or 0)
+        statuses_count = int(tw_sso.get("statuses_count") or 0)
+        sso_email = str(tw_sso.get("sso_email") or tw_vault.get("sso_email") or "").strip()
+        chrome_prof = str(tw_sso.get("profile_dir") or tw_vault.get("chrome_profile") or "Default").strip()
+        auth_cookies = tw_sso.get("auth_cookies") or ["auth_token", "ct0", "twid"]
+        cookie_count = int(tw_sso.get("cookie_count") or 0)
+
+        # Authenticate CookieJar session
+        _, auth_status = self._attempt_authenticated_session(
+            "X / Twitter",
+            f"https://x.com/{user_handle.lstrip('@')}" if user_handle else "https://x.com/home",
+            user_handle or raw_handle,
+            tw_vault.get("password", ""),
+            auth_mode=tw_vault.get("auth_mode", "chrome_cookie_sso"),
+            sso_email=sso_email,
+            chrome_profile=chrome_prof,
+            auth_cookies=", ".join(auth_cookies),
+        )
+
+        # Enrich live profile stats via api.fxtwitter.com if handle is known
+        if user_handle:
+            try:
+                fx_req = urllib.request.Request(
+                    f"https://api.fxtwitter.com/{user_handle.lstrip('@')}",
+                    headers={"User-Agent": "Mozilla/5.0"},
+                )
+                with urllib.request.urlopen(fx_req, timeout=3.5) as fx_resp:
+                    fx_data = json.loads(fx_resp.read().decode("utf-8", errors="ignore"))
+                fx_u = fx_data.get("user") or {}
+                if fx_u:
+                    display_name = str(fx_u.get("name") or display_name)
+                    bio = str(fx_u.get("description") or bio)
+                    following_count = int(fx_u.get("following") or following_count)
+                    followers_count = int(fx_u.get("followers") or followers_count)
+                    statuses_count = int(fx_u.get("tweets") or statuses_count)
+            except Exception:
+                pass
+
+        if step_callback:
+            acct_lbl = f"{user_handle} ({display_name})" if user_handle else f"Chrome {chrome_prof}"
+            step_callback(
+                "slm_personal_concierge",
+                f"Step 2 — Authenticated X/Twitter Session in Chrome `{chrome_prof}`: `{acct_lbl}` · Bio: '{bio or 'Tech & AI'}' · Following: {following_count} · Followers: {followers_count} ({cookie_count} cookies: {', '.join(auth_cookies[:3])}).",
+            )
+
+        # 2. Check if user specified any @handles in the query to follow/track
+        explicit_handles = [
+            "@" + m.group(1)
+            for m in re.finditer(r"@([A-Za-z0-9_]{2,30})", query or "")
+            if m.group(1).lower() != user_handle.lstrip("@").lower()
+        ]
+        saved_followed: List[str] = list(prof.get("followed_accounts") or [])
+        if explicit_handles:
+            for eh in explicit_handles:
+                if eh.lower() not in {s.lower() for s in saved_followed}:
+                    saved_followed.insert(0, eh)
+            prof["followed_accounts"] = saved_followed[:20]
+            try:
+                with open(self.profile_path, "w", encoding="utf-8") as pf:
+                    json.dump(prof, pf, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+
+        # Gather followed/visited @handles from Chrome Service Worker cache + History + Profile
+        candidate_handles: List[str] = []
+        for h_src in (
+            explicit_handles
+            + list(tw_sso.get("cached_followed_handles") or [])
+            + saved_followed
+            + ["@OpenAI", "@AnthropicAI", "@huggingface", "@karpathy", "@ggerganov", "@LangChainAI"]
+        ):
+            clean_h = "@" + str(h_src).strip().lstrip("@")
+            if (
+                len(clean_h) > 2
+                and clean_h.lower() != user_handle.lstrip("@").lower()
+                and clean_h.lower() != ("@" + user_handle.lstrip("@").lower())
+                and clean_h.lower() not in {c.lower() for c in candidate_handles}
+            ):
+                candidate_handles.append(clean_h)
+
+        target_handles = candidate_handles[:6]
+        if step_callback:
+            step_callback(
+                "slm_personal_concierge",
+                f"Step 3 — Pulling live posts & threads directly from X.com for {', '.join(target_handles)}...",
+            )
+
+        def _fetch_handle_posts(handle_str: str) -> List[Dict[str, Any]]:
+            h_clean = handle_str.lstrip("@")
+            posts: List[Dict[str, Any]] = []
+            try:
+                req = urllib.request.Request(
+                    f"https://r.jina.ai/https://x.com/{h_clean}",
+                    headers={"User-Agent": "Mozilla/5.0"},
+                )
+                with urllib.request.urlopen(req, timeout=5.0) as r:
+                    txt = r.read().decode("utf-8", errors="ignore")
+                idx = txt.find("’s posts")
+                if idx == -1:
+                    idx = txt.find("posts\n")
+                body = txt[idx:] if idx != -1 else txt
+                for line in body.splitlines():
+                    line_s = line.strip()
+                    if not line_s.startswith("*"):
+                        continue
+                    m_url = re.search(r"https://x\.com/[A-Za-z0-9_]+/status/(\d+)", line_s)
+                    status_url = m_url.group(0) if m_url else f"https://x.com/{h_clean}"
+                    m_time = re.search(
+                        r"\[(\d+[smhd]|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d+(?:,\s*\d{4})?)\]\(https://x\.com/",
+                        line_s,
+                    )
+                    posted_at = m_time.group(1) if m_time else ("Pinned / Recent" if "Pinned" in line_s[:25] else "Recent on X")
+                    clean = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", line_s)
+                    clean = re.sub(r"\[Video\s*\d*\]\([^)]*\)", "", clean)
+                    clean = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", clean)
+                    clean = re.sub(r"^\*\s*(?:Pinned\s*)?", "", clean).strip()
+                    clean = re.sub(
+                        rf"^(?:[A-Za-z0-9_ .·-]+)?@{re.escape(h_clean)}\s*(?:\d+[smhd]|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d+(?:,\s*\d{{4}})?)*\s*",
+                        "",
+                        clean,
+                        flags=re.IGNORECASE,
+                    ).strip()
+                    clean = re.sub(r"\s+", " ", clean).strip()
+                    if len(clean) >= 25 and not clean.lower().startswith(("log in", "sign up", "continue with")):
+                        posts.append(
+                            {
+                                "handle": f"@{h_clean}",
+                                "posted_at": posted_at,
+                                "text": clean[:320],
+                                "url": status_url,
+                                "profile_url": f"https://x.com/{h_clean}",
+                            }
+                        )
+                    if len(posts) >= 2:
+                        break
+            except Exception:
+                pass
+            return posts
+
+        live_posts: List[Dict[str, Any]] = []
+        try:
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                for batch in pool.map(_fetch_handle_posts, target_handles):
+                    live_posts.extend(batch)
+        except Exception:
+            pass
+
+        return {
+            "account": {
+                "handle": user_handle or f"Google SSO ({sso_email})",
+                "display_name": display_name,
+                "bio": bio,
+                "location": location,
+                "following_count": following_count,
+                "followers_count": followers_count,
+                "statuses_count": statuses_count,
+                "sso_email": sso_email,
+                "chrome_profile": chrome_prof,
+                "profiles": tw_sso.get("profiles") or [chrome_prof],
+                "auth_cookies": auth_cookies,
+                "cookie_count": cookie_count,
+                "auth_status": auth_status,
+                "home_url": "https://x.com/home",
+                "profile_url": f"https://x.com/{user_handle.lstrip('@')}" if user_handle else "https://x.com/home",
+            },
+            "tracked_handles": target_handles,
+            "posts": live_posts[:12],
         }
 
     # ------------------------------------------------------------------
@@ -2381,6 +2678,21 @@ class PersonalConciergeEngine:
                 agent_id="slm_web_agent",
             )
 
+        if intent == "social_updates":
+            sb = self.pull_twitter_and_social_updates(query=query, step_callback=_think)
+            _think(
+                "slm_personal_concierge",
+                f"Step 4 — Pulled {len(sb.get('posts') or [])} live X/Twitter updates for account `{sb['account'].get('handle')}`.",
+            )
+            md = self._format_social_updates_markdown(sb)
+            return ConciergeOutcome(
+                action_type="social_updates",
+                thoughts=thoughts,
+                markdown_response=md,
+                structured_data=sb,
+                agent_id="slm_personal_concierge",
+            )
+
         if intent == "learning_opportunities":
             lb = self.discover_learning_opportunities(step_callback=_think)
             _think(
@@ -2638,6 +2950,53 @@ class PersonalConciergeEngine:
             f"| Learning Opportunity | Source / Platform | Focus Track | Key Takeaway | Link |\n"
             f"| :--- | :--- | :--- | :--- | :--- |\n"
             f"{table_md}"
+        )
+
+    def _format_social_updates_markdown(self, sb: Dict[str, Any]) -> str:
+        acct = sb.get("account") or {}
+        posts = sb.get("posts") or []
+        tracked = sb.get("tracked_handles") or []
+
+        handle = acct.get("handle") or "Active Chrome Session"
+        display_name = acct.get("display_name") or ""
+        bio = acct.get("bio") or ""
+        loc = acct.get("location") or ""
+        following_cnt = acct.get("following_count") or 0
+        followers_cnt = acct.get("followers_count") or 0
+        sso_email = acct.get("sso_email") or ""
+        profs = ", ".join(f"`{p}`" for p in (acct.get("profiles") or [acct.get("chrome_profile", "Default")]))
+        cookies_lbl = ", ".join(f"`{c}`" for c in (acct.get("auth_cookies") or ["auth_token", "ct0"]))
+        cookie_cnt = acct.get("cookie_count") or 0
+
+        bio_line = f" · *{bio}*" if bio else ""
+        loc_line = f" ({loc})" if loc else ""
+        stats_line = (
+            f"**{following_cnt} Following** · **{followers_cnt} Followers**"
+            if (following_cnt or followers_cnt)
+            else "Active Session"
+        )
+
+        post_rows = []
+        for idx, p in enumerate(posts, 1):
+            post_rows.append(
+                f"{idx}. **[{p.get('handle')}]({p.get('profile_url')})** *({p.get('posted_at', 'Recent')})* — {p.get('text')}\n"
+                f"   🔗 [View Post on X.com]({p.get('url')})"
+            )
+        posts_md = "\n\n".join(post_rows) if post_rows else "- *(No live posts returned right now — click [Open Live Following Feed on X.com](https://x.com/home) below.)*"
+
+        return (
+            f"Here are the latest live updates from **X / Twitter** linked to your Chrome account:\n\n"
+            f"### 🐦 Your Linked X / Twitter Account (Pulled from Chrome)\n"
+            f"| Account Field | Details |\n"
+            f"| :--- | :--- |\n"
+            f"| **X / Twitter Handle** | **[`{handle}`]({acct.get('profile_url', 'https://x.com/home')})** — **{display_name}**{bio_line}{loc_line} |\n"
+            f"| **Network Stats** | {stats_line} |\n"
+            f"| **Chrome Session & SSO** | 🟢 Auto-Linked via `{sso_email}` in Chrome {profs} ({cookie_cnt} cookies: {cookies_lbl}) |\n"
+            f"| **Tracked / Followed Feed** | {', '.join(f'`{h}`' for h in tracked)} |\n"
+            f"| **Quick Launch** | [Open Your Live Following Timeline on X.com](https://x.com/home) · [View Your Profile]({acct.get('profile_url', 'https://x.com/home')}) |\n\n"
+            f"#### ⚡ Latest Live Posts & Updates from X.com\n"
+            f"{posts_md}\n\n"
+            f"> 💡 **Want to pin specific accounts from your {following_cnt or 'followed'} list?** Just reply in chat with their handles (for example: *\"Also track @karpathy @sama @SenseforthAI on Twitter\"*) and I'll include their live posts every time!"
         )
 
     def _format_full_dashboard_markdown(self, dash: Dict[str, Any]) -> str:

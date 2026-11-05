@@ -2797,6 +2797,7 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
     if (meta && meta.clarification && Array.isArray(meta.clarification.options) && meta.clarification.options.length > 0) {
       const cl = meta.clarification;
       const origQ = encodeURIComponent(cl.original_query || "");
+      const customInputId = "plan-custom-input-" + Math.random().toString(36).slice(2, 9);
       const cCard = document.createElement("div");
       cCard.className = "clarify-chips-card";
       const chipsHtml = cl.options.map((opt, idx) => {
@@ -2807,9 +2808,13 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
       cCard.innerHTML = `
         <div class="clarify-card-header">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span>${escapeHtmlSafe(cl.question || "Select an option to customize or clarify the plan:")}</span>
+          <span>${escapeHtmlSafe(cl.question || "Does this plan look good to you, or would you like to tweak anything before I start?")}</span>
         </div>
         <div class="clarify-options-row">${chipsHtml}</div>
+        <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+          <input type="text" id="${customInputId}" placeholder="Or type any tweaks / notes (e.g. 'use pytest', 'add logging')..." style="flex:1; padding:7px 11px; border-radius:8px; border:1px solid rgba(148,163,184,0.35); background:rgba(15,23,42,0.03); font-size:12.5px; color:inherit; outline:none;" onkeydown="if(event.key==='Enter'){event.preventDefault(); submitCustomPlanConfirmation(decodeURIComponent('${origQ}'), '${customInputId}', this);}" />
+          <button type="button" class="btn-clarify-chip" style="background:linear-gradient(135deg,#2563eb,#4f46e5); color:#fff; border:none; font-weight:600; padding:7px 13px;" onclick="submitCustomPlanConfirmation(decodeURIComponent('${origQ}'), '${customInputId}', this)">Confirm &amp; Move Forward →</button>
+        </div>
       `;
       body.appendChild(cCard);
     }
@@ -4458,11 +4463,19 @@ function selectPlanClarificationOption(originalQuery, chosenOption, btnEl) {
   if (!chosenOption) return;
   const card = btnEl ? btnEl.closest(".clarify-chips-card") : null;
   if (card) {
-    card.innerHTML = `<div class="clarify-card-header">✓ Selected: <strong>${escapeHtmlSafe(chosenOption)}</strong></div>`;
+    card.innerHTML = `<div class="clarify-card-header">✓ Confirmed: <strong>${escapeHtmlSafe(chosenOption)}</strong></div>`;
   }
-  handleChatSubmit(null, chosenOption, chosenOption);
+  const msgToSend = originalQuery ? originalQuery : chosenOption;
+  handleChatSubmit(null, msgToSend, chosenOption);
 }
 window.selectPlanClarificationOption = selectPlanClarificationOption;
+
+function submitCustomPlanConfirmation(originalQuery, inputId, btnEl) {
+  const inputEl = inputId ? document.getElementById(inputId) : null;
+  const customNote = (inputEl && inputEl.value ? inputEl.value.trim() : "") || "✅ Looks great — go ahead and build it!";
+  selectPlanClarificationOption(originalQuery, customNote, btnEl);
+}
+window.submitCustomPlanConfirmation = submitCustomPlanConfirmation;
 
 function setHarnessStopButtonVisible(visible) {
   const stopBtn = document.getElementById("chat-stop-btn");
@@ -4637,6 +4650,7 @@ function renderInlineClarificationCard(reqId, runId, payload) {
 
   const ticketId = payload.ticket_id || "";
   const origQuery = encodeURIComponent(payload.original_query || "");
+  const customInputId = "plan-custom-live-" + Math.random().toString(36).slice(2, 9);
   const options = Array.isArray(payload.options) ? payload.options : [];
   const card = document.createElement("div");
   card.className = "clarify-chips-card";
@@ -4651,9 +4665,13 @@ function renderInlineClarificationCard(reqId, runId, payload) {
   card.innerHTML = `
     <div class="clarify-card-header">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span>${escapeHtmlSafe(payload.question || "Please choose an option to clarify or refine the plan:")}</span>
+      <span>${escapeHtmlSafe(payload.question || "Does this plan look good to you, or would you like to tweak anything before I start?")}</span>
     </div>
     <div class="clarify-options-row">${chipsHtml}</div>
+    <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+      <input type="text" id="${customInputId}" placeholder="Or type any tweaks / notes (e.g. 'use pytest', 'add logging')..." style="flex:1; padding:7px 11px; border-radius:8px; border:1px solid rgba(148,163,184,0.35); background:rgba(15,23,42,0.03); font-size:12.5px; color:inherit; outline:none;" onkeydown="if(event.key==='Enter'){event.preventDefault(); submitCustomPlanConfirmation(decodeURIComponent('${origQuery}'), '${customInputId}', this);}" />
+      <button type="button" class="btn-clarify-chip" style="background:linear-gradient(135deg,#2563eb,#4f46e5); color:#fff; border:none; font-weight:600; padding:7px 13px;" onclick="submitCustomPlanConfirmation(decodeURIComponent('${origQuery}'), '${customInputId}', this)">Confirm &amp; Move Forward →</button>
+    </div>
   `;
   body.appendChild(card);
 }

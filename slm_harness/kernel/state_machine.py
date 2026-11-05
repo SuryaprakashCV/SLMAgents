@@ -345,7 +345,125 @@ class TurnStateMachine:
                 "plan_context": f"Execute OS & Machine Control workflow ({machine_intent}) with step-by-step thought process.",
             }
 
-        # When the user's request is clear, plan internally and answer naturally in one pass without asking redundant options
+        # Check if this is a Personal Concierge request (Twitter/Social updates, Chrome accounts, Email tracker, Jobs, Dashboard)
+        concierge_intent = detect_concierge_intent(q_clean)
+        if concierge_intent:
+            steps = [
+                {
+                    "node_id": "plan_1",
+                    "agent": "slm_personal_concierge",
+                    "instruction": f"Inspect linked Chrome session cookies, SSO accounts & personalization context ({concierge_intent})",
+                    "depends_on": [],
+                },
+                {
+                    "node_id": "plan_2",
+                    "agent": "slm_personal_concierge",
+                    "instruction": f"Pull live authenticated account details & feed updates for: {q_clean[:85]}",
+                    "depends_on": ["plan_1"],
+                },
+            ]
+            return {
+                "needs_blocking_clarification": False,
+                "question": "",
+                "options": [],
+                "steps": steps,
+                "plan_markdown": "",
+                "plan_context": f"Execute Personal Concierge workflow ({concierge_intent}).",
+            }
+
+        # Check if this is a Complex BUILD or TEST request (or explicit /plan) where we should present
+        # a warm, collaborative, human-like plan and get confirmation before moving forward!
+        raw_trim = (user_query or "").strip().lower()
+        is_explicit_plan_cmd = raw_trim.startswith("/plan")
+        is_complex_build_ask = bool(
+            re.search(
+                r"\b(?:build|create|develop|architect|design|implement|scaffold|construct|engineer|set\s+up)\b"
+                r".*\b(?:app|application|api|service|microservice|backend|frontend|fullstack|full-stack|system|"
+                r"pipeline|platform|dashboard|database|agent|workflow|framework|engine|cli|tool|module|server|"
+                r"bot|scraper|crawler|scheduler|authentication|auth|webhook|sdk|library|package|architecture|"
+                r"feature|portal|integration|plugin|suite|solution)\b",
+                q_low,
+                re.DOTALL,
+            )
+            or (
+                len(words) >= 8
+                and re.search(r"\b(?:build|create|develop|architect|implement)\b", q_low)
+                and not is_direct_download_followup(q_clean)
+            )
+        )
+        is_complex_test_ask = bool(
+            re.search(
+                r"\b(?:test|testing|unit\s+tests?|integration\s+tests?|e2e|end-to-end|qa|benchmark|stress\s+test|"
+                r"load\s+test|pytest|unittest|test\s+suite|test\s+cases?|test\s+plan|verify\s+and\s+test|"
+                r"write\s+tests?|run\s+tests?|audit\s+and\s+test)\b",
+                q_low,
+                re.DOTALL,
+            )
+            and len(words) >= 4
+        )
+
+        if not clarification_choice and (is_explicit_plan_cmd or is_complex_build_ask or is_complex_test_ask):
+            action_focus = "building and testing" if (is_complex_build_ask and is_complex_test_ask) else (
+                "testing and verifying" if is_complex_test_ask else "building"
+            )
+            steps = [
+                {
+                    "node_id": "plan_1",
+                    "agent": "slm_task_planner",
+                    "instruction": f"Step 1 — Scope architecture, data contracts & interface boundaries for: {q_clean[:85]}",
+                    "depends_on": [],
+                },
+                {
+                    "node_id": "plan_2",
+                    "agent": "slm_code_interpreter",
+                    "instruction": "Step 2 — Implement clean, modular core logic with type safety & edge-case guards",
+                    "depends_on": ["plan_1"],
+                },
+                {
+                    "node_id": "plan_3",
+                    "agent": "slm_code_interpreter",
+                    "instruction": "Step 3 — Build & run automated test suite (happy path, boundary cases & error handling) in sandbox",
+                    "depends_on": ["plan_2"],
+                },
+                {
+                    "node_id": "plan_4",
+                    "agent": primary_agent,
+                    "instruction": "Step 4 — Review sandbox output & walk through how to run and extend it",
+                    "depends_on": ["plan_3"],
+                },
+            ]
+            question = "Does this plan look good to you, or would you like to tweak anything before I start?"
+            options = [
+                "✅ Looks great — go ahead and build it!",
+                "🧪 Go ahead + include an expanded test & edge-case suite",
+                "⚡ Keep it lightweight — build a clean, fast MVP first",
+            ]
+            plan_markdown = (
+                f"I'd love to help you with **{action_focus}** this! Since this has a few moving parts, let's quickly align on a game plan before I jump into writing and running the code:\n\n"
+                f"### 🗺️ Proposed Game Plan for: *{q_clean}*\n\n"
+                f"1. **Step 1 — Architecture & Data Contracts**\n"
+                f"   We'll lay out clean data models, interfaces, and validation rules so the foundation is solid and easy to extend.\n"
+                f"2. **Step 2 — Core Implementation & Edge-Case Guards**\n"
+                f"   I'll write self-contained, production-ready code with full type hints, structured error handling, and guards for empty, invalid, or boundary inputs.\n"
+                f"3. **Step 3 — Automated Testing & Live Sandbox Verification**\n"
+                f"   I'll build a runnable test suite covering normal workflows, edge cases, and failure modes, and execute it directly in the isolated sandbox so we know everything passes.\n"
+                f"4. **Step 4 — Clear Walkthrough & Next Steps**\n"
+                f"   Finally, I'll share the verified output, complexity notes, and how you can plug it right into your workflow.\n\n"
+                f"---\n"
+                f"💬 **{question}**\n"
+                f"*(You can click one of the quick options below, or just reply naturally in chat — e.g. \"sounds good, go ahead\" or tell me any changes you'd like!)*"
+            )
+            return {
+                "needs_blocking_clarification": True,
+                "question": question,
+                "options": options,
+                "steps": steps,
+                "plan_markdown": plan_markdown,
+                "plan_context": "",
+                "original_query": q_clean,
+            }
+
+        # When the user's request is clear (or already confirmed), plan internally and answer naturally
         if primary_agent == "slm_code_interpreter" or _CODING_INTENT_RE.search(q_clean):
             chosen_note = clarification_choice or "Optimal O(n)/O(log n) Time & Space Complexity + Full Edge-Case Guards"
             steps = [
@@ -376,9 +494,10 @@ class TurnStateMachine:
             ]
             plan_context = (
                 f"1. Target Objective: {q_clean}\n"
-                f"2. Architectural Strategy: {chosen_note}\n"
+                f"2. Confirmed User Direction: {chosen_note}\n"
                 f"3. Mandatory Loophole Guards: Handle n <= 0, negative inputs, empty inputs, and boundary conditions explicitly; use optimal time/space complexity.\n"
-                f"4. Verification: Include runnable `__main__` assertions and `print(...)` output verified in the sandbox."
+                f"4. Verification: Include runnable `__main__` assertions and `print(...)` output verified in the sandbox.\n"
+                f"5. Tone: Speak naturally and collaboratively like a senior human engineering teammate."
             )
             return {
                 "needs_blocking_clarification": False,
@@ -390,7 +509,7 @@ class TurnStateMachine:
             }
 
         # General / analytical / SQL / math plan when Medium or High reasoning is active
-        chosen_note = clarification_choice or "Direct, accurate, grounded synthesis"
+        chosen_note = clarification_choice or "Direct, accurate, conversational synthesis"
         steps = [
             {"node_id": "plan_1", "agent": primary_agent, "instruction": f"Decompose question & constraints: {q_clean[:90]}", "depends_on": []},
             {"node_id": "plan_2", "agent": primary_agent, "instruction": f"Synthesize grounded answer ({chosen_note})", "depends_on": ["plan_1"]},
@@ -401,7 +520,7 @@ class TurnStateMachine:
             "options": [],
             "steps": steps,
             "plan_markdown": "",
-            "plan_context": f"Follow structured plan: {chosen_note}. Answer directly, accurately, and concisely.",
+            "plan_context": f"Follow structured plan: {chosen_note}. Answer naturally, warmly, and accurately like a thoughtful human expert.",
         }
 
     def run_turn(
@@ -440,6 +559,45 @@ class TurnStateMachine:
 
         bb = get_blackboard()
         ckpt = get_checkpoint_store()
+
+        # Check if there is a pending interactive plan awaiting user confirmation in this session
+        pending_plan = bb.get(session_id, "pending_plan_state")
+        if isinstance(pending_plan, dict) and pending_plan.get("original_query"):
+            orig_plan_query = str(pending_plan["original_query"]).strip()
+            reply_clean = (user_query or "").strip()
+            reply_low = reply_clean.lower()
+            is_confirm_reply = bool(
+                clarification_choice
+                or re.match(
+                    r"^(?:✅|🧪|⚡)?\s*(?:yes|yep|yeah|yup|sure|ok|okay|k|sounds?\s+good|looks?\s+good|looks?\s+great|"
+                    r"go\s+ahead|move\s+forward|proceed|build\s+it|test\s+it|do\s+it|run\s+it|start|"
+                    r"let'?s\s+go|let'?s\s+do\s+it|confirm(?:ed)?|approve[d]?|perfect|awesome|great|fine|1|2|3)\b",
+                    reply_low,
+                )
+            )
+            is_plan_revision_request = bool(
+                not is_confirm_reply
+                and re.search(
+                    r"\b(?:update\s+the\s+plan|change\s+the\s+plan|modify\s+the\s+plan|revise\s+the\s+plan|"
+                    r"instead\s+of|change\s+step|in\s+the\s+plan)\b",
+                    reply_low,
+                )
+            )
+            if is_confirm_reply:
+                bb.put(session_id, "pending_plan_state", None)
+                if not clarification_choice:
+                    clarification_choice = reply_clean
+                # If the user clicked an option and frontend sent chosenOption as message, restore orig_plan_query
+                if reply_clean == clarification_choice or len(reply_clean.split()) <= 12 or reply_low.startswith(("yes", "looks", "sounds", "go ahead", "move forward", "proceed", "✅", "🧪", "⚡")):
+                    user_query = orig_plan_query
+                else:
+                    user_query = f"{orig_plan_query} ({reply_clean})"
+            elif is_plan_revision_request:
+                user_query = f"{orig_plan_query} — Plan update requested by user: {reply_clean}"
+                bb.put(session_id, "pending_plan_state", None)
+            else:
+                # User moved on to a different topic/question; clear pending plan state
+                bb.put(session_id, "pending_plan_state", None)
 
         # Resolve conversational retry phrases ("retry", "retry it", "try again") to the last user query
         _retry_re = re.compile(r"^(?:please\s+)?(?:retry(?:\s+it|\s+this|\s+that)?|try\s+again|run\s+(?:it\s+)?again|regenerate)\s*[.!]*$", re.IGNORECASE)
@@ -629,18 +787,32 @@ class TurnStateMachine:
                     steps=plan_info["steps"],
                 )
                 if plan_info.get("needs_blocking_clarification") and plan_info.get("options"):
+                    orig_q_for_plan = str(plan_info.get("original_query") or user_query).strip()
+                    bb.put(
+                        session_id,
+                        "pending_plan_state",
+                        {
+                            "original_query": orig_q_for_plan,
+                            "question": plan_info.get("question", ""),
+                            "options": plan_info.get("options", []),
+                            "steps": plan_info.get("steps", []),
+                            "primary_agent": route_dec.primary_agent,
+                        },
+                    )
                     self.bus.emit(
                         EventType.CLARIFICATION_NEEDED,
                         rid,
                         session_id,
                         agent=route_dec.primary_agent,
-                        question=plan_info.get("question", "Select an option to tailor the plan:"),
+                        question=plan_info.get("question", "Does this plan look good to you?"),
                         options=plan_info["options"],
+                        original_query=orig_q_for_plan,
                         blocking=True,
                     )
 
-            # If the prompt is strictly underspecified and requires user clarification first, return immediately with options!
+            # If the prompt requires plan confirmation or clarification first, return immediately with interactive options!
             if plan_info.get("needs_blocking_clarification"):
+                orig_q_for_plan = str(plan_info.get("original_query") or user_query).strip()
                 final_text = str(plan_info.get("plan_markdown") or "")
                 self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
                 total_ms = round((time.perf_counter() - t0) * 1000.0, 1)
@@ -659,6 +831,7 @@ class TurnStateMachine:
                         "clarification_needed": True,
                         "question": plan_info.get("question"),
                         "options": plan_info.get("options"),
+                        "original_query": orig_q_for_plan,
                     },
                 )
                 self.bus.emit(EventType.RUN_COMPLETED, rid, session_id, agent=route_dec.primary_agent, **outcome.to_dict())
@@ -667,7 +840,8 @@ class TurnStateMachine:
             # 3. Hybrid FTS5 + Dense + BGE INT8 Retrieval + Live Web Search Augmentation
             q_lower = user_query.lower()
             asks_about_repo = any(k in q_lower for k in ("slm_harness", "slmagents", "readme.md", "this repo", "codebase"))
-            if route_dec.needs_rag and (not artifacts or asks_about_repo):
+            _is_concierge_pre = bool(detect_concierge_intent(user_query))
+            if route_dec.needs_rag and not _is_concierge_pre and (not artifacts or asks_about_repo):
                 with tracer.span(rid, "hybrid_rag_search", "retrieval", parent_id=root_span.span_id) as rag_span:
                     if has_docs and not asks_about_repo:
                         cols = [f"session:{session_id}"]
@@ -715,6 +889,7 @@ class TurnStateMachine:
                 run_web = (
                     not _is_skill_only
                     and not _is_fast_export_turn
+                    and not _is_concierge_pre
                     and not detect_machine_control_intent(user_query)
                     and not extract_video_or_media_url(user_query)
                     and route_dec.primary_agent != "slm_math"
@@ -950,11 +1125,12 @@ class TurnStateMachine:
             if sympy_hint:
                 extra_sys = f"{extra_sys}\n\n### Exact SymPy Verification\n{sympy_hint}".strip()
 
-            # Brand & Entity Grounding (never confuse SLMAgents with "SlimeMinds" or "SLM Minds")
+            # Brand & Entity Grounding + Natural Human-Like Communication Style
             extra_sys = (
                 f"{extra_sys}\n\n"
-                "### System & Brand Grounding\n"
-                "- 'SLMAgents' (also written 'slmagents', 'slm agents', 'SLM-Agents', or 'slm_harness') is this 10-Plane Pure-CPU Multi-Agent Harness & Desktop AI Studio. Never misspell or rename SLMAgents as 'SlimeMinds' or 'SLM Minds'."
+                "### System Grounding & Collaborative Human Tone\n"
+                "- 'SLMAgents' (also written 'slmagents', 'slm agents', 'SLM-Agents', or 'slm_harness') is this 10-Plane Pure-CPU Multi-Agent Harness & Desktop AI Studio. Never misspell or rename SLMAgents as 'SlimeMinds' or 'SLM Minds'.\n"
+                "- Speak naturally, warmly, and collaboratively like a senior human engineering partner — avoid stiff, robotic boilerplate, and end with a helpful, conversational follow-up when appropriate."
             ).strip()
 
             # Strictly Opt-In Personalization Context (ONLY injected when the user has explicitly enabled Personalization)
