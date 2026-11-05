@@ -112,3 +112,18 @@ def test_kernel_turn_readme_and_critic_repair():
     assert "Based on the analyzed content, see the detailed breakdown below." not in repaired_text
     assert len(repaired_text.split()) > 300
 
+
+def test_web_personalization_query_returns_security_notice_and_download_links():
+    kernel = get_kernel()
+    outcome = kernel.run_turn(
+        user_query="i a=cant see personalization option here",
+        session_id="test_web_personalize_notice",
+        client_surface="web",
+    )
+    assert "security and privacy reasons" in outcome.final_text.lower()
+    assert "/api/installers/download/macos" in outcome.final_text
+    assert "/api/installers/download/windows" in outcome.final_text
+    assert "/api/installers/download/linux" in outcome.final_text
+    assert "Personalization Applied:" not in outcome.final_text
+
+

@@ -447,6 +447,7 @@ class ChatRequest(BaseModel):
     max_tokens: int = 2400
     reasoning_effort: str = "medium"
     clarification_choice: Optional[str] = None
+    client_surface: str = "desktop"
 
 from slm_memory import SLMMemoryManager
 memory_mgr = SLMMemoryManager()
@@ -2887,6 +2888,7 @@ def chat_endpoint(req: ChatRequest):
             max_tokens=req.max_tokens,
             reasoning_effort=getattr(req, "reasoning_effort", "medium") or "medium",
             clarification_choice=getattr(req, "clarification_choice", None),
+            client_surface=getattr(req, "client_surface", "desktop") or "desktop",
         )
 
     thought_queue = queue.Queue()

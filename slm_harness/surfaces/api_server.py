@@ -250,6 +250,7 @@ def build_harness_chat_streaming_response(
     max_tokens: int = 2400,
     reasoning_effort: str = "medium",
     clarification_choice: Optional[str] = None,
+    client_surface: str = "desktop",
 ) -> StreamingResponse:
     """
     Runs `TurnStateMachine` on a MultiThreadExecutionScheduler worker lane and streams
@@ -311,6 +312,7 @@ def build_harness_chat_streaming_response(
                 max_tokens=max_tokens,
                 reasoning_effort=eff_norm,
                 clarification_choice=clarification_choice,
+                client_surface=(client_surface or "desktop").strip().lower(),
             )
             outcome_box["outcome"] = outcome
         except Exception as exc:
@@ -695,6 +697,7 @@ class HarnessChatRequest(BaseModel):
     max_tokens: int = 2400
     reasoning_effort: str = "medium"
     clarification_choice: Optional[str] = None
+    client_surface: str = "desktop"
 
 
 class CancelRunRequest(BaseModel):
@@ -814,6 +817,7 @@ def mount_harness_routes(app: FastAPI) -> None:
             max_tokens=req.max_tokens,
             reasoning_effort=req.reasoning_effort,
             clarification_choice=req.clarification_choice,
+            client_surface=req.client_surface,
         )
 
     @app.post("/api/harness/models/ensure")

@@ -219,6 +219,7 @@ class TurnStateMachine:
         primary_agent: str,
         reasoning_effort: str = "medium",
         clarification_choice: Optional[str] = None,
+        client_surface: str = "desktop",
     ) -> Dict[str, Any]:
         """
         Builds a structured Plan-First Execution Blueprint and context-aware Clarification Options.
@@ -383,6 +384,26 @@ class TurnStateMachine:
         # Check if this is a Personal Concierge request (Twitter/Social updates, Chrome accounts, Email tracker, Jobs, Dashboard)
         concierge_intent = detect_concierge_intent(q_clean)
         if concierge_intent:
+            from ..personalization.concierge import is_web_cloud_environment
+
+            asks_why_missing_on_web = bool(
+                re.search(
+                    r"(?:can't|cant|cannot|don't|dont|not|no|where\s+is|missing)\b.*?\bpersonaliz"
+                    r"|\bpersonaliz.*?\b(?:not\s+here|not\s+showing|not\s+visible|missing|on\s+web|web\s+version)",
+                    q_clean,
+                    re.IGNORECASE | re.DOTALL,
+                )
+            )
+            if client_surface == "web" or is_web_cloud_environment() or asks_why_missing_on_web:
+                return {
+                    "needs_blocking_clarification": False,
+                    "question": "",
+                    "options": [],
+                    "steps": [],
+                    "plan_markdown": "",
+                    "plan_context": "",
+                }
+
             has_consent = False
             try:
                 has_consent = get_concierge_engine().has_consent()
@@ -606,6 +627,7 @@ class TurnStateMachine:
         reasoning_effort: str = "medium",
         clarification_choice: Optional[str] = None,
         cancel_token: Optional[CancellationToken] = None,
+        client_surface: str = "desktop",
     ) -> TurnOutcome:
         rid = run_id or f"run_{uuid.uuid4().hex[:10]}"
         cancels = get_cancellation_registry()
@@ -885,6 +907,7 @@ class TurnStateMachine:
                 primary_agent=route_dec.primary_agent,
                 reasoning_effort=effort,
                 clarification_choice=clarification_choice,
+                client_surface=client_surface,
             )
             plan_context = str(plan_info.get("plan_context") or "")
 
@@ -1249,11 +1272,18 @@ class TurnStateMachine:
                 "- Speak naturally, warmly, and collaboratively like a senior human engineering partner — avoid stiff, robotic boilerplate, and end with a helpful, conversational follow-up when appropriate."
             ).strip()
 
-            # Strictly Opt-In Personalization Context (ONLY injected when the user has explicitly enabled Personalization)
+            # Strictly Opt-In Personalization Context (ONLY injected on Desktop App when user has explicitly granted consent)
             try:
+                from ..personalization.concierge import is_web_cloud_environment
+
                 concierge_eng = get_concierge_engine()
                 u_prof = concierge_eng.get_profile()
-                if u_prof.get("enabled"):
+                if (
+                    client_surface == "desktop"
+                    and not is_web_cloud_environment()
+                    and concierge_eng.has_consent()
+                    and u_prof.get("enabled")
+                ):
                     extra_sys = (
                         f"{extra_sys}\n\n"
                         f"### Opt-In User Personalization Profile\n"
@@ -1418,6 +1448,7 @@ class TurnStateMachine:
                     c_out = c_engine.execute_from_query(
                         query=user_query,
                         step_callback=_on_concierge_thought,
+                        client_surface=client_surface,
                     )
                 final_text = c_out.markdown_response
                 structured_out = c_out.structured_data
@@ -2319,7 +2350,11 @@ class TurnStateMachine:
         ):
             return False, "false refusal to read local workspace file"
 
-        # 6. Detect overly brief / truncated stub responses on substantive queries
+        # 6. Detect hallucinated "Personalization Applied:" blocks when user asks about missing personalization option on web
+        if "personalization applied:" in stripped.lower():
+            return False, "hallucinated personalization profile instead of web security & download notice"
+
+        # 7. Detect overly brief / truncated stub responses on substantive queries
         if len(stripped) < 28 and len(q_clean.split()) >= 4:
             return False, f"response too brief ({len(stripped)} chars) to be helpful"
 
@@ -2369,6 +2404,16 @@ class TurnStateMachine:
                 agent=agent_lbl or "slm_quality_critic",
                 message=msg,
             )
+
+        if "personalization" in reason:
+            try:
+                web_sec_out = get_concierge_engine().build_web_security_download_response(
+                    query=q_clean,
+                    step_callback=_on_critic_thought,
+                )
+                return web_sec_out.markdown_response, True
+            except Exception:
+                pass
 
         # Pass 1: Document / File Recovery via Multi-Root MediaDocIntelligenceEngine
         doc_token_m = re.search(

@@ -3714,6 +3714,10 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
       }
       const toneSelectEl = document.getElementById("chat-tone-select");
       const selectedDesignTone = toneSelectEl ? toneSelectEl.value : "";
+      const isDesktopSurface =
+        document.documentElement.classList.contains("desktop-app-mode") ||
+        window.location.search.indexOf("desktop=1") !== -1 ||
+        !!window.pywebview;
       const payload = {
         session_id: targetSessionId,
         req_id: reqId,
@@ -3726,6 +3730,7 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
         active_skills: Array.from(window.pinnedSkillsSet || []),
         reasoning_effort: selectedEffort,
         clarification_choice: clarificationChoice || null,
+        client_surface: isDesktopSurface ? "desktop" : "web",
         use_harness: true,
         history: session.messages.slice(-6).map(m => ({ role: m.role, content: m.text }))
       };
@@ -5699,7 +5704,24 @@ document.addEventListener("DOMContentLoaded", () => {
 const escapeHtml = escapeHtmlSafe;
 let _personalizeState = null;
 
+function isDesktopAppSurface() {
+  return (
+    document.documentElement.classList.contains("desktop-app-mode") ||
+    window.location.search.indexOf("desktop=1") !== -1 ||
+    !!window.pywebview
+  );
+}
+
 async function loadPersonalizationState() {
+  if (!isDesktopAppSurface()) {
+    const topBtn = document.getElementById("btn-personalize-studio");
+    if (topBtn) topBtn.style.display = "none";
+    const popBtn = document.getElementById("btn-popover-personalize");
+    if (popBtn) popBtn.style.display = "none";
+    const tray = document.getElementById("personalize-suggestions-tray");
+    if (tray) tray.style.display = "none";
+    return;
+  }
   try {
     const res = await fetch(getApiEndpoint("/api/harness/personalize"));
     if (!res.ok) return;
@@ -5712,6 +5734,7 @@ async function loadPersonalizationState() {
 }
 
 function applyPersonalizationToUI(data) {
+  if (!isDesktopAppSurface()) return;
   if (!data || !data.profile) return;
   const prof = data.profile;
   const creds = data.credentials || {};

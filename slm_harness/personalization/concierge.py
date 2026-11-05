@@ -125,9 +125,14 @@ _CONCIERGE_INTENT_PATTERNS: List[Tuple[str, re.Pattern[str]]] = [
     (
         "personalize_setup",
         re.compile(
-            r"\b(?:personalize\s+my\s+(?:profile|settings|assistant|harness)|understand\s+my\s+personal\s+(?:profile|preferences|settings)|"
-            r"configure\s+my\s+personal\s+profile|set\s+up\s+personalization)\b",
-            re.IGNORECASE,
+            r"\b(?:personalize\s+(?:my|for\s+me|option|button|feature|here|studio|app|profile|settings|assistant|harness)|"
+            r"personalization\s+(?:option|button|feature|settings|mode|studio|here)|"
+            r"(?:can't|cant|cannot|don't|dont|not|unable\s+to|where\s+is|how\s+to|why\s+can't\s+i)\b.*?\bpersonaliz(?:e|ation|ed|ing)\b|"
+            r"\bpersonaliz(?:e|ation)\b.*?\b(?:here|web|browser|option|missing|not\s+showing|not\s+visible|where|how)|"
+            r"understand\s+my\s+personal\s+(?:profile|preferences|settings)|"
+            r"configure\s+my\s+personal\s+profile|set\s+up\s+personalization|"
+            r"link\s+my\s+(?:personal\s+)?(?:accounts?|details|profile))\b",
+            re.IGNORECASE | re.DOTALL,
         ),
     ),
 ]
@@ -2722,11 +2727,86 @@ class PersonalConciergeEngine:
     # ------------------------------------------------------------------
     # 7. NATURAL CHAT EXECUTION WITH LIVE AGENT THOUGHT PROCESS
     # ------------------------------------------------------------------
+    def build_web_security_download_response(
+        self,
+        query: str = "",
+        step_callback: Optional[Callable[[str, str], None]] = None,
+    ) -> ConciergeOutcome:
+        """
+        Returns a clear security notice + direct Desktop App download links when a user on the Web Version
+        asks about Personalization or why the Personalize option is not available on the web.
+        """
+        thoughts: List[str] = []
+
+        def _think(agent_lbl: str, msg: str) -> None:
+            thoughts.append(msg)
+            if step_callback is not None:
+                try:
+                    step_callback(agent_lbl, msg)
+                except Exception:
+                    pass
+
+        _think(
+            "slm_personal_concierge",
+            "Security Policy Check: Detected Web Version surface — Personalization is restricted to the Native Desktop App for security & privacy.",
+        )
+        _think(
+            "slm_personal_concierge",
+            "Compiling standalone Desktop App installer download links (.dmg for macOS, .exe for Windows, .AppImage for Linux)...",
+        )
+
+        md = (
+            "### 🔒 Personalization Is Disabled on the Web Version for Security Reasons\n\n"
+            "You cannot personalize or link accounts on the **Web Version** due to **security and privacy reasons**:\n"
+            "- Linking your **Chrome profiles, emails, cookies, and social/job sessions** (`X/Twitter`, `LinkedIn`, `Gmail`, `Naukri`) requires direct access to your local encrypted vault (`0600` owner-only permissions).\n"
+            "- To protect your credentials and personal data from ever being exposed over a browser session, **SLMAgents never accesses or stores personal account details on the Web Version**.\n\n"
+            "---\n\n"
+            "### 💻 Download the SLMAgents Desktop App to Personalize\n\n"
+            "To use **Opt-In Personalization (`✨ Personalize`)** with explicit consent on your own machine, download and launch the native **SLMAgents 2.0 Desktop App**:\n\n"
+            "| Operating System | Direct Standalone Desktop App Installer |\n"
+            "| :--- | :--- |\n"
+            "| 🍎 **macOS** *(Apple Silicon & Intel `.dmg`)* | [**⬇ Download SLMAgents for macOS (`.dmg`)**](/api/installers/download/macos) |\n"
+            "| 🪟 **Windows** *(64-bit Setup `.exe`)* | [**⬇ Download SLMAgents for Windows (`.exe`)**](/api/installers/download/windows) |\n"
+            "| 🐧 **Linux** *(`x86_64` `.AppImage`)* | [**⬇ Download SLMAgents for Linux (`.AppImage`)**](/api/installers/download/linux) |\n\n"
+            "#### ✨ How to Enable Personalization in the Desktop App\n"
+            "1. Download and open **SLMAgents 2.0** from the installer link above (or click the **Download App** button in the top navigation bar).\n"
+            "2. Click **✨ Personalize** in the top-right bar of the Desktop App.\n"
+            "3. Click **✅ Grant Consent & Link Personal Details** — your consent and linked accounts will be saved securely on your device."
+        )
+        return ConciergeOutcome(
+            action_type="web_personalize_security_notice",
+            thoughts=thoughts,
+            markdown_response=md,
+            structured_data={
+                "web_personalization_disabled": True,
+                "reason": "security_and_privacy",
+                "download_links": {
+                    "macos": "/api/installers/download/macos",
+                    "windows": "/api/installers/download/windows",
+                    "linux": "/api/installers/download/linux",
+                },
+            },
+            agent_id="slm_personal_concierge",
+        )
+
     def execute_from_query(
         self,
         query: str,
         step_callback: Optional[Callable[[str, str], None]] = None,
+        client_surface: str = "desktop",
     ) -> ConciergeOutcome:
+        q_clean = (query or "").strip()
+        asks_why_missing_on_web = bool(
+            re.search(
+                r"(?:can't|cant|cannot|don't|dont|not|no|where\s+is|missing)\b.*?\bpersonaliz"
+                r"|\bpersonaliz.*?\b(?:not\s+here|not\s+showing|not\s+visible|missing|on\s+web|web\s+version)",
+                q_clean,
+                re.IGNORECASE | re.DOTALL,
+            )
+        )
+        if client_surface == "web" or is_web_cloud_environment() or asks_why_missing_on_web:
+            return self.build_web_security_download_response(query=q_clean, step_callback=step_callback)
+
         intent = detect_concierge_intent(query) or "daily_dashboard"
         thoughts: List[str] = []
 
