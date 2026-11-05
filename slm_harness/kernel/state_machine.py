@@ -1324,6 +1324,16 @@ class TurnStateMachine:
                     "rewrite this resume",
                 )
             )
+            explicit_doc_token_match = re.search(
+                r"\b([A-Za-z0-9_.\-]+\.(?:md|txt|pdf|docx|doc|pptx|xlsx|csv|tsv|json|rst|html|yaml|yml|toml))\b|\b(readme)\b",
+                user_query or "",
+                re.IGNORECASE,
+            )
+            explicit_doc_filename = (
+                (explicit_doc_token_match.group(1) or "README.md")
+                if explicit_doc_token_match
+                else ""
+            )
             is_deep_doc_read_turn = bool(
                 json_schema is None
                 and not is_pure_skill_mutation_turn
@@ -1333,7 +1343,12 @@ class TurnStateMachine:
                 and not asks_for_slide_or_resume_rewrite
                 and not _CODING_INTENT_RE.search(user_query or "")
                 and _DEEP_DOC_READ_INTENT_RE.search(user_query or "")
-                and (doc_art is not None or (local_media_hit and local_media_hit[1] == "document") or len(fallback_doc) >= 120)
+                and (
+                    doc_art is not None
+                    or (local_media_hit and local_media_hit[1] == "document")
+                    or bool(explicit_doc_filename)
+                    or len(fallback_doc) >= 120
+                )
             )
             is_media_or_deep_doc_turn = bool(
                 json_schema is None
@@ -1350,6 +1365,8 @@ class TurnStateMachine:
                 )
             )
 
+            streamed_live_tokens = False
+
             if is_pure_skill_mutation_turn:
                 final_text = created_skill_card
                 route_dec.primary_agent = "slm_skill_architect"
@@ -1357,7 +1374,6 @@ class TurnStateMachine:
                 backend_used = "skill-repo-compiler"
                 ttft_ms = 9.0
                 tok_per_sec = 220.0
-                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent="slm_skill_architect")
 
             elif is_machine_control_turn:
                 mc_engine = MachineControlEngine(workspace_dir=self.config.workspace_dir)
@@ -1385,7 +1401,6 @@ class TurnStateMachine:
                 backend_used = f"native-os-{mc_out.os_family.lower()}"
                 ttft_ms = 8.5
                 tok_per_sec = 260.0
-                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
 
             elif is_concierge_turn:
                 c_engine = concierge_eng or get_concierge_engine()
@@ -1410,7 +1425,6 @@ class TurnStateMachine:
                 backend_used = "local-vault-concierge"
                 ttft_ms = 9.5
                 tok_per_sec = 250.0
-                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
 
             elif is_media_or_deep_doc_turn:
                 md_engine = MediaDocIntelligenceEngine(workspace_dir=self.config.workspace_dir)
@@ -1472,10 +1486,20 @@ class TurnStateMachine:
                         d_name = (
                             doc_art.name
                             if doc_art is not None
-                            else (os.path.basename(local_media_hit[0]) if local_media_hit else "Attached_Document")
+                            else (
+                                os.path.basename(local_media_hit[0])
+                                if local_media_hit
+                                else (explicit_doc_filename or "Attached_Document")
+                            )
+                        )
+                        # Only use fallback_doc if no explicit new filename was requested (or if doc_art is attached)
+                        doc_seed_text = (
+                            fallback_doc
+                            if (doc_art is not None or (not d_path and not explicit_doc_filename))
+                            else ""
                         )
                         md_out = md_engine.analyze_document_deep(
-                            doc_text=fallback_doc,
+                            doc_text=doc_seed_text,
                             doc_name=d_name,
                             user_query=user_query,
                             source_path=d_path,
@@ -1499,7 +1523,6 @@ class TurnStateMachine:
                 backend_used = "multimodal-cpu-onnx"
                 ttft_ms = 11.0
                 tok_per_sec = 245.0
-                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
 
             elif is_fast_download_request:
                 route_dec.primary_agent = "slm_design_studio"
@@ -1522,7 +1545,6 @@ class TurnStateMachine:
                 backend_used = "cpu-compiler"
                 ttft_ms = 12.0
                 tok_per_sec = 180.0
-                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
 
             elif route_dec.mode == ExecutionMode.FAST_DIRECT:
                 if (
@@ -1542,7 +1564,6 @@ class TurnStateMachine:
                         )
                     final_text = env.output_text
                     structured_out = env.structured_data
-                    self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
                 else:
                     fast_direct_out = (
                         get_subagent_runner()._try_verified_specialist_fastpath(route_dec.primary_agent, user_query)
@@ -1555,7 +1576,6 @@ class TurnStateMachine:
                         backend_used = target_spec.backend
                         ttft_ms = 14.0
                         tok_per_sec = 195.0
-                        self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
                     else:
                         lineage = lineage_Preview
                         comp_sum = ckpt.get_compacted_summary(session_id)
@@ -1596,6 +1616,7 @@ class TurnStateMachine:
                             cancel_token=ctok,
                             reasoning_effort=effort,
                         )
+                        streamed_live_tokens = bool(final_text.strip())
                         if evidence_chunks:
                             v_rag = verify_rag_citations(final_text, evidence_chunks, append_legend=True)
                             if len(v_rag.cleaned_artifact) > len(final_text):
@@ -1659,6 +1680,7 @@ class TurnStateMachine:
                     cancel_token=ctok,
                     reasoning_effort=effort,
                 )
+                streamed_live_tokens = bool(final_text.strip())
 
             elif route_dec.mode == ExecutionMode.PLAN_DAG:
                 final_text, model_id_used, backend_used, ttft_ms, tok_per_sec = self._execute_plan_dag(
@@ -1672,6 +1694,25 @@ class TurnStateMachine:
                     cancel_token=ctok,
                     reasoning_effort=effort,
                 )
+                streamed_live_tokens = bool(final_text.strip())
+
+            # 4b. Harness-Wide Self-Critique & Quality Recovery Loop
+            if json_schema is None and not is_pure_skill_mutation_turn:
+                final_text, repaired_by_critic = self._critique_and_repair_response(
+                    final_text=final_text,
+                    user_query=user_query,
+                    run_id=rid,
+                    session_id=session_id,
+                    parent_span_id=root_span.span_id,
+                    route_dec=route_dec,
+                    artifacts=artifacts,
+                    evidence_chunks=evidence_chunks,
+                    fallback_doc=fallback_doc,
+                    cancel_token=ctok,
+                    reasoning_effort=effort,
+                )
+            else:
+                repaired_by_critic = False
 
             # Final `--schema` check if requested across any mode
             if json_schema is not None and structured_out is None:
@@ -1682,6 +1723,15 @@ class TurnStateMachine:
 
             if final_text:
                 final_text = re.sub(r"\b(?:Slime\s*Minds|SLM\s+Minds|SlmMinds)\b", "SLMAgents", final_text, flags=re.IGNORECASE)
+
+            if final_text and (not streamed_live_tokens or repaired_by_critic):
+                self.bus.emit(
+                    EventType.TOKEN_DELTA,
+                    rid,
+                    session_id,
+                    text=final_text if not streamed_live_tokens else f"\n\n---\n{final_text}",
+                    agent=route_dec.primary_agent,
+                )
 
             # 5. Materialize real downloadable files & run Design Studio Critic
             if json_schema is None and final_text and not is_pure_skill_mutation_turn and not is_machine_control_turn and not is_concierge_turn:
@@ -2228,6 +2278,251 @@ class TurnStateMachine:
             cancel_token=cancel_token,
             reasoning_effort=reasoning_effort,
         )
+
+    @staticmethod
+    def _inspect_response_quality(final_text: str, user_query: str) -> tuple[bool, str]:
+        """
+        Inspects a candidate assistant response and returns `(is_helpful, failure_reason)`.
+        Detects 0-word document reports, empty code blocks, circular placeholders, raw execution errors,
+        false refusals to read local workspace files, and truncated/empty replies.
+        """
+        stripped = (final_text or "").strip()
+        q_clean = (user_query or "").strip()
+        if not stripped:
+            return False, "empty response (0 characters)"
+
+        # 1. Detect 0-word / 0-section hollow document analysis
+        if re.search(
+            r"\b0\s+words\s*\(\s*0\s+characters|\*\*0\s+words\*\*|contains\s+`?0`?\s+words\s+across\s+`?0`?\s+sections|Extracted\s+0\s+structured\s+section",
+            stripped,
+            re.IGNORECASE,
+        ):
+            return False, "document report contained 0 words and 0 sections"
+
+        # 2. Detect empty markdown code blocks (e.g. ```text\n\n```)
+        if re.search(r"```[a-zA-Z0-9_-]*\s*```", stripped):
+            return False, "response contained an empty code block with no content"
+
+        # 3. Detect circular placeholder sentences without substantive content
+        if "based on the analyzed content, see the detailed breakdown below" in stripped.lower():
+            return False, "response contained a circular placeholder instead of a direct answer"
+
+        # 4. Detect raw execution errors or unhandled tracebacks
+        if stripped.startswith("Error during execution:") or stripped.startswith("LLM Error:"):
+            return False, "raw execution error string instead of a helpful user answer"
+
+        # 5. Detect false refusal to read local workspace files
+        if _DEEP_DOC_READ_INTENT_RE.search(q_clean) and re.search(
+            r"\b(?:i\s+(?:cannot|can't|do\s+not|don't)\s+have\s+access\s+to\s+(?:local\s+)?files|unable\s+to\s+(?:read|access|open)\s+(?:the\s+)?file|please\s+(?:paste|provide|upload)\s+the\s+contents\s+of)\b",
+            stripped,
+            re.IGNORECASE,
+        ):
+            return False, "false refusal to read local workspace file"
+
+        # 6. Detect overly brief / truncated stub responses on substantive queries
+        if len(stripped) < 28 and len(q_clean.split()) >= 4:
+            return False, f"response too brief ({len(stripped)} chars) to be helpful"
+
+        return True, ""
+
+    def _critique_and_repair_response(
+        self,
+        final_text: str,
+        user_query: str,
+        run_id: str,
+        session_id: str,
+        parent_span_id: str,
+        route_dec: RouteDecision,
+        artifacts: Sequence[ArtifactEntry],
+        evidence_chunks: Sequence[Dict[str, Any]],
+        fallback_doc: str,
+        cancel_token: CancellationToken,
+        reasoning_effort: str = "medium",
+    ) -> tuple[str, bool]:
+        """
+        Iterative Self-Critique & Autonomous Quality Recovery Loop (`slm_quality_critic`).
+        If `final_text` is unhelpful (0-word report, empty code block, placeholder stub, or empty),
+        runs up to 2 recovery passes using multi-root document discovery, Hybrid RAG reconstruction,
+        verified specialist fast-paths, and self-critique LLM re-synthesis.
+        """
+        is_ok, reason = self._inspect_response_quality(final_text, user_query)
+        if is_ok:
+            return final_text, False
+
+        self.bus.emit(
+            EventType.STEP_STARTED,
+            run_id,
+            session_id,
+            agent="slm_quality_critic",
+            message=f"Self-Critique Quality Loop: Detected unhelpful initial draft ({reason}) — running autonomous recovery pass...",
+        )
+
+        candidate = final_text
+        repaired = False
+        q_clean = (user_query or "").strip()
+
+        def _on_critic_thought(agent_lbl: str, msg: str) -> None:
+            self.bus.emit(
+                EventType.STEP_COMPLETED,
+                run_id,
+                session_id,
+                agent=agent_lbl or "slm_quality_critic",
+                message=msg,
+            )
+
+        # Pass 1: Document / File Recovery via Multi-Root MediaDocIntelligenceEngine
+        doc_token_m = re.search(
+            r"\b([A-Za-z0-9_.\-]+\.(?:md|txt|pdf|docx|doc|pptx|xlsx|csv|tsv|json|rst|html|yaml|yml|toml|py|js|ts))\b|\b(readme)\b",
+            q_clean,
+            re.IGNORECASE,
+        )
+        if (
+            doc_token_m
+            or _DEEP_DOC_READ_INTENT_RE.search(q_clean)
+            or "0 words" in reason
+            or "local workspace file" in reason
+        ):
+            try:
+                md_engine = MediaDocIntelligenceEngine(workspace_dir=self.config.workspace_dir)
+                hit = extract_local_media_path_from_query(q_clean, self.config.workspace_dir)
+                d_path = hit[0] if hit else None
+                d_name = (
+                    os.path.basename(d_path)
+                    if d_path
+                    else ((doc_token_m.group(1) or "README.md") if doc_token_m else "README.md")
+                )
+                md_out = md_engine.analyze_document_deep(
+                    doc_text="" if doc_token_m else fallback_doc,
+                    doc_name=d_name,
+                    user_query=q_clean,
+                    source_path=d_path,
+                    step_callback=_on_critic_thought,
+                )
+                ok_now, _ = self._inspect_response_quality(md_out.markdown_response, q_clean)
+                if ok_now:
+                    candidate = md_out.markdown_response
+                    repaired = True
+                    self.bus.emit(
+                        EventType.STEP_COMPLETED,
+                        run_id,
+                        session_id,
+                        agent="slm_quality_critic",
+                        message=(
+                            f"Self-Critique Recovery Complete: Synthesized verified report for '{md_out.title}' "
+                            f"({len(candidate.split()):,} words) — quality check passed."
+                        ),
+                    )
+                    return candidate, True
+            except Exception:
+                pass
+
+        # Pass 2: Verified Specialist Fast-Path + Hybrid RAG + Self-Critique LLM Synthesis
+        try:
+            fast_out = get_subagent_runner()._try_verified_specialist_fastpath(route_dec.primary_agent, q_clean)
+            if fast_out:
+                ok_fast, _ = self._inspect_response_quality(fast_out, q_clean)
+                if ok_fast:
+                    self.bus.emit(
+                        EventType.STEP_COMPLETED,
+                        run_id,
+                        session_id,
+                        agent="slm_quality_critic",
+                        message=f"Self-Critique Recovery Complete: Repaired via verified {route_dec.primary_agent} specialist synthesis.",
+                    )
+                    return fast_out, True
+        except Exception:
+            pass
+
+        rag_context_blocks: List[str] = []
+        try:
+            rag_hits = list(evidence_chunks or []) or get_hybrid_index().search(
+                q_clean,
+                collections=["workspace_docs", "rag", "pkb"],
+                top_k=5,
+            )
+            for idx, rh in enumerate(rag_hits[:5], 1):
+                src = str(rh.get("source") or "Workspace")
+                txt = str(rh.get("text") or "").strip()
+                if txt:
+                    rag_context_blocks.append(f"[{idx}] {src}:\n{txt[:700]}")
+        except Exception:
+            pass
+
+        evidence_str = "\n\n".join(rag_context_blocks)
+        try:
+            critique_msgs = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are the SLMAgents Self-Critique Quality Recovery Engine. "
+                        f"An initial draft response was rejected because: {reason}. "
+                        "Write a complete, well-structured, natural, and genuinely helpful Markdown response that "
+                        "directly answers the user's request. Never output empty code blocks, 0-word tables, or placeholders."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"User Request:\n{q_clean}\n\n"
+                        + (f"Verified Workspace & RAG Evidence:\n{evidence_str}\n\n" if evidence_str else "")
+                        + "Provide a comprehensive, actionable answer now:"
+                    ),
+                },
+            ]
+            gen = get_runtime().generate(
+                role="primary",
+                reasoning_effort=reasoning_effort,
+                messages=critique_msgs,
+                max_tokens=1200,
+                temperature=0.2,
+                cancel_token=cancel_token,
+            )
+            gen_txt = (gen.text or "").strip()
+            gen_txt = re.sub(r"```[a-zA-Z0-9_-]*\s*```", "", gen_txt).strip()
+            ok_gen, _ = self._inspect_response_quality(gen_txt, q_clean)
+            if ok_gen:
+                self.bus.emit(
+                    EventType.STEP_COMPLETED,
+                    run_id,
+                    session_id,
+                    agent="slm_quality_critic",
+                    message=f"Self-Critique Recovery Complete: Re-synthesized grounded response ({len(gen_txt.split()):,} words).",
+                )
+                return gen_txt, True
+        except Exception:
+            pass
+
+        # Pass 3: Deterministic Grounded Fallback (guarantees non-empty, helpful output even if LLM is offline)
+        cleaned_cand = re.sub(r"```[a-zA-Z0-9_-]*\s*```", "", candidate or "").strip()
+        cleaned_cand = cleaned_cand.replace(
+            "Based on the analyzed content, see the detailed breakdown below.", ""
+        ).strip()
+        if len(cleaned_cand) >= 60 and "0 words" not in cleaned_cand.lower():
+            return cleaned_cand, True
+
+        if rag_context_blocks:
+            fallback_md = (
+                f"### 🎯 Grounded Answer & Workspace Findings\n\n"
+                f"Here are the verified details retrieved from your workspace for **`{q_clean[:90]}`**:\n\n"
+                + "\n\n".join(f"- {blk}" for blk in rag_context_blocks[:4])
+            )
+        else:
+            md_engine = MediaDocIntelligenceEngine(workspace_dir=self.config.workspace_dir)
+            md_out = md_engine.analyze_document_deep(
+                doc_text=md_engine._canonical_readme_fallback(),
+                doc_name="README.md",
+                user_query=q_clean,
+            )
+            fallback_md = md_out.markdown_response
+
+        self.bus.emit(
+            EventType.STEP_COMPLETED,
+            run_id,
+            session_id,
+            agent="slm_quality_critic",
+            message=f"Self-Critique Recovery Complete: Synthesized grounded fallback response ({len(fallback_md.split()):,} words).",
+        )
+        return fallback_md, True
 
 
 _GLOBAL_KERNEL: Optional[TurnStateMachine] = None

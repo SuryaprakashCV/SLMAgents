@@ -252,6 +252,7 @@ def build_pyinstaller_frozen_bundle() -> str:
             f"--add-data=download_models.py{os.pathsep}.",
             f"--add-data=main.py{os.pathsep}.",
             f"--add-data=requirements.txt{os.pathsep}.",
+            f"--add-data=README.md{os.pathsep}.",
         ]
         if os.path.isdir(os.path.join(REPO_ROOT, ".slm", "skills")):
             add_data_args.append(f"--add-data=.slm/skills{os.pathsep}.slm/skills")
