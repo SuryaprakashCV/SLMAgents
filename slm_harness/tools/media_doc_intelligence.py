@@ -1818,7 +1818,7 @@ class MediaDocIntelligenceEngine:
                         full_text = "\n\n".join(pages_txt)
                 elif ext in (".docx", ".doc", ".pptx", ".ppt", ".odt"):
                     extracted = extract_openxml_text(source_path, ext)
-                    if len(extracted) > len(full_text):
+                    if extracted:
                         full_text = extracted
                 elif ext in (".xlsx", ".xls", ".csv", ".tsv"):
                     import pandas as pd
@@ -1830,6 +1830,13 @@ class MediaDocIntelligenceEngine:
                         f"Summary Statistics:\n{df.describe(include='all').to_string()}\n\n"
                         f"Sample Records:\n{df.head(25).to_string(index=False)}"
                     )
+                else:
+                    with open(source_path, "r", encoding="utf-8", errors="ignore") as tf:
+                        read_txt = tf.read(250_000).strip()
+                    if read_txt:
+                        if read_txt.startswith("---"):
+                            read_txt = re.sub(r"^---\s*\n.*?\n---\s*\n", "", read_txt, count=1, flags=re.DOTALL).strip()
+                        full_text = read_txt
             except Exception:
                 pass
 
@@ -1857,22 +1864,29 @@ class MediaDocIntelligenceEngine:
 
         specific_answer = ""
         q_clean = (user_query or "").strip()
-        is_generic_read = bool(
-            not q_clean
-            or re.match(
-                r"^(?:please\s+)?(?:read|analyze|analyse|summarize|summarise|review|explain|inspect|give\s+(?:me\s+)?(?:all\s+|the\s+)?details(?:\s+on|\s+of|\s+from|\s+about)?)\s*"
-                r"(?:this\s+|the\s+|attached\s+|uploaded\s+)?(?:document|file|pdf|report|paper|doc|docx|slides?|deck|resume|cv|it)?\s*"
-                r"(?:and\s+give\s+(?:me\s+)?(?:all\s+)?details)?\s*[.?!]*$",
-                q_clean,
-                re.IGNORECASE,
-            )
-        )
+        doc_stem = os.path.splitext(doc_name or "")[0].lower()
+        generic_read_stop = {
+            "please", "read", "analyze", "analyse", "summarize", "summarise", "review",
+            "explain", "inspect", "give", "all", "the", "details", "sections", "verified",
+            "metrics", "numbers", "figures", "facts", "points", "takeaways", "summary",
+            "breakdown", "complete", "full", "everything", "document", "file", "pdf",
+            "report", "paper", "doc", "docx", "slides", "deck", "resume", "readme",
+            "markdown", "txt", "don", "dont", "have", "from", "about", "this", "that",
+            "and", "for", "with", "into", "out", "what", "are", "inside", doc_stem,
+            (doc_name or "").lower(),
+        }
+        meaningful_q_tokens = [
+            w.lower()
+            for w in re.findall(r"[A-Za-z0-9_]{3,}", q_clean)
+            if w.lower() not in generic_read_stop
+        ]
+        is_generic_read = len(meaningful_q_tokens) == 0
         if not is_generic_read and len(q_clean.split()) >= 3:
             _think(
                 f"Step 4 — Grounded Question Answering: Synthesizing direct answer for '{q_clean[:80]}'...",
                 "slm_rag",
             )
-            specific_answer = self._answer_question_over_text(q_clean, full_text[:8000])
+            specific_answer = self._answer_question_over_text(q_clean, full_text[:12000])
 
         exec_points = _select_top_informative_sentences(full_text, max_sentences=6)
         exec_md = "\n".join(f"- {pt}" for pt in exec_points) if exec_points else f"- `{doc_name}` contains `{total_words:,}` words across `{len(sections)}` sections."

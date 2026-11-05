@@ -5693,48 +5693,17 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ============================================================================
-// Opt-In Personalization & Daily Concierge Studio (Desktop App Only)
+// Opt-In Personalization & Daily Concierge Studio (Consent-Gated)
 // ============================================================================
 
 const escapeHtml = escapeHtmlSafe;
 let _personalizeState = null;
 
-function isPersonalizationDesktopMode() {
-  const host = (window.location.hostname || "").toLowerCase();
-  const isRemoteWebHost = (
-    host.includes("huggingface.co") ||
-    host.includes("hf.space") ||
-    host.includes("github.io") ||
-    host.includes("slmagents.ai")
-  );
-  if (isRemoteWebHost) return false;
-  return (
-    document.documentElement.classList.contains("desktop-app-mode") ||
-    window.location.search.indexOf("desktop=1") !== -1 ||
-    !!window.pywebview
-  );
-}
-
-function hideAllPersonalizationUI() {
-  ["btn-personalize-studio", "btn-sidebar-personalize", "btn-popover-personalize", "personalize-suggestions-tray", "personalize-modal-backdrop"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = "none";
-  });
-}
-
 async function loadPersonalizationState() {
-  if (!isPersonalizationDesktopMode()) {
-    hideAllPersonalizationUI();
-    return;
-  }
   try {
     const res = await fetch(getApiEndpoint("/api/harness/personalize"));
     if (!res.ok) return;
     const data = await res.json();
-    if (data && data.web_disabled) {
-      hideAllPersonalizationUI();
-      return;
-    }
     _personalizeState = data;
     applyPersonalizationToUI(data);
   } catch (e) {
@@ -5743,31 +5712,61 @@ async function loadPersonalizationState() {
 }
 
 function applyPersonalizationToUI(data) {
-  if (!isPersonalizationDesktopMode()) {
-    hideAllPersonalizationUI();
-    return;
-  }
   if (!data || !data.profile) return;
   const prof = data.profile;
   const creds = data.credentials || {};
   const enabled = !!prof.enabled;
+  const consentGiven = !!(data.consent_given || prof.consent_given);
+  const consentTs = data.consent_timestamp || prof.consent_timestamp || "";
 
-  // Ensure Personalize only lives inside the Options popover (#btn-popover-personalize)
-  const staleTopBtn = document.getElementById("btn-personalize-studio");
-  const staleSideBtn = document.getElementById("btn-sidebar-personalize");
-  if (staleTopBtn) staleTopBtn.style.display = "none";
-  if (staleSideBtn) staleSideBtn.style.display = "none";
+  const topBtn = document.getElementById("btn-personalize-studio");
+  if (topBtn) topBtn.style.display = "inline-flex";
 
   const popBtn = document.getElementById("btn-popover-personalize");
   if (popBtn) popBtn.style.display = "flex";
 
   const dot = document.getElementById("personalize-status-dot");
+  const topDot = document.getElementById("personalize-top-dot");
   const statusLbl = document.getElementById("pers-optin-status-label");
-  if (dot) {
-    dot.style.background = enabled ? "#10b981" : "#94a3b8";
-  }
+  const activeColor = (enabled && consentGiven) ? "#10b981" : "#94a3b8";
+  if (dot) dot.style.background = activeColor;
+  if (topDot) topDot.style.background = activeColor;
   if (statusLbl) {
-    statusLbl.textContent = enabled ? "✓ Personalization Active (Opt-In)" : "Enable Personalization (Opt-In)";
+    statusLbl.textContent = (enabled && consentGiven) ? "✓ Personalization & Consent Active" : "Enable Personalization (Opt-In)";
+  }
+
+  // Update Consent Banner inside Modal
+  const consentBanner = document.getElementById("pers-consent-banner");
+  const consentTitle = document.getElementById("pers-consent-title");
+  const consentDesc = document.getElementById("pers-consent-desc");
+  const grantBtn = document.getElementById("btn-grant-pers-consent");
+  const revokeBtn = document.getElementById("btn-revoke-pers-consent");
+  if (consentBanner && consentTitle && consentDesc) {
+    if (consentGiven) {
+      consentBanner.style.background = "#ecfdf5";
+      consentBanner.style.borderColor = "#6ee7b7";
+      consentTitle.style.color = "#065f46";
+      consentTitle.textContent = `🟢 Personalization Consent Active & Saved${consentTs ? " (" + consentTs + ")" : ""}`;
+      consentDesc.style.color = "#047857";
+      consentDesc.textContent = "Your consent is saved locally in .slm/concierge/personal_profile.json. Chrome profiles, email accounts, cookies, and SSO sessions are linked.";
+      if (grantBtn) {
+        grantBtn.textContent = "🔄 Rescan & Sync Linked Accounts";
+        grantBtn.style.background = "#0f172a";
+      }
+      if (revokeBtn) revokeBtn.style.display = "inline-flex";
+    } else {
+      consentBanner.style.background = "#fffbeb";
+      consentBanner.style.borderColor = "#fcd34d";
+      consentTitle.style.color = "#92400e";
+      consentTitle.textContent = "🔒 Opt-In Consent Required to Link Personal Details";
+      consentDesc.style.color = "#78350f";
+      consentDesc.textContent = "SLMAgents only links your Chrome profiles, emails, cookies, and social/job accounts if you choose to personalize and grant consent. Once granted, your consent is saved locally so you stay linked automatically.";
+      if (grantBtn) {
+        grantBtn.textContent = "✅ Grant Consent & Link Personal Details";
+        grantBtn.style.background = "#059669";
+      }
+      if (revokeBtn) revokeBtn.style.display = "none";
+    }
   }
 
   const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
@@ -5853,6 +5852,7 @@ function applyPersonalizationToUI(data) {
 }
 
 function renderChromeProfilesDirectory(cd) {
+  const consentRequired = !!(cd && cd.consent_required);
   const profiles = Array.isArray(cd.profiles) ? cd.profiles : [];
   const uniqueEmails = Array.isArray(cd.unique_emails) ? cd.unique_emails : [];
   const ssoAccounts = Array.isArray(cd.google_sso_accounts) ? cd.google_sso_accounts : [];
@@ -5879,11 +5879,27 @@ function renderChromeProfilesDirectory(cd) {
 
   const countBadge = document.getElementById("pers-chrome-count-badge");
   if (countBadge) {
-    countBadge.textContent = `${profiles.length} Profiles · ${uniqueEmails.length} Emails · ${ssoAccounts.length} Gmail SSO`;
+    countBadge.textContent = consentRequired
+      ? "Consent Required"
+      : `${profiles.length} Profiles · ${uniqueEmails.length} Emails · ${ssoAccounts.length} Gmail SSO`;
   }
 
   const container = document.getElementById("pers-chrome-profiles-container");
   if (!container) return;
+
+  if (consentRequired) {
+    container.innerHTML = `
+      <div style="padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:0.78rem;color:#92400e;">
+          🔒 <strong>Waiting for your consent:</strong> Personal Chrome profiles, emails, cookies, and SSO sessions are only linked after you grant consent.
+        </div>
+        <button type="button" onclick="grantPersonalizeConsentAndLink(this)" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:0.75rem;font-weight:700;cursor:pointer;">
+          ✅ Grant Consent &amp; Link Chrome Accounts
+        </button>
+      </div>
+    `;
+    return;
+  }
 
   if (profiles.length === 0) {
     container.innerHTML = `<div style="font-size:0.77rem;color:#64748b;">No local Chrome profiles detected.</div>`;
@@ -6121,11 +6137,72 @@ window.applyPersonalizePreset = async function applyPersonalizePreset(presetKey)
   await savePersonalizationSettings(false, true);
 };
 
-window.openPersonalizeModal = async function openPersonalizeModal(defaultTab) {
-  if (!isPersonalizationDesktopMode()) {
-    hideAllPersonalizationUI();
-    return;
+window.grantPersonalizeConsentAndLink = async function grantPersonalizeConsentAndLink(btn) {
+  const orig = btn ? btn.textContent : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Saving Consent & Linking Chrome Accounts...";
   }
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/personalize/consent"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ consent_given: true }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      _personalizeState = data;
+      applyPersonalizationToUI(data);
+      const fb = document.getElementById("pers-save-feedback");
+      if (fb) {
+        fb.textContent = "✓ Consent saved & Chrome accounts linked!";
+        setTimeout(() => {
+          fb.textContent = "";
+        }, 4000);
+      }
+    }
+  } catch (e) {
+    if (btn) btn.textContent = orig;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+    }
+  }
+};
+
+window.revokePersonalizeConsent = async function revokePersonalizeConsent(btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(getApiEndpoint("/api/harness/personalize/consent"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ consent_given: false }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      _personalizeState = data;
+      // Clear input fields in modal when consent is revoked
+      ["pers-full-name", "cred-twitter-user", "cred-twitter-pass", "cred-hn-user", "cred-hn-pass", "cred-email-addr", "cred-email-pass", "cred-naukri-user", "cred-naukri-pass"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+      applyPersonalizationToUI(data);
+      const fb = document.getElementById("pers-save-feedback");
+      if (fb) {
+        fb.textContent = "🔒 Consent revoked & personal accounts unlinked.";
+        setTimeout(() => {
+          fb.textContent = "";
+        }, 4000);
+      }
+    }
+  } catch (e) {
+    // Ignore
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+window.openPersonalizeModal = async function openPersonalizeModal(defaultTab) {
   const modal = document.getElementById("personalize-modal-backdrop");
   if (!modal) return;
   modal.style.display = "flex";
@@ -6160,7 +6237,11 @@ window.switchPersonalizeTab = function switchPersonalizeTab(tabKey) {
 };
 
 window.handlePersonalizeOptInToggle = async function handlePersonalizeOptInToggle(checked) {
-  await savePersonalizationSettings(true, checked);
+  if (checked) {
+    await window.grantPersonalizeConsentAndLink();
+  } else {
+    await window.revokePersonalizeConsent();
+  }
 };
 
 window.savePersonalizationSettings = async function savePersonalizationSettings(silent, forcedEnabled) {
@@ -6178,6 +6259,7 @@ window.savePersonalizationSettings = async function savePersonalizationSettings(
   const payload = {
     profile: {
       enabled: forcedEnabled !== undefined ? isEnabled : true,
+      consent_given: forcedEnabled !== undefined ? isEnabled : true,
       onboarded: true,
       full_name: getVal("pers-full-name"),
       current_role: getVal("pers-current-role") || "AI & Software Systems Engineer",

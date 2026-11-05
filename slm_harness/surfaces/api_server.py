@@ -1161,29 +1161,32 @@ def mount_harness_routes(app: FastAPI) -> None:
         return {"ok": True, "facts": get_procedural_memory().list_facts(workspace=cfg.workspace_dir)}
 
     # -----------------------------------------------------------------------
-    # Opt-In Personalization & Daily Concierge Studio Endpoints (Local Desktop Only)
+    # Opt-In Personalization & Daily Concierge Studio Endpoints (Consent-Gated)
     # -----------------------------------------------------------------------
-
-    def _is_personalize_allowed(request: Request) -> bool:
-        from ..personalization import is_web_cloud_environment
-
-        if is_web_cloud_environment():
-            return False
-        host_hdr = (request.headers.get("host") or "").split(":")[0].lower()
-        return host_hdr in ("127.0.0.1", "localhost", "::1", "[::1]", "")
 
     @app.get("/api/harness/personalize")
     async def get_personalization_status(request: Request) -> Dict[str, Any]:
-        if not _is_personalize_allowed(request):
-            return {"enabled": False, "web_disabled": True, "profile": {"enabled": False}, "suggestions": []}
         from ..personalization import get_concierge_engine
 
         return get_concierge_engine().get_status_bundle()
 
+    @app.post("/api/harness/personalize/consent")
+    async def update_personalization_consent(request: Request) -> Dict[str, Any]:
+        from ..personalization import get_concierge_engine
+
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+        grant = bool(body.get("consent_given", True))
+        eng = get_concierge_engine()
+        if grant:
+            return eng.grant_consent_and_link()
+        return eng.revoke_consent()
+
     @app.post("/api/harness/personalize")
     async def save_personalization_settings(request: Request) -> Dict[str, Any]:
-        if not _is_personalize_allowed(request):
-            return {"enabled": False, "web_disabled": True, "profile": {"enabled": False}, "suggestions": []}
         from ..personalization import get_concierge_engine
 
         body = {}
@@ -1197,11 +1200,11 @@ def mount_harness_routes(app: FastAPI) -> None:
 
     @app.get("/api/harness/personalize/dashboard")
     async def get_personal_dashboard(request: Request, refresh: bool = False) -> Dict[str, Any]:
-        if not _is_personalize_allowed(request):
-            return {"ok": False, "web_disabled": True, "dashboard": None}
         from ..personalization import get_concierge_engine
 
         eng = get_concierge_engine()
+        if not eng.has_consent():
+            return {"ok": False, "consent_required": True, "dashboard": None}
         if not refresh:
             cached = eng.get_cached_dashboard()
             if cached:
@@ -1212,19 +1215,17 @@ def mount_harness_routes(app: FastAPI) -> None:
 
     @app.post("/api/harness/personalize/dashboard/run")
     async def run_personal_dashboard_now(request: Request) -> Dict[str, Any]:
-        if not _is_personalize_allowed(request):
-            return {"ok": False, "web_disabled": True, "dashboard": None}
         from ..personalization import get_concierge_engine
 
         eng = get_concierge_engine()
+        if not eng.has_consent():
+            eng.grant_consent_and_link()
         loop = asyncio.get_running_loop()
         dash = await loop.run_in_executor(None, eng.build_daily_dashboard)
         return {"ok": True, "dashboard": dash}
 
     @app.post("/api/harness/personalize/jobs/apply")
     async def apply_personal_job(request: Request) -> Dict[str, Any]:
-        if not _is_personalize_allowed(request):
-            return {"ok": False, "web_disabled": True}
         from ..personalization import get_concierge_engine
 
         body = {}
@@ -1244,8 +1245,6 @@ def mount_harness_routes(app: FastAPI) -> None:
 
     @app.post("/api/harness/personalize/emails/update")
     async def update_personal_email_reminder(request: Request) -> Dict[str, Any]:
-        if not _is_personalize_allowed(request):
-            return {"ok": False, "web_disabled": True}
         from ..personalization import get_concierge_engine
 
         body = {}
@@ -1257,24 +1256,21 @@ def mount_harness_routes(app: FastAPI) -> None:
 
     @app.get("/api/harness/personalize/chrome-profiles")
     async def get_chrome_profiles_discovery(request: Request) -> Dict[str, Any]:
-        if not _is_personalize_allowed(request):
-            return {"ok": False, "web_disabled": True, "profiles": [], "unique_emails": [], "google_sso_accounts": []}
         from ..personalization import get_concierge_engine
 
-        return get_concierge_engine().discover_chrome_profiles()
+        eng = get_concierge_engine()
+        if not eng.has_consent():
+            return {"ok": False, "consent_required": True, "profiles": [], "unique_emails": [], "google_sso_accounts": [], "saved_site_accounts": []}
+        return eng.discover_chrome_profiles()
 
     @app.post("/api/harness/personalize/chrome-profiles/sync")
     async def sync_chrome_profiles_endpoint(request: Request) -> Dict[str, Any]:
-        if not _is_personalize_allowed(request):
-            return {"ok": False, "web_disabled": True}
         from ..personalization import get_concierge_engine
 
-        return get_concierge_engine().sync_chrome_profiles_to_personalization()
+        return get_concierge_engine().grant_consent_and_link()
 
     @app.post("/api/harness/personalize/chrome-profiles/launch")
     async def launch_chrome_profile_endpoint(request: Request) -> Dict[str, Any]:
-        if not _is_personalize_allowed(request):
-            return {"ok": False, "web_disabled": True}
         from ..personalization import get_concierge_engine
 
         body = {}

@@ -159,11 +159,13 @@ def detect_concierge_intent(query: str) -> Optional[str]:
     Returns the concierge intent key (`daily_dashboard`, `email_tracker`, `job_assistant`,
     `learning_opportunities`, `personalize_setup`, or `multi_concierge`) if the user query
     requests a Personal Concierge workflow; otherwise `None`.
-    Disabled automatically on hosted web/cloud deployments.
     """
-    if is_web_cloud_environment():
-        return None
-    q = (query or "").strip()
+    q = re.sub(
+        r"\s*(?:—\s*Selected Plan Option:|\[Clarified Plan Option:).*$",
+        "",
+        (query or "").strip(),
+        flags=re.IGNORECASE,
+    ).strip()
     if not q:
         return None
     matched: List[str] = []
@@ -344,6 +346,8 @@ class PersonalConciergeEngine:
     def get_profile(self) -> Dict[str, Any]:
         default_profile: Dict[str, Any] = {
             "enabled": False,  # Strictly opt-in: disabled by default for general users
+            "consent_given": False,  # Explicit user consent required before linking personal details or Chrome accounts
+            "consent_timestamp": "",
             "onboarded": False,
             "full_name": "",
             "current_role": "AI & Software Systems Engineer",
@@ -403,21 +407,68 @@ class PersonalConciergeEngine:
                     prof[k] = [item.strip() for item in v.split(",") if item.strip()]
                 elif isinstance(v, list):
                     prof[k] = [str(item).strip() for item in v if str(item).strip()]
-            elif k in ("enabled", "onboarded", "daily_job_enabled"):
+            elif k in ("enabled", "consent_given", "onboarded", "daily_job_enabled"):
                 prof[k] = bool(v)
             else:
                 prof[k] = v
 
-        prof["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_ts_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if prof.get("consent_given") and not prof.get("consent_timestamp"):
+            prof["consent_timestamp"] = now_ts_str
+        prof["updated_at"] = now_ts_str
         with open(self.profile_path, "w", encoding="utf-8") as f:
             json.dump(prof, f, indent=2, ensure_ascii=False)
 
-        if credentials_updates:
+        if credentials_updates and prof.get("consent_given"):
             self.vault.save_credentials(credentials_updates)
 
         if prof.get("daily_job_enabled"):
             self._ensure_daily_scheduled_job(prof.get("daily_job_time", "08:30"))
 
+        return self.get_status_bundle()
+
+    def has_consent(self) -> bool:
+        """Returns True only if the user has explicitly granted consent to link personal details."""
+        return bool(self.get_profile().get("consent_given"))
+
+    def grant_consent_and_link(self) -> Dict[str, Any]:
+        """
+        Records explicit user consent persistently in `.slm/concierge/personal_profile.json`
+        ('take the consent and keep it') and links Chrome profiles, emails, cookies, and SSO accounts.
+        """
+        prof = self.get_profile()
+        now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        prof["consent_given"] = True
+        prof["enabled"] = True
+        prof["onboarded"] = True
+        if not prof.get("consent_timestamp"):
+            prof["consent_timestamp"] = now_ts
+        prof["updated_at"] = now_ts
+        with open(self.profile_path, "w", encoding="utf-8") as f:
+            json.dump(prof, f, indent=2, ensure_ascii=False)
+        return self.sync_chrome_profiles_to_personalization()
+
+    def revoke_consent(self) -> Dict[str, Any]:
+        """
+        Revokes personalization consent, unlinks Chrome profiles & emails, and clears auto-linked vault credentials.
+        """
+        prof = self.get_profile()
+        prof["consent_given"] = False
+        prof["enabled"] = False
+        prof["consent_timestamp"] = ""
+        prof["full_name"] = ""
+        prof["linked_chrome_profiles"] = []
+        prof["linked_emails"] = []
+        prof["linked_sso_accounts"] = []
+        prof["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(self.profile_path, "w", encoding="utf-8") as f:
+            json.dump(prof, f, indent=2, ensure_ascii=False)
+        try:
+            if os.path.isfile(self.vault.vault_path):
+                with open(self.vault.vault_path, "w", encoding="utf-8") as vf:
+                    json.dump({}, vf, indent=2)
+        except OSError:
+            pass
         return self.get_status_bundle()
 
     def get_personalized_suggestions(self, include_preview: bool = True) -> List[Dict[str, str]]:
@@ -1019,40 +1070,44 @@ class PersonalConciergeEngine:
 
                                 # Generic X / Twitter handle & session detection
                                 if host in ("x.com", "twitter.com"):
-                                    handle_x = ""
-                                    m_tx = re.search(r"\(@([A-Za-z0-9_]{2,30})\)", t_s)
-                                    if m_tx:
-                                        handle_x = "@" + m_tx.group(1)
-                                    else:
-                                        path_parts = [p for p in urlparse(u_s).path.split("/") if p]
-                                        if len(path_parts) >= 1 and path_parts[0].lower() not in _TWITTER_RESERVED_PATHS:
-                                            handle_x = "@" + path_parts[0]
                                     sso_entry = google_sso_map.get("twitter")
-                                    prev_handle = (sso_entry or {}).get("handle", "")
-                                    best_handle = handle_x if handle_x else (prev_handle if prev_handle.startswith("@") else f"Google SSO ({gmail_sso_email})")
-                                    profs_list = list((sso_entry or {}).get("profiles") or [])
-                                    if prof_dir not in profs_list:
-                                        profs_list.append(prof_dir)
-                                    cookie_meta = prof_cookie_sessions.get("twitter") or (sso_entry or {}).get("cookie_meta") or {}
-                                    auth_cookies = cookie_meta.get("auth_cookies") or ["auth_token", "ct0"]
-                                    entry_x = {
-                                        "service": "X / Twitter",
-                                        "label": "X / Twitter",
-                                        "service_key": "twitter",
-                                        "handle": best_handle,
-                                        "display_name": sso_entry.get("display_name", primary_full_name) if sso_entry else primary_full_name,
-                                        "sso_email": sso_entry.get("sso_email", gmail_sso_email) if sso_entry else gmail_sso_email,
-                                        "auth_method": f"Chrome CookieJar ({', '.join(auth_cookies[:3])}) + Google SSO",
-                                        "auth_cookies": auth_cookies,
-                                        "cookie_count": cookie_meta.get("cookie_count", 0),
-                                        "profile_dir": sso_entry.get("profile_dir", prof_dir) if sso_entry else prof_dir,
-                                        "profile_name": sso_entry.get("profile_name", prof_name) if sso_entry else prof_name,
-                                        "profiles": profs_list,
-                                        "url": f"https://x.com/{best_handle.lstrip('@')}" if best_handle.startswith("@") else "https://x.com/home",
-                                    }
-                                    google_sso_map["twitter"] = entry_x
-                                    if not any(x.get("service_key") == "twitter" for x in prof_sso_accounts):
-                                        prof_sso_accounts.append(entry_x)
+                                    if sso_entry and sso_entry.get("user_id"):
+                                        if prof_dir not in (sso_entry.get("profiles") or []):
+                                            sso_entry.setdefault("profiles", []).append(prof_dir)
+                                    else:
+                                        handle_x = ""
+                                        m_tx = re.search(r"\(@([A-Za-z0-9_]{2,30})\)", t_s)
+                                        if m_tx:
+                                            handle_x = "@" + m_tx.group(1)
+                                        else:
+                                            path_parts = [p for p in urlparse(u_s).path.split("/") if p]
+                                            if len(path_parts) == 1 and path_parts[0].lower() not in _TWITTER_RESERVED_PATHS:
+                                                handle_x = "@" + path_parts[0]
+                                        prev_handle = (sso_entry or {}).get("handle", "")
+                                        best_handle = handle_x if handle_x else (prev_handle if prev_handle.startswith("@") else f"Google SSO ({gmail_sso_email})")
+                                        profs_list = list((sso_entry or {}).get("profiles") or [])
+                                        if prof_dir not in profs_list:
+                                            profs_list.append(prof_dir)
+                                        cookie_meta = prof_cookie_sessions.get("twitter") or (sso_entry or {}).get("cookie_meta") or {}
+                                        auth_cookies = cookie_meta.get("auth_cookies") or ["auth_token", "ct0"]
+                                        entry_x = {
+                                            "service": "X / Twitter",
+                                            "label": "X / Twitter",
+                                            "service_key": "twitter",
+                                            "handle": best_handle,
+                                            "display_name": sso_entry.get("display_name", primary_full_name) if sso_entry else primary_full_name,
+                                            "sso_email": sso_entry.get("sso_email", gmail_sso_email) if sso_entry else gmail_sso_email,
+                                            "auth_method": f"Chrome CookieJar ({', '.join(auth_cookies[:3])}) + Google SSO",
+                                            "auth_cookies": auth_cookies,
+                                            "cookie_count": cookie_meta.get("cookie_count", 0),
+                                            "profile_dir": sso_entry.get("profile_dir", prof_dir) if sso_entry else prof_dir,
+                                            "profile_name": sso_entry.get("profile_name", prof_name) if sso_entry else prof_name,
+                                            "profiles": profs_list,
+                                            "url": f"https://x.com/{best_handle.lstrip('@')}" if best_handle.startswith("@") else "https://x.com/home",
+                                        }
+                                        google_sso_map["twitter"] = entry_x
+                                        if not any(x.get("service_key") == "twitter" for x in prof_sso_accounts):
+                                            prof_sso_accounts.append(entry_x)
 
                                 # Generic LinkedIn handle & session detection
                                 elif "linkedin.com" in host:
@@ -1239,52 +1294,75 @@ class PersonalConciergeEngine:
                                 sess_uid = str((init_st.get("session") or {}).get("user_id") or "").strip()
                                 users_map = ((init_st.get("entities") or {}).get("users") or {}).get("entities") or {}
                                 u_meta = users_map.get(sess_uid) if sess_uid else None
-                                if not u_meta and users_map:
-                                    u_meta = next(iter(users_map.values()))
-                                if isinstance(u_meta, dict) and u_meta.get("screen_name"):
+                                other_handles = [
+                                    "@" + str(ou.get("screen_name")).lstrip("@")
+                                    for ouid, ou in users_map.items()
+                                    if isinstance(ou, dict) and ou.get("screen_name") and str(ouid) != sess_uid
+                                ]
+                                sso_x = google_sso_map.get("twitter") or {}
+                                existing_followed = list(sso_x.get("cached_followed_handles") or [])
+                                for oh in other_handles:
+                                    if oh not in existing_followed:
+                                        existing_followed.append(oh)
+
+                                if sess_uid and isinstance(u_meta, dict) and u_meta.get("screen_name"):
                                     sn = "@" + str(u_meta["screen_name"]).lstrip("@")
-                                    other_handles = [
-                                        "@" + str(ou.get("screen_name")).lstrip("@")
-                                        for ouid, ou in users_map.items()
-                                        if isinstance(ou, dict) and ou.get("screen_name") and str(ouid) != sess_uid
-                                    ]
-                                    sso_x = google_sso_map.get("twitter") or {}
-                                    profs_l = list(sso_x.get("profiles") or [])
-                                    if prof_dir not in profs_l:
-                                        profs_l.append(prof_dir)
-                                    cookie_m = prof_cookie_sessions.get("twitter") or {}
-                                    auth_c = cookie_m.get("auth_cookies") or sso_x.get("auth_cookies") or ["auth_token", "ct0", "twid"]
-                                    updated_x = {
-                                        "service": "X / Twitter",
-                                        "label": "X / Twitter",
-                                        "service_key": "twitter",
-                                        "handle": sn,
-                                        "user_id": sess_uid or str(u_meta.get("id_str") or ""),
-                                        "display_name": str(u_meta.get("name") or primary_full_name),
-                                        "bio": str(u_meta.get("description") or "").strip(),
-                                        "location": str(u_meta.get("location") or "").strip(),
-                                        "following_count": int(u_meta.get("friends_count") or 0),
-                                        "followers_count": int(u_meta.get("followers_count") or 0),
-                                        "statuses_count": int(u_meta.get("statuses_count") or 0),
-                                        "cached_followed_handles": other_handles[:20],
-                                        "sso_email": sso_x.get("sso_email") or gmail_sso_email,
-                                        "auth_method": f"Chrome CookieJar ({', '.join(auth_c[:3])}) + Google SSO",
-                                        "auth_cookies": auth_c,
-                                        "cookie_count": cookie_m.get("cookie_count") or sso_x.get("cookie_count") or 0,
-                                        "profile_dir": sso_x.get("profile_dir") or prof_dir,
-                                        "profile_name": sso_x.get("profile_name") or prof_name,
-                                        "profiles": profs_l,
-                                        "url": f"https://x.com/{sn.lstrip('@')}",
-                                    }
-                                    google_sso_map["twitter"] = updated_x
-                                    replaced_in_prof = False
-                                    for idx_px, px_item in enumerate(prof_sso_accounts):
-                                        if px_item.get("service_key") == "twitter":
-                                            prof_sso_accounts[idx_px] = updated_x
-                                            replaced_in_prof = True
-                                            break
-                                    if not replaced_in_prof:
-                                        prof_sso_accounts.append(updated_x)
+                                    prev_primary_h = str(sso_x.get("handle") or "").strip()
+                                    if prev_primary_h.startswith("@") and prev_primary_h.lower() != sn.lower() and sso_x.get("profile_dir") == "Default":
+                                        # Default profile already has a primary @handle; keep Default's @handle as primary
+                                        # and include this secondary profile's @handle in cached_followed_handles!
+                                        if sn not in existing_followed:
+                                            existing_followed.insert(0, sn)
+                                        sso_x["cached_followed_handles"] = existing_followed[:20]
+                                        if not sso_x.get("following_count") and u_meta.get("friends_count"):
+                                            sso_x["following_count"] = int(u_meta.get("friends_count") or 0)
+                                        if not sso_x.get("followers_count") and u_meta.get("followers_count"):
+                                            sso_x["followers_count"] = int(u_meta.get("followers_count") or 0)
+                                        if prof_dir not in (sso_x.get("profiles") or []):
+                                            sso_x.setdefault("profiles", []).append(prof_dir)
+                                        google_sso_map["twitter"] = sso_x
+                                    else:
+                                        existing_followed = [h for h in existing_followed if h.lower() != sn.lower()]
+                                        profs_l = list(sso_x.get("profiles") or [])
+                                        if prof_dir not in profs_l:
+                                            profs_l.append(prof_dir)
+                                        cookie_m = prof_cookie_sessions.get("twitter") or {}
+                                        auth_c = cookie_m.get("auth_cookies") or sso_x.get("auth_cookies") or ["auth_token", "ct0", "twid"]
+                                        updated_x = {
+                                            "service": "X / Twitter",
+                                            "label": "X / Twitter",
+                                            "service_key": "twitter",
+                                            "handle": sn,
+                                            "user_id": sess_uid,
+                                            "display_name": str(u_meta.get("name") or primary_full_name),
+                                            "bio": str(u_meta.get("description") or "").strip(),
+                                            "location": str(u_meta.get("location") or "").strip(),
+                                            "following_count": int(u_meta.get("friends_count") or 0),
+                                            "followers_count": int(u_meta.get("followers_count") or 0),
+                                            "statuses_count": int(u_meta.get("statuses_count") or 0),
+                                            "cached_followed_handles": existing_followed[:20],
+                                            "sso_email": gmail_sso_email or sso_x.get("sso_email", ""),
+                                            "auth_method": f"Chrome CookieJar ({', '.join(auth_c[:3])}) + Google SSO",
+                                            "auth_cookies": auth_c,
+                                            "cookie_count": cookie_m.get("cookie_count") or sso_x.get("cookie_count") or 0,
+                                            "profile_dir": prof_dir,
+                                            "profile_name": prof_name,
+                                            "profiles": profs_l,
+                                            "url": f"https://x.com/{sn.lstrip('@')}",
+                                        }
+                                        google_sso_map["twitter"] = updated_x
+                                        replaced_in_prof = False
+                                        for idx_px, px_item in enumerate(prof_sso_accounts):
+                                            if px_item.get("service_key") == "twitter":
+                                                prof_sso_accounts[idx_px] = updated_x
+                                                replaced_in_prof = True
+                                                break
+                                        if not replaced_in_prof:
+                                            prof_sso_accounts.append(updated_x)
+                                elif sso_x and existing_followed:
+                                    sso_x["cached_followed_handles"] = [
+                                        h for h in existing_followed if h.lower() != str(sso_x.get("handle") or "").lower()
+                                    ][:20]
                                 break
                     except Exception:
                         pass
@@ -1436,6 +1514,12 @@ class PersonalConciergeEngine:
             if not prof.get("full_name") and primary_prof.get("primary_full_name"):
                 prof["full_name"] = primary_prof["primary_full_name"]
 
+        now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        prof["consent_given"] = True
+        prof["enabled"] = True
+        prof["onboarded"] = True
+        if not prof.get("consent_timestamp"):
+            prof["consent_timestamp"] = now_ts
         prof["linked_chrome_profiles"] = [
             {
                 "profile_dir": p["profile_dir"],
@@ -1449,7 +1533,7 @@ class PersonalConciergeEngine:
         ]
         prof["linked_emails"] = [u["email"] for u in unique_emails]
         prof["linked_sso_accounts"] = sso_accounts
-        prof["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        prof["updated_at"] = now_ts
         with open(self.profile_path, "w", encoding="utf-8") as f:
             json.dump(prof, f, indent=2, ensure_ascii=False)
 
@@ -1514,7 +1598,39 @@ class PersonalConciergeEngine:
 
     def get_status_bundle(self) -> Dict[str, Any]:
         prof = self.get_profile()
+        has_consent = bool(prof.get("consent_given"))
+        suggestions = self.get_personalized_suggestions()
+        dashboard = self.get_cached_dashboard() if has_consent else None
+
+        # Strictly enforce opt-in consent: do NOT scan Chrome or auto-fill personal details until consent_given is True
+        if not has_consent:
+            empty_discovery = {
+                "consent_required": True,
+                "browser": "Google Chrome",
+                "total_profiles": 0,
+                "total_unique_emails": 0,
+                "total_site_accounts": 0,
+                "total_sso_accounts": 0,
+                "total_cookies_scanned": 0,
+                "profiles": [],
+                "unique_emails": [],
+                "google_sso_accounts": [],
+                "saved_site_accounts": [],
+                "gmail_recent_threads": [],
+            }
+            return {
+                "consent_given": False,
+                "consent_timestamp": "",
+                "profile": prof,
+                "credentials": {},
+                "chrome_discovery": empty_discovery,
+                "suggestions": suggestions,
+                "has_dashboard": False,
+                "dashboard_updated_at": "",
+            }
+
         chrome_discovery = self.discover_chrome_profiles()
+        chrome_discovery["consent_required"] = False
         # Automatically enrich full_name, linked_emails & Google SSO vault defaults from runtime Chrome discovery
         if not prof.get("full_name") and chrome_discovery.get("profiles"):
             prof["full_name"] = chrome_discovery["profiles"][0].get("primary_full_name", "")
@@ -1544,9 +1660,9 @@ class PersonalConciergeEngine:
             self.vault.save_credentials(auto_updates)
 
         vault_summary = self.vault.get_masked_summary()
-        suggestions = self.get_personalized_suggestions()
-        dashboard = self.get_cached_dashboard()
         return {
+            "consent_given": True,
+            "consent_timestamp": prof.get("consent_timestamp", ""),
             "profile": prof,
             "credentials": vault_summary,
             "chrome_discovery": chrome_discovery,

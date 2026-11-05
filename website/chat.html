@@ -46,20 +46,9 @@
   }
   </script>
   <style>
-    /* Personalization is strictly for the Installed Desktop App — accessed cleanly via Options (#btn-popover-personalize) */
-    #btn-personalize-studio,
-    #btn-sidebar-personalize,
-    #btn-popover-personalize,
-    html:not(.desktop-app-mode) #personalize-suggestions-tray,
-    html:not(.desktop-app-mode) #personalize-modal-backdrop {
-      display: none !important;
-    }
     html.desktop-app-mode .web-only-nav,
     html.desktop-app-mode .btn-top-github-issue {
       display: none !important;
-    }
-    html.desktop-app-mode #btn-popover-personalize {
-      display: flex !important;
     }
 
     /* Reasoning Effort Selector (Low / Medium / High) */
@@ -328,7 +317,10 @@
             CPU Ready
           </span>
 
-          <!-- btn-personalize-studio moved to Options menu (#btn-popover-personalize) -->
+          <button type="button" class="btn-harness-top" id="btn-personalize-studio" onclick="openPersonalizeModal()" title="Opt-In Personalization &amp; Consent-Gated Account Linking" style="display: inline-flex; align-items: center; gap: 6px;">
+            <span>✨ Personalize</span>
+            <span id="personalize-top-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
+          </button>
 
           <!-- Unified On-Demand Workspace & Engine Menu -->
           <div class="top-workspace-menu-wrap" id="top-workspace-menu-wrap">
@@ -359,7 +351,7 @@
               <div class="popover-divider"></div>
               <div class="popover-section-label">Workspace &amp; Session</div>
 
-              <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openPersonalizeModal()" id="btn-popover-personalize" style="display: none;" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant">
+              <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openPersonalizeModal()" id="btn-popover-personalize" style="display: flex;" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 <span>Personalize &amp; Concierge</span>
                 <span id="personalize-status-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block; margin-left: auto; flex-shrink: 0;"></span>
@@ -835,6 +827,26 @@
 
       <!-- Modal Body -->
       <div class="issue-modal-body" style="overflow-y: auto; padding: 18px 20px; flex: 1;">
+        <!-- Persistent Opt-In Consent & Account Linking Gate Banner -->
+        <div id="pers-consent-banner" style="background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 240px;">
+            <div id="pers-consent-title" style="font-size: 0.84rem; font-weight: 700; color: #92400e;">
+              🔒 Opt-In Consent Required to Link Personal Details
+            </div>
+            <div id="pers-consent-desc" style="font-size: 0.76rem; color: #78350f; margin-top: 2px;">
+              SLMAgents only links your Chrome profiles, emails, cookies, and social/job accounts if you choose to personalize and grant consent. Once granted, your consent is saved locally so you stay linked automatically.
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="btn-grant-pers-consent" onclick="grantPersonalizeConsentAndLink(this)" style="background: #059669; color: #ffffff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.77rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
+              ✅ Grant Consent &amp; Link Personal Details
+            </button>
+            <button type="button" id="btn-revoke-pers-consent" onclick="revokePersonalizeConsent(this)" style="display: none; background: #ffffff; color: #b91c1c; border: 1px solid #fecaca; border-radius: 8px; padding: 6px 12px; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+              🔒 Revoke Consent &amp; Unlink
+            </button>
+          </div>
+        </div>
+
         <!-- TAB 1: PROFILE & PREFERENCES -->
         <div id="pers-tab-profile">
           <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.8rem; color: #166534;">

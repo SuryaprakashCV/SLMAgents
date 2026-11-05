@@ -307,6 +307,41 @@ class TurnStateMachine:
                 "plan_context": f"Analyze online video ({vid_url_plan}) with full timestamped breakdown.",
             }
 
+        # Check if this is a local document / media file read request (e.g. "Read README.md and give me all details...")
+        local_doc_hit = extract_local_media_path_from_query(q_clean, get_config().workspace_dir)
+        if local_doc_hit:
+            f_name = os.path.basename(local_doc_hit[0])
+            f_kind = local_doc_hit[1]
+            doc_agent = "slm_document_parser" if f_kind == "document" else ("slm_voice" if f_kind == "audio" else "slm_vision_parser")
+            steps = [
+                {
+                    "node_id": "plan_1",
+                    "agent": doc_agent,
+                    "instruction": f"Ingest 100% of '{f_name}' & map structural hierarchy / sections",
+                    "depends_on": [],
+                },
+                {
+                    "node_id": "plan_2",
+                    "agent": "slm_rag",
+                    "instruction": f"Extract verified numbers, dates, percentages & KPIs from '{f_name}'",
+                    "depends_on": ["plan_1"],
+                },
+                {
+                    "node_id": "plan_3",
+                    "agent": doc_agent,
+                    "instruction": f"Synthesize complete section-by-section breakdown for: {q_clean[:80]}",
+                    "depends_on": ["plan_2"],
+                },
+            ]
+            return {
+                "needs_blocking_clarification": False,
+                "question": "",
+                "options": [],
+                "steps": steps,
+                "plan_markdown": "",
+                "plan_context": f"Perform zero-omission deep document extraction on '{f_name}'.",
+            }
+
         # Check if this is a Machine / OS Control request
         machine_intent = detect_machine_control_intent(q_clean)
         if machine_intent:
@@ -348,6 +383,12 @@ class TurnStateMachine:
         # Check if this is a Personal Concierge request (Twitter/Social updates, Chrome accounts, Email tracker, Jobs, Dashboard)
         concierge_intent = detect_concierge_intent(q_clean)
         if concierge_intent:
+            has_consent = False
+            try:
+                has_consent = get_concierge_engine().has_consent()
+            except Exception:
+                has_consent = False
+
             steps = [
                 {
                     "node_id": "plan_1",
@@ -362,6 +403,32 @@ class TurnStateMachine:
                     "depends_on": ["plan_1"],
                 },
             ]
+            if not has_consent and not clarification_choice:
+                question = "Would you like to grant consent to link your personal details and Chrome accounts?"
+                options = [
+                    "✅ Yes, I consent — link my personal details & continue",
+                    "🔒 No thanks — keep personalization off",
+                ]
+                plan_markdown = (
+                    f"Before I link or pull any personal details for **{q_clean}**, I'd like to ask for your **consent** first:\n\n"
+                    f"### 🔐 Opt-In Personalization & Account Linking Consent\n\n"
+                    f"- **Strictly Opt-In:** SLMAgents only links your personal details if you explicitly choose to personalize.\n"
+                    f"- **What Gets Linked (100% Local on Your Machine):** With your permission, I'll link your signed-in Google Chrome profiles, email accounts, session cookies, and SSO logins (such as X/Twitter, LinkedIn, and Naukri) into your local owner-only vault (`.slm/vault/personal_vault.json`, `chmod 0600`).\n"
+                    f"- **Saved Once & Kept:** Once you grant consent, I'll save it locally (`.slm/concierge/personal_profile.json`) so you don't have to approve again — and you can manage or revoke it anytime from **✨ Personalize**.\n\n"
+                    f"---\n"
+                    f"💬 **{question}**\n"
+                    f"*(Click one of the options below or simply reply **\"yes, I consent\"** in chat to link and continue right away!)*"
+                )
+                return {
+                    "needs_blocking_clarification": True,
+                    "question": question,
+                    "options": options,
+                    "steps": steps,
+                    "plan_markdown": plan_markdown,
+                    "plan_context": "",
+                    "original_query": q_clean,
+                    "is_consent_prompt": True,
+                }
             return {
                 "needs_blocking_clarification": False,
                 "question": "",
@@ -566,14 +633,52 @@ class TurnStateMachine:
             orig_plan_query = str(pending_plan["original_query"]).strip()
             reply_clean = (user_query or "").strip()
             reply_low = reply_clean.lower()
+            is_consent_prompt = bool(pending_plan.get("is_consent_prompt"))
+            is_decline_consent = bool(
+                is_consent_prompt
+                and (
+                    "🔒" in reply_clean
+                    or "no thanks" in reply_low
+                    or "keep personalization off" in reply_low
+                    or re.match(r"^(?:no|nope|nah|cancel|decline|don'?t|never|2)\b", reply_low)
+                )
+            )
+            if is_decline_consent:
+                bb.put(session_id, "pending_plan_state", None)
+                try:
+                    get_concierge_engine().revoke_consent()
+                except Exception:
+                    pass
+                decline_msg = (
+                    "Got it! I've kept **Personalization** off and haven't linked any of your personal details or Chrome accounts.\n\n"
+                    "Whenever you'd like to enable it in the future, you can click **✨ Personalize** in the top bar and grant consent anytime."
+                )
+                self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=decline_msg, agent="slm_personal_concierge")
+                outcome = TurnOutcome(
+                    run_id=rid,
+                    session_id=session_id,
+                    final_text=decline_msg,
+                    agent_used="slm_personal_concierge",
+                    mode="consent_declined",
+                    model_id="slm-personal-concierge",
+                    backend="local-vault-concierge",
+                    ttft_ms=5.0,
+                    tok_per_sec=180.0,
+                    total_ms=5.0,
+                    structured_output={"consent_given": False},
+                )
+                self.bus.emit(EventType.RUN_COMPLETED, rid, session_id, agent="slm_personal_concierge", **outcome.to_dict())
+                return outcome
+
             is_confirm_reply = bool(
                 clarification_choice
                 or re.match(
-                    r"^(?:✅|🧪|⚡)?\s*(?:yes|yep|yeah|yup|sure|ok|okay|k|sounds?\s+good|looks?\s+good|looks?\s+great|"
+                    r"^(?:✅|🧪|⚡)?\s*(?:yes|yep|yeah|yup|sure|ok|okay|k|i\s+consent|consent|link|sounds?\s+good|looks?\s+good|looks?\s+great|"
                     r"go\s+ahead|move\s+forward|proceed|build\s+it|test\s+it|do\s+it|run\s+it|start|"
                     r"let'?s\s+go|let'?s\s+do\s+it|confirm(?:ed)?|approve[d]?|perfect|awesome|great|fine|1|2|3)\b",
                     reply_low,
                 )
+                or (is_consent_prompt and ("consent" in reply_low or "link" in reply_low))
             )
             is_plan_revision_request = bool(
                 not is_confirm_reply
@@ -585,10 +690,20 @@ class TurnStateMachine:
             )
             if is_confirm_reply:
                 bb.put(session_id, "pending_plan_state", None)
+                if is_consent_prompt:
+                    try:
+                        get_concierge_engine().grant_consent_and_link()
+                    except Exception:
+                        pass
                 if not clarification_choice:
                     clarification_choice = reply_clean
                 # If the user clicked an option and frontend sent chosenOption as message, restore orig_plan_query
-                if reply_clean == clarification_choice or len(reply_clean.split()) <= 12 or reply_low.startswith(("yes", "looks", "sounds", "go ahead", "move forward", "proceed", "✅", "🧪", "⚡")):
+                if (
+                    is_consent_prompt
+                    or reply_clean == clarification_choice
+                    or len(reply_clean.split()) <= 12
+                    or reply_low.startswith(("yes", "looks", "sounds", "go ahead", "move forward", "proceed", "✅", "🧪", "⚡"))
+                ):
                     user_query = orig_plan_query
                 else:
                     user_query = f"{orig_plan_query} ({reply_clean})"
@@ -797,6 +912,7 @@ class TurnStateMachine:
                             "options": plan_info.get("options", []),
                             "steps": plan_info.get("steps", []),
                             "primary_agent": route_dec.primary_agent,
+                            "is_consent_prompt": bool(plan_info.get("is_consent_prompt")),
                         },
                     )
                     self.bus.emit(
@@ -1365,6 +1481,14 @@ class TurnStateMachine:
                             source_path=d_path,
                             step_callback=_on_media_thought,
                         )
+                        if d_path and os.path.isfile(d_path) and not doc_art:
+                            try:
+                                with open(d_path, "r", encoding="utf-8", errors="ignore") as _df:
+                                    _cached_doc = _df.read(50_000).strip()
+                                if _cached_doc:
+                                    bb.put(session_id, "last_attached_doc_text", _cached_doc)
+                            except Exception:
+                                pass
 
                 final_text = md_out.markdown_response
                 structured_out = md_out.structured_data
