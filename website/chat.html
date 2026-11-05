@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Chat Studio: Local Multi-Agent SLM Orchestrator | SLMAgents</title>
   <meta name="description" content="Full-page private AI Chat Studio powered by local SLM agents. Run code interpretation, Text-to-SQL, document RAG, and multi-agent workflows offline on CPU.">
-  <link rel="stylesheet" href="chat.css?v=14.0">
+  <link rel="stylesheet" href="chat.css?v=15.0">
   <!-- Offline Vendored Highlight.js & Marked.js (Zero External CDN Calls) -->
   <link rel="stylesheet" href="vendor/github-dark.min.css">
   <script src="vendor/highlight.min.js"></script>
@@ -46,7 +46,7 @@
   }
   </script>
   <style>
-    /* Personalization is strictly for the Installed Desktop App — hidden on the Web Version */
+    /* Personalization is strictly for the Installed Desktop App — accessed cleanly via Options (#btn-popover-personalize) */
     #btn-personalize-studio,
     #btn-sidebar-personalize,
     #btn-popover-personalize,
@@ -57,10 +57,6 @@
     html.desktop-app-mode .web-only-nav,
     html.desktop-app-mode .btn-top-github-issue {
       display: none !important;
-    }
-    html.desktop-app-mode #btn-personalize-studio,
-    html.desktop-app-mode #btn-sidebar-personalize {
-      display: inline-flex !important;
     }
     html.desktop-app-mode #btn-popover-personalize {
       display: flex !important;
@@ -266,16 +262,12 @@
     <aside class="chat-sidebar" id="chat-sidebar">
       
       <!-- Top Sidebar Action: Single Clean New Chat Button (No Duplicate Brand Logo) -->
-      <div class="sidebar-top-brand" style="display: flex; flex-direction: column; gap: 8px;">
+      <div class="sidebar-top-brand">
         <button type="button" class="btn-sidebar-new-chat-full" id="btn-new-chat" onclick="createNewChatSession()" title="Start New Conversation">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
           </svg>
           <span>New Chat</span>
-        </button>
-        <button type="button" id="btn-sidebar-personalize" onclick="openPersonalizeModal()" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant" style="display: none; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 8px 12px; border-radius: 10px; font-size: 0.8rem; font-weight: 600; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; cursor: pointer; transition: all 0.15s ease;">
-          <span id="sidebar-personalize-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block; flex-shrink: 0;"></span>
-          <span>✨ Personalize &amp; Concierge</span>
         </button>
       </div>
 
@@ -345,11 +337,7 @@
             CPU Ready
           </span>
 
-          <!-- Strictly Opt-In Personalization & Daily Concierge Button (Desktop App Only) -->
-          <button type="button" class="btn-harness-top" id="btn-personalize-studio" onclick="openPersonalizeModal()" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant" style="display: none; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; cursor: pointer;">
-            <span id="personalize-status-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
-            <span>✨ Personalize</span>
-          </button>
+          <!-- btn-personalize-studio moved to Options menu (#btn-popover-personalize) -->
 
           <button type="button" class="btn-top-mobile-new" onclick="createNewChatSession()" title="Start New Conversation">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -387,7 +375,8 @@
 
               <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openPersonalizeModal()" id="btn-popover-personalize" style="display: none;" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                <span>✨ Personalization &amp; Concierge</span>
+                <span>Personalize &amp; Concierge</span>
+                <span id="personalize-status-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block; margin-left: auto; flex-shrink: 0;"></span>
               </button>
               <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openSkillsRepoModal()" id="btn-top-skills-repo" title="Open Local Skill Repository (.slm/skills/) &amp; AI Skill Creator">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
@@ -1172,6 +1161,6 @@
       }
     }
   </script>
-  <script src="app.js?v=113.0"></script>
+  <script src="app.js?v=103.0"></script>
 </body>
 </html>

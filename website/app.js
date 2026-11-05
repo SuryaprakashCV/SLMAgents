@@ -5734,25 +5734,19 @@ function applyPersonalizationToUI(data) {
   const creds = data.credentials || {};
   const enabled = !!prof.enabled;
 
-  // Update header & sidebar button status dot
+  // Ensure Personalize only lives inside the Options popover (#btn-popover-personalize)
+  const staleTopBtn = document.getElementById("btn-personalize-studio");
+  const staleSideBtn = document.getElementById("btn-sidebar-personalize");
+  if (staleTopBtn) staleTopBtn.style.display = "none";
+  if (staleSideBtn) staleSideBtn.style.display = "none";
+
+  const popBtn = document.getElementById("btn-popover-personalize");
+  if (popBtn) popBtn.style.display = "flex";
+
   const dot = document.getElementById("personalize-status-dot");
-  const sideDot = document.getElementById("sidebar-personalize-dot");
-  const btn = document.getElementById("btn-personalize-studio");
-  const sideBtn = document.getElementById("btn-sidebar-personalize");
   const statusLbl = document.getElementById("pers-optin-status-label");
   if (dot) {
     dot.style.background = enabled ? "#10b981" : "#94a3b8";
-  }
-  if (sideDot) {
-    sideDot.style.background = enabled ? "#10b981" : "#94a3b8";
-  }
-  if (btn) {
-    btn.style.borderColor = enabled ? "#10b981" : "#cbd5e1";
-    btn.style.background = enabled ? "#f0fdf4" : "#ffffff";
-  }
-  if (sideBtn) {
-    sideBtn.style.borderColor = enabled ? "#10b981" : "#cbd5e1";
-    sideBtn.style.background = enabled ? "#f0fdf4" : "#ffffff";
   }
   if (statusLbl) {
     statusLbl.textContent = enabled ? "✓ Personalization Active (Opt-In)" : "Enable Personalization (Opt-In)";
