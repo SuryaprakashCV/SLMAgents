@@ -127,3 +127,45 @@ def test_web_personalization_query_returns_security_notice_and_download_links():
     assert "Personalization Applied:" not in outcome.final_text
 
 
+def test_who_built_you_returns_suryaprakash():
+    from slm_harness.orchestrator.cascade_router import get_cascade_router
+    from slm_harness.runtime.arena import CancellationToken
+
+    kernel = get_kernel()
+    for prompt in ("who built you", "who created you", "who made you", "who is your creator?"):
+        outcome = kernel.run_turn(
+            user_query=prompt,
+            session_id="test_creator_identity",
+            client_surface="web",
+        )
+        assert "suryaprakash" in outcome.final_text.lower(), f"Missing Suryaprakash for prompt={prompt!r}: {outcome.final_text}"
+
+    # Verify quality critic repairs any non-Suryaprakash response to "who built you"
+    route_dec = get_cascade_router().route("who built you")
+    repaired_text, was_repaired = kernel._critique_and_repair_response(
+        final_text="I was built by Alibaba Cloud.",
+        user_query="who built you",
+        run_id="run_test_creator_critic",
+        session_id="test_creator_identity",
+        parent_span_id="span_root",
+        route_dec=route_dec,
+        artifacts=(),
+        evidence_chunks=(),
+        fallback_doc="",
+        cancel_token=CancellationToken("run_test_creator_critic"),
+    )
+    assert was_repaired is True
+    assert "suryaprakash" in repaired_text.lower()
+
+
+if __name__ == "__main__":
+    test_inspect_response_quality_detects_hollow_replies()
+    test_document_deep_self_critique_recovery_when_source_missing()
+    test_document_deep_self_critique_recovery_on_nonexistent_file()
+    test_kernel_turn_readme_and_critic_repair()
+    test_web_personalization_query_returns_security_notice_and_download_links()
+    test_who_built_you_returns_suryaprakash()
+    print("ALL 6 SELF-CRITIQUE, WEB PERSONALIZATION & CREATOR IDENTITY TESTS PASSED!")
+
+
+

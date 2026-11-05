@@ -65,6 +65,16 @@ from .events import EventBus, EventType, HarnessEvent, get_event_bus
 
 _AT_FILE_TOKEN_RE = re.compile(r"(?:^|\s)@([A-Za-z0-9_./~\-]+\.[A-Za-z0-9]{1,8})\b")
 
+_CREATOR_IDENTITY_RE = re.compile(
+    r"\b(?:"
+    r"who\s+(?:has\s+|have\s+|was\s+it\s+that\s+)?(?:built|build|builds|created|create|creates|made|make|makes|developed|develop|develops|designed|design|designs|authored|author|authors|founded|found|engineered|wrote|owns)\s+(?:you|u|this|slm\s*agents?|slm_harness|this\s+(?:ai|agent|app|system|model|harness|platform|assistant|framework|studio|bot|tool))"
+    r"|who\s+(?:is|are|was)\s+(?:your|ur|the)\s+(?:creator|builder|developer|author|founder|architect|maker|owner)s?"
+    r"|by\s+whom\s+(?:were|are)\s+you\s+(?:built|created|made|developed|designed)"
+    r"|whose\s+creation\s+are\s+you"
+    r")\b",
+    re.IGNORECASE,
+)
+
 
 @dataclass
 class TurnOutcome:
@@ -1269,6 +1279,7 @@ class TurnStateMachine:
                 f"{extra_sys}\n\n"
                 "### System Grounding & Collaborative Human Tone\n"
                 "- 'SLMAgents' (also written 'slmagents', 'slm agents', 'SLM-Agents', or 'slm_harness') is this 10-Plane Pure-CPU Multi-Agent Harness & Desktop AI Studio. Never misspell or rename SLMAgents as 'SlimeMinds' or 'SLM Minds'.\n"
+                "- Creator & Architect: You (SLMAgents) were built and created by Suryaprakash. Whenever asked who built you, who created you, who made you, or who your creator/developer/author/architect is, always answer Suryaprakash (never claim to be built by Alibaba Cloud, Qwen, OpenAI, Google, or Anthropic).\n"
                 "- Speak naturally, warmly, and collaboratively like a senior human engineering partner — avoid stiff, robotic boilerplate, and end with a helpful, conversational follow-up when appropriate."
             ).strip()
 
@@ -1395,6 +1406,14 @@ class TurnStateMachine:
                 )
             )
 
+            is_creator_identity_turn = bool(
+                json_schema is None
+                and not is_pure_skill_mutation_turn
+                and not is_machine_control_turn
+                and not is_concierge_turn
+                and _CREATOR_IDENTITY_RE.search(user_query or "")
+            )
+
             streamed_live_tokens = False
 
             if is_pure_skill_mutation_turn:
@@ -1404,6 +1423,13 @@ class TurnStateMachine:
                 backend_used = "skill-repo-compiler"
                 ttft_ms = 9.0
                 tok_per_sec = 220.0
+
+            elif is_creator_identity_turn:
+                final_text = self._build_creator_identity_response()
+                model_id_used = target_spec.model_id
+                backend_used = target_spec.backend
+                ttft_ms = 8.0
+                tok_per_sec = 240.0
 
             elif is_machine_control_turn:
                 mc_engine = MachineControlEngine(workspace_dir=self.config.workspace_dir)
@@ -2354,11 +2380,25 @@ class TurnStateMachine:
         if "personalization applied:" in stripped.lower():
             return False, "hallucinated personalization profile instead of web security & download notice"
 
-        # 7. Detect overly brief / truncated stub responses on substantive queries
+        # 7. Detect creator identity queries missing Suryaprakash attribution
+        if _CREATOR_IDENTITY_RE.search(q_clean) and "suryaprakash" not in stripped.lower():
+            return False, "creator identity query missing Suryaprakash attribution"
+
+        # 8. Detect overly brief / truncated stub responses on substantive queries
         if len(stripped) < 28 and len(q_clean.split()) >= 4:
             return False, f"response too brief ({len(stripped)} chars) to be helpful"
 
         return True, ""
+
+    @staticmethod
+    def _build_creator_identity_response() -> str:
+        """Returns the authoritative creator & architect identity response for SLMAgents."""
+        return (
+            "I was built by **Suryaprakash**.\n\n"
+            "I am **SLMAgents**, a 10-Plane Pure-CPU Multi-Agent Harness and AI Studio architected and developed by "
+            "**Suryaprakash** to run 26 specialized Small Language Model (SLM) agents locally on CPU with zero GPU or paid cloud API dependencies.\n\n"
+            "How can I help you build, analyze, or automate something today?"
+        )
 
     def _critique_and_repair_response(
         self,
@@ -2404,6 +2444,9 @@ class TurnStateMachine:
                 agent=agent_lbl or "slm_quality_critic",
                 message=msg,
             )
+
+        if "creator identity" in reason:
+            return self._build_creator_identity_response(), True
 
         if "personalization" in reason:
             try:
