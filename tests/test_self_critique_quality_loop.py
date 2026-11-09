@@ -238,6 +238,109 @@ def test_local_project_build_creates_files_runs_tests_and_completes_project():
     assert "fibonacci" not in outcome_prev_chat.final_text.lower()
 
 
+def test_project_builder_custom_folder_and_permissions() -> None:
+    import os
+    import tempfile
+    from slm_harness.governance.policy import get_folder_permission_manager
+    from slm_harness.tools.project_builder import LocalProjectBuilder
+
+    perm_mgr = get_folder_permission_manager()
+    with tempfile.TemporaryDirectory() as tmp_parent:
+        custom_folder = os.path.join(tmp_parent, "user_chosen_project_folder")
+
+        # 1. Before granting permission, check_permission requires consent
+        check0 = perm_mgr.check_permission(custom_folder, operation="all")
+        assert check0["permitted"] is False
+        assert check0["requires_consent"] is True
+
+        # 2. Attempting to create/edit/delete/execute without permission returns permission_required
+        blocked = LocalProjectBuilder.perform_permitted_folder_operation(
+            folder_path=custom_folder,
+            operation="create",
+            rel_path="hello.txt",
+            content="blocked",
+        )
+        assert blocked["status"] == "permission_required"
+        assert blocked["requires_consent"] is True
+
+        # 3. User grants all permissions under custom_folder (create, edit, delete, run, execute)
+        granted = perm_mgr.grant_permission(
+            folder_path=custom_folder,
+            permissions={
+                "create": True,
+                "edit": True,
+                "delete": True,
+                "run": True,
+                "execute": True,
+                "full_access": True,
+            },
+            project_name="Custom Folder Project",
+            project_slug="custom_folder_proj",
+            set_active=False,
+        )
+        assert granted["permitted"] is True
+        assert granted["full_access"] is True
+
+        # 4. Build a project inside the chosen custom_folder
+        builder = LocalProjectBuilder()
+        outcome = builder.build_project(
+            user_query="build an interviewer app",
+            target_folder=custom_folder,
+            custom_project_name="Custom Folder Interviewer",
+            grant_permission=True,
+        )
+        assert os.path.isdir(outcome.project_dir)
+        assert os.path.isfile(os.path.join(outcome.project_dir, "index.html"))
+        assert outcome.test_passed is True
+
+        # 5. Create, Read, Edit, Execute, and Delete under the permitted folder all succeed
+        op_create = LocalProjectBuilder.perform_permitted_folder_operation(
+            folder_path=outcome.project_dir,
+            operation="create",
+            rel_path="custom_notes.txt",
+            content="initial content",
+        )
+        assert op_create["status"] == "ok"
+
+        op_edit = LocalProjectBuilder.perform_permitted_folder_operation(
+            folder_path=outcome.project_dir,
+            operation="edit",
+            rel_path="custom_notes.txt",
+            content="updated content",
+        )
+        assert op_edit["status"] == "ok"
+
+        op_read = LocalProjectBuilder.perform_permitted_folder_operation(
+            folder_path=outcome.project_dir,
+            operation="read",
+            rel_path="custom_notes.txt",
+        )
+        assert op_read["status"] == "ok"
+        assert op_read["content"] == "updated content"
+
+        op_exec = LocalProjectBuilder.perform_permitted_folder_operation(
+            folder_path=outcome.project_dir,
+            operation="execute",
+            command="python3 -c \"print('PERM_EXEC_OK')\"",
+        )
+        assert op_exec["status"] == "ok"
+        assert "PERM_EXEC_OK" in op_exec["stdout"]
+
+        op_del = LocalProjectBuilder.perform_permitted_folder_operation(
+            folder_path=outcome.project_dir,
+            operation="delete",
+            rel_path="custom_notes.txt",
+        )
+        assert op_del["status"] == "ok"
+        assert not os.path.exists(os.path.join(outcome.project_dir, "custom_notes.txt"))
+
+        # 6. Revoking permission blocks operations again
+        perm_mgr.revoke_permission(outcome.project_dir)
+        perm_mgr.revoke_permission(custom_folder)
+        check_after = perm_mgr.check_permission(custom_folder, operation="all")
+        assert check_after["permitted"] is False
+
+
 if __name__ == "__main__":
     test_inspect_response_quality_detects_hollow_replies()
     test_document_deep_self_critique_recovery_when_source_missing()
@@ -246,7 +349,8 @@ if __name__ == "__main__":
     test_web_personalization_query_returns_security_notice_and_download_links()
     test_who_built_you_returns_suryaprakash()
     test_local_project_build_creates_files_runs_tests_and_completes_project()
-    print("ALL 7 SELF-CRITIQUE, WEB PERSONALIZATION, CREATOR IDENTITY & LOCAL PROJECT BUILD TESTS PASSED!")
+    test_project_builder_custom_folder_and_permissions()
+    print("ALL 8 SELF-CRITIQUE, WEB PERSONALIZATION, CREATOR IDENTITY, PROJECT BUILDER & FOLDER PERMISSION TESTS PASSED!")
 
 
 

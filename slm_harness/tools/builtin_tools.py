@@ -181,7 +181,7 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
     def _fs_write_preview(args: Dict[str, Any], ctx: ToolExecutionContext) -> str:
         jail = WorkspaceJail()
         p = str(args.get("path", ""))
-        target = jail.resolve_path(p, for_write=True)
+        target = jail.resolve_path(p, for_write=True, operation="create")
         old = ""
         if os.path.isfile(target):
             with open(target, "r", encoding="utf-8", errors="ignore") as f:
@@ -190,17 +190,17 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
 
     def _fs_write(args: Dict[str, Any], ctx: ToolExecutionContext) -> str:
         jail = WorkspaceJail()
-        target = jail.resolve_path(str(args["path"]), for_write=True)
+        target = jail.resolve_path(str(args["path"]), for_write=True, operation="create")
         content = str(args.get("content", ""))
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8") as f:
             f.write(content)
-        return f"Wrote {len(content)} chars to {os.path.relpath(target, jail.workspace_real)}"
+        return f"Wrote {len(content)} chars to {target}"
 
     registry.register(
         ToolSpec(
             name="fs_write",
-            description="Create or overwrite a file inside the workspace (undoable via /undo).",
+            description="Create or overwrite a file inside the workspace or a permitted project folder (undoable via /undo).",
             parameters={
                 "type": "object",
                 "properties": {
@@ -221,7 +221,7 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
     def _fs_edit_preview(args: Dict[str, Any], ctx: ToolExecutionContext) -> str:
         jail = WorkspaceJail()
         p = str(args.get("path", ""))
-        target = jail.resolve_path(p, for_write=True)
+        target = jail.resolve_path(p, for_write=True, operation="edit")
         with open(target, "r", encoding="utf-8", errors="replace") as f:
             old = f.read()
         new = old.replace(str(args.get("target", "")), str(args.get("replacement", "")), 1)
@@ -229,7 +229,7 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
 
     def _fs_edit(args: Dict[str, Any], ctx: ToolExecutionContext) -> str:
         jail = WorkspaceJail()
-        target = jail.resolve_path(str(args["path"]), for_write=True)
+        target = jail.resolve_path(str(args["path"]), for_write=True, operation="edit")
         with open(target, "r", encoding="utf-8", errors="replace") as f:
             old = f.read()
         needle = str(args["target"])
@@ -238,12 +238,12 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
         updated = old.replace(needle, str(args.get("replacement", "")), 1)
         with open(target, "w", encoding="utf-8") as f:
             f.write(updated)
-        return f"Edited {os.path.relpath(target, jail.workspace_real)} successfully."
+        return f"Edited {target} successfully."
 
     registry.register(
         ToolSpec(
             name="fs_edit",
-            description="Replace an exact target snippet in a workspace file (undoable via /undo).",
+            description="Replace an exact target snippet in a workspace or permitted project file (undoable via /undo).",
             parameters={
                 "type": "object",
                 "properties": {
@@ -258,6 +258,35 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
             preview_fn=_fs_edit_preview,
             mutates_path_arg="path",
             tags=["edit", "patch", "modify", "refactor", "fix"],
+        )
+    )
+
+    # 5b. fs_delete
+    def _fs_delete(args: Dict[str, Any], ctx: ToolExecutionContext) -> str:
+        jail = WorkspaceJail()
+        target = jail.resolve_path(str(args["path"]), for_write=True, operation="delete")
+        if not os.path.exists(target):
+            return f"Path does not exist: {target}"
+        if os.path.isfile(target) or os.path.islink(target):
+            os.remove(target)
+            return f"Deleted file: {target}"
+        raise ValueError(f"Refusing to delete directory via fs_delete: {target}")
+
+    registry.register(
+        ToolSpec(
+            name="fs_delete",
+            description="Delete a file inside the workspace or a permitted project folder.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                },
+                "required": ["path"],
+            },
+            risk_level=RiskLevel.L3_WORKSPACE_MUTATE,
+            handler=_fs_delete,
+            mutates_path_arg="path",
+            tags=["delete", "remove", "clean", "file"],
         )
     )
 

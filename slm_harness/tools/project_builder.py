@@ -337,7 +337,13 @@ class LocalProjectBuilder:
         last_user_query: str = "",
         lineage_queries: Sequence[str] = (),
         step_callback: Optional[Callable[[str, str], None]] = None,
+        target_folder: Optional[str] = None,
+        custom_project_name: Optional[str] = None,
+        grant_permission: bool = False,
+        permissions: Optional[Dict[str, bool]] = None,
     ) -> ProjectBuildOutcome:
+        from ..governance.policy import get_folder_permission_manager
+
         def _emit(agent: str, msg: str) -> None:
             if step_callback:
                 try:
@@ -345,14 +351,66 @@ class LocalProjectBuilder:
                 except Exception:
                     pass
 
+        perm_mgr = get_folder_permission_manager()
         resolved_goal = resolve_project_goal(user_query, last_user_query=last_user_query, lineage_queries=lineage_queries)
         project_name, project_slug, project_kind = _derive_project_identity(resolved_goal)
-        project_dir = os.path.join(self.projects_root, project_slug)
+        if custom_project_name and custom_project_name.strip():
+            project_name = custom_project_name.strip()
+            custom_slug = re.sub(r"[^a-zA-Z0-9_\-]", "_", project_name.lower()).strip("_")
+            if custom_slug:
+                project_slug = custom_slug
+
+        # Resolve target project directory: explicit target_folder > path in user_query > active permitted folder > default projects_root
+        explicit_folder = (target_folder or "").strip()
+        if not explicit_folder:
+            m_path = re.search(r"(?:\bin|\bat|\binto|\bfolder|\bpath)\s+([~/][A-Za-z0-9_.\-/]+)", user_query or "")
+            if m_path:
+                explicit_folder = m_path.group(1).strip()
+
+        if explicit_folder:
+            norm_base = perm_mgr.normalize_folder_path(explicit_folder)
+            # If the user chose a parent folder (like ~/Desktop or ~/Documents/SLMAgents/projects), place project_slug inside it unless it already ends with project_slug
+            if os.path.basename(norm_base).lower() in ("projects", "desktop", "documents", "developer", "downloads"):
+                project_dir = os.path.join(norm_base, project_slug)
+            else:
+                project_dir = norm_base
+        elif perm_mgr.get_active_folder():
+            active_base = perm_mgr.get_active_folder() or self.projects_root
+            if os.path.basename(active_base).lower() == project_slug.lower():
+                project_dir = active_base
+            else:
+                project_dir = os.path.join(active_base, project_slug)
+        else:
+            project_dir = os.path.join(self.projects_root, project_slug)
+
+        if grant_permission:
+            perm_mgr.grant_permission(
+                folder_path=project_dir,
+                permissions=permissions,
+                project_name=project_name,
+                project_slug=project_slug,
+                set_active=True,
+                create_if_missing=True,
+            )
+        elif project_dir.startswith(os.path.realpath(self.projects_root)):
+            # Default workspace projects folder: auto-register permissions so user can manage/edit/run immediately
+            if not perm_mgr.check_permission(project_dir).get("permitted"):
+                perm_mgr.grant_permission(
+                    folder_path=project_dir,
+                    permissions=permissions,
+                    project_name=project_name,
+                    project_slug=project_slug,
+                    set_active=False,
+                    create_if_missing=True,
+                )
+
         os.makedirs(project_dir, exist_ok=True)
+        perm_mgr.register_project_location(project_slug=project_slug, project_dir=project_dir, project_name=project_name)
+        perm_info = perm_mgr.check_permission(project_dir, operation="all")
 
         _emit(
             "slm_task_planner",
-            f"Step 1 — Scaffolding local project workspace at '{project_dir}' for: {project_name}",
+            f"Step 1 — Scaffolding local project workspace at '{project_dir}' (permissions={'FULL ACCESS' if perm_info.get('permitted') else 'STANDARD'}) for: {project_name}",
         )
 
         file_specs = self._generate_project_files(
@@ -435,6 +493,11 @@ class LocalProjectBuilder:
             f"| `{bf.rel_path}` | {bf.role} | {bf.line_count:,} lines | {bf.size_bytes:,} B | `{bf.sha256}` |"
             for bf in built_files
         )
+        perm_badge = (
+            "✅ **Full Folder Permissions Granted** (`create` · `edit` · `delete` · `run` · `execute`)"
+            if perm_info.get("permitted")
+            else "🔒 **Consent-Gated** *(Open **🛠️ Project Builder** in top bar to choose folder & grant permissions)*"
+        )
 
         md = (
             f"## 🛠️ Local Project Built & Verified on Disk: **{project_name}**\n\n"
@@ -444,6 +507,7 @@ class LocalProjectBuilder:
             f"| :--- | :--- |\n"
             f"| 🌐 **Open Live Built Web App** | [**{live_url}**]({live_url}) *(Click to launch in browser)* |\n"
             f"| 📂 **Local Project Directory** | `{project_dir}` |\n"
+            f"| 🔐 **Folder Permissions** | {perm_badge} |\n"
             f"| 📦 **Download Complete Project ZIP** | [**⬇ Download `{zip_filename}` ({zip_size_kb} KB)**]({zip_download_url}) |\n"
             f"| 🧪 **Local Test Suite Status** | **{'✅ ALL ' + str(tests_run) + ' TESTS PASSED' if test_passed else '⚠️ Check logs'}** ({test_dur_ms:.1f} ms on local CPU) |\n"
             f"| 📊 **Total Code Written to Disk** | **{len(built_files)} files** ({total_lines:,} lines · {total_bytes:,} bytes) |\n\n"
@@ -459,7 +523,7 @@ class LocalProjectBuilder:
             f"---\n\n"
             f"### 💻 How to Use or Run Standalone in Terminal\n\n"
             f"1. **Use Immediately in Browser (Already Mounted):**\n"
-            f"   Open [**{live_url}**]({live_url}) — you can select any built-in sample application, upload `.html`/`.js`/`.py`/`.json` files, or paste custom application code and click **▶ Run Full Automated Evaluation Suite**.\n"
+            f"   Open [**{live_url}**]({live_url}) — or click **🛠️ Project Builder** in the top bar to choose a custom folder path, manage folder permissions (`create`, `edit`, `delete`, `run`, `execute`), edit files, or run commands.\n"
             f"2. **Or Run the Standalone Project Server in Terminal:**\n"
             f"   ```bash\n"
             f"   cd {project_dir}\n"
@@ -494,8 +558,130 @@ class LocalProjectBuilder:
                 "files_count": len(built_files),
                 "tests_run": tests_run,
                 "test_passed": test_passed,
+                "permissions": perm_info.get("permissions", {}),
+                "permitted": bool(perm_info.get("permitted")),
             },
         )
+
+    @staticmethod
+    def perform_permitted_folder_operation(
+        folder_path: str,
+        operation: str,
+        rel_path: str = "",
+        content: str = "",
+        command: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Executes a consent-gated operation (`list`, `read`, `create`, `edit`, `delete`, `run`, `execute`)
+        inside a user-selected project folder. Requires explicit user permission for that folder.
+        """
+        from ..governance.policy import get_folder_permission_manager, run_sandboxed_subprocess
+
+        perm_mgr = get_folder_permission_manager()
+        norm_root = perm_mgr.normalize_folder_path(folder_path)
+        op_clean = (operation or "list").strip().lower()
+
+        check_op = "read" if op_clean in ("list", "read") else op_clean
+        perm_status = perm_mgr.check_permission(norm_root, operation=check_op)
+        if not perm_status.get("permitted"):
+            return {
+                "status": "permission_required",
+                "requires_consent": True,
+                "folder_path": norm_root,
+                "operation": op_clean,
+                "permission_status": perm_status,
+                "message": perm_status.get("message")
+                or f"Permission required to perform '{op_clean}' under '{norm_root}'.",
+            }
+
+        if op_clean == "list":
+            if not os.path.isdir(norm_root):
+                return {"status": "ok", "folder_path": norm_root, "files": [], "permission_status": perm_status}
+            files_out: List[Dict[str, Any]] = []
+            skip = {".git", ".venv", "__pycache__", "node_modules"}
+            for root, dirs, files in os.walk(norm_root):
+                dirs[:] = [d for d in sorted(dirs) if d not in skip]
+                for fn in sorted(files):
+                    abs_f = os.path.join(root, fn)
+                    rel_f = os.path.relpath(abs_f, norm_root)
+                    try:
+                        sz = os.path.getsize(abs_f)
+                    except OSError:
+                        sz = 0
+                    files_out.append({"rel_path": rel_f, "size_bytes": sz})
+            return {"status": "ok", "folder_path": norm_root, "files": files_out, "permission_status": perm_status}
+
+        if op_clean in ("read", "create", "edit", "delete"):
+            clean_rel = (rel_path or "").strip().lstrip("/\\")
+            if not clean_rel:
+                return {"status": "error", "message": "File relative path ('rel_path') is required."}
+            abs_target = os.path.abspath(os.path.join(norm_root, clean_rel))
+            if not (abs_target == norm_root or abs_target.startswith(norm_root + os.sep)):
+                return {"status": "error", "message": "Target path escapes the permitted project folder."}
+
+            if op_clean == "read":
+                if not os.path.isfile(abs_target):
+                    return {"status": "error", "message": f"File not found: {clean_rel}"}
+                with open(abs_target, "r", encoding="utf-8", errors="replace") as f:
+                    text = f.read()
+                return {
+                    "status": "ok",
+                    "folder_path": norm_root,
+                    "rel_path": clean_rel,
+                    "content": text,
+                    "size_bytes": len(text.encode("utf-8")),
+                }
+
+            if op_clean in ("create", "edit"):
+                os.makedirs(os.path.dirname(abs_target), exist_ok=True)
+                data_bytes = (content or "").encode("utf-8")
+                with open(abs_target, "wb") as f:
+                    f.write(data_bytes)
+                return {
+                    "status": "ok",
+                    "operation": op_clean,
+                    "folder_path": norm_root,
+                    "rel_path": clean_rel,
+                    "size_bytes": len(data_bytes),
+                    "message": f"{'Created' if op_clean == 'create' else 'Updated'} '{clean_rel}' ({len(data_bytes):,} bytes).",
+                }
+
+            if op_clean == "delete":
+                if not os.path.exists(abs_target):
+                    return {"status": "error", "message": f"File does not exist: {clean_rel}"}
+                if os.path.isfile(abs_target) or os.path.islink(abs_target):
+                    os.remove(abs_target)
+                    return {
+                        "status": "ok",
+                        "operation": "delete",
+                        "folder_path": norm_root,
+                        "rel_path": clean_rel,
+                        "message": f"Deleted '{clean_rel}' from '{norm_root}'.",
+                    }
+                return {"status": "error", "message": "Only files can be deleted directly."}
+
+        if op_clean in ("run", "execute"):
+            cmd_str = (command or "").strip() or f"{sys.executable} -m unittest discover -s tests -p \"test_*.py\" -v"
+            os.makedirs(norm_root, exist_ok=True)
+            res = run_sandboxed_subprocess(
+                cmd_str,
+                cwd=norm_root,
+                timeout_sec=20.0,
+                shell=True,
+            )
+            return {
+                "status": "ok",
+                "operation": op_clean,
+                "folder_path": norm_root,
+                "command": cmd_str,
+                "returncode": res.returncode,
+                "stdout": res.stdout,
+                "stderr": res.stderr,
+                "timed_out": res.timed_out,
+                "duration_ms": res.duration_ms,
+            }
+
+        return {"status": "error", "message": f"Unsupported operation: {op_clean}"}
 
     def _generate_project_files(
         self,
