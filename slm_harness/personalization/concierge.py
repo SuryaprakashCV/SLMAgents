@@ -482,32 +482,32 @@ class PersonalConciergeEngine:
 
         return [
             {
-                "label": "📊 My Daily Dashboard",
+                "label": "Daily Briefing",
                 "prompt": f"Build my daily personalized dashboard pulling my latest news on {top_interest}, email reminders, relevant {role} jobs on Naukri, and {top_learn} learning opportunities.",
                 "category": "dashboard",
             },
             {
-                "label": "📧 Track Important Emails",
+                "label": "Important Emails",
                 "prompt": "Check and track my emails, highlight important messages needing a reply or follow-up, and draft smart responses.",
                 "category": "email",
             },
             {
-                "label": f"💼 {role} Jobs (Naukri)",
+                "label": f"{role} Jobs",
                 "prompt": f"Find relevant {role} jobs for me on Naukri and LinkedIn matching {top_skill} in {top_location} and help me apply.",
                 "category": "jobs",
             },
             {
-                "label": f"🎓 Learn: {top_learn[:24]}",
+                "label": f"Learn: {top_learn[:24]}",
                 "prompt": f"Inform me about new learning opportunities, courses, and open-source releases from X/Twitter and the internet on {top_learn}.",
                 "category": "learning",
             },
             {
-                "label": f"📰 {top_interest[:24]} Digest",
+                "label": f"{top_interest[:24]} Digest",
                 "prompt": f"Log into my news & social feeds and pull the most interesting developments today in {top_interest}.",
                 "category": "news",
             },
             {
-                "label": "🌐 Chrome Profiles & Accounts",
+                "label": "Chrome Accounts",
                 "prompt": "Link with Chrome and pull all the email and account details available across my different Chrome profiles.",
                 "category": "chrome",
             },

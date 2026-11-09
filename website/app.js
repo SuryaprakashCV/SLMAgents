@@ -5771,7 +5771,7 @@ function applyPersonalizationToUI(data) {
   const consentTs = data.consent_timestamp || prof.consent_timestamp || "";
 
   const topBtn = document.getElementById("btn-personalize-studio");
-  if (topBtn) topBtn.style.display = "inline-flex";
+  if (topBtn) topBtn.style.display = "none";
 
   const popBtn = document.getElementById("btn-popover-personalize");
   if (popBtn) popBtn.style.display = "flex";
@@ -5783,57 +5783,55 @@ function applyPersonalizationToUI(data) {
   if (dot) dot.style.background = activeColor;
   if (topDot) topDot.style.background = activeColor;
   if (statusLbl) {
-    statusLbl.textContent = (enabled && consentGiven) ? "✓ Personalization & Consent Active" : "Enable Personalization (Opt-In)";
+    statusLbl.textContent = (enabled && consentGiven) ? "Personalization Active" : "Enable Personalization";
   }
 
-  // Update Consent Banner inside Modal
+  // Update Consent Banner inside Modal (clean neutral slate surface)
   const consentBanner = document.getElementById("pers-consent-banner");
   const consentTitle = document.getElementById("pers-consent-title");
   const consentDesc = document.getElementById("pers-consent-desc");
   const grantBtn = document.getElementById("btn-grant-pers-consent");
   const revokeBtn = document.getElementById("btn-revoke-pers-consent");
   if (consentBanner && consentTitle && consentDesc) {
+    consentBanner.style.background = "#f8fafc";
+    consentBanner.style.borderColor = "#e2e8f0";
+    consentTitle.style.color = "#0f172a";
+    consentDesc.style.color = "#64748b";
     if (consentGiven) {
-      consentBanner.style.background = "#ecfdf5";
-      consentBanner.style.borderColor = "#6ee7b7";
-      consentTitle.style.color = "#065f46";
-      consentTitle.textContent = `🟢 Personalization Consent Active & Saved${consentTs ? " (" + consentTs + ")" : ""}`;
-      consentDesc.style.color = "#047857";
-      consentDesc.textContent = "Your consent is saved locally in .slm/concierge/personal_profile.json. Chrome profiles, email accounts, cookies, and SSO sessions are linked.";
+      consentTitle.textContent = `Account Linking Active${consentTs ? " · " + consentTs : ""}`;
+      consentDesc.textContent = "Local Chrome profiles, email accounts, and sessions are linked on this device.";
       if (grantBtn) {
-        grantBtn.textContent = "🔄 Rescan & Sync Linked Accounts";
+        grantBtn.textContent = "Sync Accounts";
         grantBtn.style.background = "#0f172a";
       }
       if (revokeBtn) revokeBtn.style.display = "inline-flex";
     } else {
-      consentBanner.style.background = "#fffbeb";
-      consentBanner.style.borderColor = "#fcd34d";
-      consentTitle.style.color = "#92400e";
-      consentTitle.textContent = "🔒 Opt-In Consent Required to Link Personal Details";
-      consentDesc.style.color = "#78350f";
-      consentDesc.textContent = "SLMAgents only links your Chrome profiles, emails, cookies, and social/job accounts if you choose to personalize and grant consent. Once granted, your consent is saved locally so you stay linked automatically.";
+      consentTitle.textContent = "Account Linking & Local Sync";
+      consentDesc.textContent = "Link local Chrome profiles and accounts to personalize suggestions, email reminders, and job matches.";
       if (grantBtn) {
-        grantBtn.textContent = "✅ Grant Consent & Link Personal Details";
-        grantBtn.style.background = "#059669";
+        grantBtn.textContent = "Link Chrome Accounts";
+        grantBtn.style.background = "#0f172a";
       }
       if (revokeBtn) revokeBtn.style.display = "none";
     }
   }
 
+  const stripLeadingEmoji = (str) => String(str || "").replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\s]+/u, "").trim();
   const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
 
-  // Render tailored suggestions inside the modal preview box (always visible in modal)
+  // Render tailored suggestions inside the modal preview row
   const modalPreview = document.getElementById("pers-modal-suggestions-preview");
   if (modalPreview) {
     if (suggestions.length > 0) {
       modalPreview.innerHTML = suggestions
         .map((s) => {
           const safePrompt = (s.prompt || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
-          return `<button type="button" onclick="closePersonalizeModal(); applyQuickPrompt('${safePrompt}'); handleChatSubmit(new Event('submit'));" style="background:#ffffff;border:1px solid #cbd5e1;color:#0f172a;border-radius:999px;padding:5px 12px;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.background='#0f172a';this.style.color='#fff';" onmouseout="this.style.background='#ffffff';this.style.color='#0f172a';">${escapeHtmlSafe(s.label)}</button>`;
+          const cleanLabel = stripLeadingEmoji(s.label);
+          return `<button type="button" onclick="closePersonalizeModal(); applyQuickPrompt('${safePrompt}'); handleChatSubmit(new Event('submit'));" style="background:#f8fafc;border:1px solid #e2e8f0;color:#334155;border-radius:6px;padding:4px 10px;font-size:0.73rem;font-weight:500;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.background='#0f172a';this.style.color='#fff';this.style.borderColor='#0f172a';" onmouseout="this.style.background='#f8fafc';this.style.color='#334155';this.style.borderColor='#e2e8f0';">${escapeHtmlSafe(cleanLabel)}</button>`;
         })
         .join("");
     } else {
-      modalPreview.innerHTML = `<span style="font-size:0.75rem;color:#64748b;">Save your profile below to generate tailored suggestions.</span>`;
+      modalPreview.innerHTML = `<span style="font-size:0.74rem;color:#94a3b8;">Save your profile to generate tailored prompts.</span>`;
     }
   }
 
@@ -5845,7 +5843,8 @@ function applyPersonalizationToUI(data) {
       tray.innerHTML = suggestions
         .map((s) => {
           const safePrompt = (s.prompt || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
-          return `<button type="button" onclick="applyQuickPrompt('${safePrompt}'); handleChatSubmit(new Event('submit'));" style="background:#f8fafc;border:1px solid #cbd5e1;color:#0f172a;border-radius:999px;padding:4px 11px;font-size:0.74rem;font-weight:600;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.background='#0f172a';this.style.color='#fff';" onmouseout="this.style.background='#f8fafc';this.style.color='#0f172a';">${escapeHtmlSafe(s.label)}</button>`;
+          const cleanLabel = stripLeadingEmoji(s.label);
+          return `<button type="button" onclick="applyQuickPrompt('${safePrompt}'); handleChatSubmit(new Event('submit'));" style="background:#f8fafc;border:1px solid #e2e8f0;color:#334155;border-radius:999px;padding:4px 11px;font-size:0.73rem;font-weight:500;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.background='#0f172a';this.style.color='#fff';" onmouseout="this.style.background='#f8fafc';this.style.color='#334155';">${escapeHtmlSafe(cleanLabel)}</button>`;
         })
         .join("");
     } else {
@@ -5915,14 +5914,11 @@ function renderChromeProfilesDirectory(cd) {
       summaryBar.style.display = "block";
       const emailsHtml = uniqueEmails
         .map((u) => {
-          const unreadBadge = u.unread_count ? ` <span style="color:#059669;font-size:0.68rem;">(${escapeHtmlSafe(u.unread_count)} unread)</span>` : "";
-          return `<code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-weight:600;color:#0f172a;">${escapeHtmlSafe(u.email)}</code>${unreadBadge}`;
+          const unreadBadge = u.unread_count ? ` <span style="color:#64748b;font-size:0.68rem;">(${escapeHtmlSafe(u.unread_count)} unread)</span>` : "";
+          return `<code style="background:#ffffff;border:1px solid #e2e8f0;padding:1px 6px;border-radius:4px;font-weight:500;color:#0f172a;">${escapeHtmlSafe(u.email)}</code>${unreadBadge}`;
         })
         .join(" · ");
-      const ssoSummary = ssoAccounts.length > 0
-        ? ` · <strong>Gmail SSO:</strong> ` + ssoAccounts.slice(0, 4).map((s) => `<span style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:1px 6px;border-radius:4px;font-size:0.7rem;font-weight:600;">${escapeHtmlSafe(s.label)}: ${escapeHtmlSafe(s.handle)}</span>`).join(" ")
-        : "";
-      summaryBar.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span>🔗 <strong>Linked with ${escapeHtmlSafe(cd.browser || "Google Chrome")}:</strong> <strong>${profiles.length} Profile(s)</strong> (<code>${profiles.map((p) => escapeHtmlSafe(p.profile_dir)).join(", ")}</code>) · <strong>${uniqueEmails.length} Email(s):</strong> ${emailsHtml}${ssoSummary}</span><button type="button" onclick="switchPersonalizeTab('accounts')" style="background:#0f172a;color:#fff;border:none;border-radius:999px;padding:3px 10px;font-size:0.71rem;font-weight:600;cursor:pointer;">View All Accounts &rarr;</button></div>`;
+      summaryBar.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span><strong>${escapeHtmlSafe(cd.browser || "Chrome")}:</strong> ${profiles.length} profile(s) · ${emailsHtml}</span><button type="button" onclick="switchPersonalizeTab('accounts')" style="background:transparent;color:#0f172a;border:none;padding:0;font-size:0.72rem;font-weight:600;cursor:pointer;text-decoration:underline;">Manage accounts &rarr;</button></div>`;
     } else {
       summaryBar.style.display = "none";
     }
@@ -5931,8 +5927,8 @@ function renderChromeProfilesDirectory(cd) {
   const countBadge = document.getElementById("pers-chrome-count-badge");
   if (countBadge) {
     countBadge.textContent = consentRequired
-      ? "Consent Required"
-      : `${profiles.length} Profiles · ${uniqueEmails.length} Emails · ${ssoAccounts.length} Gmail SSO`;
+      ? "Not Linked"
+      : `${profiles.length} Profiles · ${uniqueEmails.length} Emails`;
   }
 
   const container = document.getElementById("pers-chrome-profiles-container");
@@ -5940,12 +5936,12 @@ function renderChromeProfilesDirectory(cd) {
 
   if (consentRequired) {
     container.innerHTML = `
-      <div style="padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-        <div style="font-size:0.78rem;color:#92400e;">
-          🔒 <strong>Waiting for your consent:</strong> Personal Chrome profiles, emails, cookies, and SSO sessions are only linked after you grant consent.
+      <div style="padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:0.76rem;color:#475569;">
+          Chrome profiles and sessions are only linked after you enable account linking.
         </div>
-        <button type="button" onclick="grantPersonalizeConsentAndLink(this)" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:0.75rem;font-weight:700;cursor:pointer;">
-          ✅ Grant Consent &amp; Link Chrome Accounts
+        <button type="button" onclick="grantPersonalizeConsentAndLink(this)" style="background:#0f172a;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:0.74rem;font-weight:500;cursor:pointer;">
+          Link Chrome Accounts
         </button>
       </div>
     `;
@@ -5953,7 +5949,7 @@ function renderChromeProfilesDirectory(cd) {
   }
 
   if (profiles.length === 0) {
-    container.innerHTML = `<div style="font-size:0.77rem;color:#64748b;">No local Chrome profiles detected.</div>`;
+    container.innerHTML = `<div style="font-size:0.76rem;color:#64748b;">No local Chrome profiles detected.</div>`;
     return;
   }
 
@@ -5964,30 +5960,22 @@ function renderChromeProfilesDirectory(cd) {
         const safeProf = (s.profile_dir || "Default").replace(/'/g, "\\'");
         const safeUrl = (s.url || "https://x.com/home").replace(/'/g, "\\'");
         const profsBadge = Array.isArray(s.profiles) ? s.profiles.join(", ") : (s.profile_dir || "Default");
-        const cookiesArr = Array.isArray(s.auth_cookies) ? s.auth_cookies.slice(0, 4) : [];
-        const cookiesTag = cookiesArr.length > 0
-          ? `<span style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:1px 6px;border-radius:4px;font-size:0.68rem;font-weight:600;">🍪 Cookies: ${escapeHtmlSafe(cookiesArr.join(", "))} (${escapeHtmlSafe(s.cookie_count || cookiesArr.length)})</span>`
-          : (s.cookie_count ? `<span style="background:#e0f2fe;color:#0369a1;padding:1px 6px;border-radius:4px;font-size:0.68rem;">🍪 ${escapeHtmlSafe(s.cookie_count)} cookies</span>` : "");
         return `
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-              <span style="background:#059669;color:#fff;padding:2px 7px;border-radius:999px;font-size:0.68rem;font-weight:700;">🟢 Auto-Login</span>
-              <strong style="font-size:0.79rem;color:#0f172a;">${escapeHtmlSafe(s.label)}:</strong>
-              <code style="background:#ffffff;border:1px solid #86efac;padding:1px 7px;border-radius:5px;font-size:0.76rem;font-weight:700;color:#065f46;">${escapeHtmlSafe(s.handle)}</code>
-              ${cookiesTag}
-              <span style="font-size:0.72rem;color:#334155;">via <strong>${escapeHtmlSafe(s.sso_email || "Chrome Session")}</strong> (<code>${escapeHtmlSafe(profsBadge)}</code>)</span>
+              <strong style="font-size:0.77rem;color:#0f172a;">${escapeHtmlSafe(s.label)}</strong>
+              <code style="background:#ffffff;border:1px solid #e2e8f0;padding:1px 6px;border-radius:4px;font-size:0.74rem;color:#334155;">${escapeHtmlSafe(s.handle)}</code>
+              <span style="font-size:0.71rem;color:#64748b;">${escapeHtmlSafe(s.sso_email || "Chrome Session")} (${escapeHtmlSafe(profsBadge)})</span>
             </div>
-            <div style="display:flex;gap:5px;flex-wrap:wrap;">
-              <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeUrl}')" style="background:#0f172a;color:#ffffff;border:none;border-radius:6px;padding:4px 10px;font-size:0.71rem;font-weight:600;cursor:pointer;">🚀 Launch ${escapeHtmlSafe(s.label)} in Chrome</button>
-            </div>
+            <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeUrl}')" style="background:#ffffff;color:#0f172a;border:1px solid #cbd5e1;border-radius:6px;padding:3px 9px;font-size:0.71rem;font-weight:500;cursor:pointer;">Open</button>
           </div>
         `;
       })
       .join("");
     ssoHtml = `
-      <div style="background:#ffffff;border:1.5px solid #86efac;border-radius:10px;padding:10px 12px;">
-        <div style="font-size:0.78rem;font-weight:700;color:#065f46;margin-bottom:7px;">🔗 Auto-Authenticated Social, Job &amp; Developer Sessions (Pulled from Chrome Cookies, Login Data &amp; Google SSO)</div>
-        <div style="display:flex;flex-direction:column;gap:6px;">${ssoCards}</div>
+      <div style="margin-bottom:4px;">
+        <div style="font-size:0.74rem;font-weight:600;color:#475569;margin-bottom:6px;">Active Sessions</div>
+        <div style="display:flex;flex-direction:column;gap:5px;">${ssoCards}</div>
       </div>
     `;
   }
@@ -5995,39 +5983,28 @@ function renderChromeProfilesDirectory(cd) {
   const profCards = profiles
     .map((p) => {
       const avatarHtml = p.avatar_data_url
-        ? `<img src="${p.avatar_data_url}" alt="${escapeHtmlSafe(p.profile_name)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid #cbd5e1;">`
-        : `<div style="width:32px;height:32px;border-radius:50%;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;">${escapeHtmlSafe((p.profile_name || "C").slice(0, 1).toUpperCase())}</div>`;
-
-      const portals = Array.isArray(p.top_portals) && p.top_portals.length > 0
-        ? p.top_portals.slice(0, 5).map((pt) => `<span style="background:#f1f5f9;color:#475569;border-radius:999px;padding:1px 7px;font-size:0.68rem;">${escapeHtmlSafe(pt.domain)}</span>`).join(" ")
-        : "";
+        ? `<img src="${p.avatar_data_url}" alt="${escapeHtmlSafe(p.profile_name)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid #cbd5e1;">`
+        : `<div style="width:28px;height:28px;border-radius:50%;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:0.75rem;">${escapeHtmlSafe((p.profile_name || "C").slice(0, 1).toUpperCase())}</div>`;
 
       const acctsRows = (Array.isArray(p.accounts) ? p.accounts : [])
         .map((a) => {
           const safeProf = (p.profile_dir || "Default").replace(/'/g, "\\'");
           const safeGmail = (a.gmail_url || "https://mail.google.com").replace(/'/g, "\\'");
-          const safeCal = (a.calendar_url || "https://calendar.google.com").replace(/'/g, "\\'");
           const safeEmail = (a.email || "").replace(/'/g, "\\'");
           const safeName = (a.full_name || "").replace(/'/g, "\\'");
-          const badge = a.is_primary
-            ? `<span style="background:#dcfce7;color:#166534;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:700;">Primary</span>`
-            : `<span style="background:#e0f2fe;color:#0369a1;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:600;">authuser=${a.authuser_index}</span>`;
-          const unreadTag = a.gmail_enabled === false
-            ? `<span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:600;">SSO Only (Gmail Disabled)</span>`
-            : (a.unread_count ? `<span style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:1px 7px;border-radius:999px;font-size:0.67rem;font-weight:700;">📬 ${escapeHtmlSafe(a.unread_count)} unread</span>` : "");
+          const unreadTag = a.unread_count
+            ? `<span style="color:#64748b;font-size:0.7rem;">${escapeHtmlSafe(a.unread_count)} unread</span>`
+            : "";
           return `
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;background:#f8fafc;border:1px solid #f1f5f9;border-radius:6px;flex-wrap:wrap;">
               <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-                <strong style="font-size:0.77rem;color:#0f172a;">${escapeHtmlSafe(a.email)}</strong>
-                <span style="font-size:0.73rem;color:#475569;">(${escapeHtmlSafe(a.full_name)})</span>
-                ${badge}
+                <span style="font-size:0.76rem;font-weight:500;color:#0f172a;">${escapeHtmlSafe(a.email)}</span>
+                <span style="font-size:0.72rem;color:#64748b;">${escapeHtmlSafe(a.full_name)}</span>
                 ${unreadTag}
-                <span style="font-size:0.68rem;color:#64748b;background:#fff;border:1px solid #cbd5e1;padding:1px 6px;border-radius:999px;">${escapeHtmlSafe(a.account_type)}</span>
               </div>
               <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button type="button" onclick="useChromeAccountInVault('${safeEmail}', '${safeName}')" style="background:#ffffff;color:#0f172a;border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:0.7rem;font-weight:600;cursor:pointer;">✓ Use in Profile</button>
-                <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeGmail}')" style="background:#0f172a;color:#ffffff;border:none;border-radius:6px;padding:3px 9px;font-size:0.7rem;font-weight:600;cursor:pointer;">✉️ Open Gmail</button>
-                <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeCal}')" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:0.7rem;font-weight:600;cursor:pointer;">📅 Calendar</button>
+                <button type="button" onclick="useChromeAccountInVault('${safeEmail}', '${safeName}')" style="background:#ffffff;color:#334155;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;font-size:0.7rem;font-weight:500;cursor:pointer;">Use in Profile</button>
+                <button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeGmail}')" style="background:#ffffff;color:#0f172a;border:1px solid #cbd5e1;border-radius:5px;padding:2px 8px;font-size:0.7rem;font-weight:500;cursor:pointer;">Gmail</button>
               </div>
             </div>
           `;
@@ -6035,23 +6012,17 @@ function renderChromeProfilesDirectory(cd) {
         .join("");
 
       return `
-        <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-            <div style="display:flex;align-items:center;gap:9px;">
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
               ${avatarHtml}
               <div>
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                  <strong style="font-size:0.83rem;color:#0f172a;">${escapeHtmlSafe(p.profile_dir)} — ${escapeHtmlSafe(p.profile_name)}</strong>
-                  <span style="background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;border-radius:999px;padding:1px 8px;font-size:0.69rem;font-weight:600;">${escapeHtmlSafe(p.account_type)}</span>
-                </div>
-                <div style="font-size:0.73rem;color:#64748b;margin-top:1px;">
-                  Owner: <strong>${escapeHtmlSafe(p.primary_full_name)}</strong> (<code>${escapeHtmlSafe(p.primary_email)}</code>)${p.last_active ? ` · Active: ${escapeHtmlSafe(p.last_active)}` : ""}
-                </div>
+                <div style="font-size:0.79rem;font-weight:600;color:#0f172a;">${escapeHtmlSafe(p.profile_dir)} — ${escapeHtmlSafe(p.profile_name)}</div>
+                <div style="font-size:0.71rem;color:#64748b;">${escapeHtmlSafe(p.primary_email)}</div>
               </div>
             </div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">${portals}</div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="display:flex;flex-direction:column;gap:4px;">
             ${acctsRows}
           </div>
         </div>
@@ -6062,17 +6033,17 @@ function renderChromeProfilesDirectory(cd) {
   let siteHtml = "";
   if (siteAccounts.length > 0) {
     const sitePills = siteAccounts
-      .slice(0, 10)
+      .slice(0, 8)
       .map((sa) => {
         const safeProf = (sa.profile_dir || "Default").replace(/'/g, "\\'");
         const safeUrl = (sa.origin_url || "").replace(/'/g, "\\'");
-        return `<button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeUrl}')" title="Open ${escapeHtmlSafe(sa.origin_url)} in Chrome (${escapeHtmlSafe(sa.profile_dir)})" style="display:inline-flex;align-items:center;gap:5px;background:#ffffff;border:1px solid #cbd5e1;border-radius:999px;padding:4px 10px;font-size:0.72rem;color:#0f172a;cursor:pointer;"><strong>${escapeHtmlSafe(sa.domain)}</strong>: <code>${escapeHtmlSafe(sa.username)}</code> <span style="color:#64748b;font-size:0.67rem;">(${escapeHtmlSafe(sa.profile_dir)}) &nearr;</span></button>`;
+        return `<button type="button" onclick="launchChromeProfileAccount('${safeProf}', '${safeUrl}')" style="display:inline-flex;align-items:center;gap:4px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;font-size:0.71rem;color:#334155;cursor:pointer;"><strong>${escapeHtmlSafe(sa.domain)}</strong>: ${escapeHtmlSafe(sa.username)}</button>`;
       })
       .join("");
     siteHtml = `
-      <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;padding:9px 12px;">
-        <div style="font-size:0.75rem;font-weight:700;color:#0f172a;margin-bottom:6px;">🔐 Saved Web Portal Accounts Across Chrome Profiles (Click to launch in profile)</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;">${sitePills}</div>
+      <div>
+        <div style="font-size:0.73rem;font-weight:600;color:#475569;margin-bottom:5px;">Saved Portal Logins</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;">${sitePills}</div>
       </div>
     `;
   }
@@ -6088,7 +6059,7 @@ window.syncChromeProfilesToPersonalization = async function syncChromeProfilesTo
   const orig = btn ? btn.textContent : "";
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "⏳ Syncing Chrome Profiles...";
+    btn.textContent = "Syncing...";
   }
   try {
     const res = await fetch(getApiEndpoint("/api/harness/personalize/chrome-profiles/sync"), {
@@ -6097,7 +6068,7 @@ window.syncChromeProfilesToPersonalization = async function syncChromeProfilesTo
     if (res.ok) {
       const data = await res.json();
       applyPersonalizationToUI(data);
-      if (btn) btn.textContent = "✓ Chrome Profiles Linked!";
+      if (btn) btn.textContent = "Synced";
     }
   } catch (e) {
     if (btn) btn.textContent = orig;
@@ -6192,7 +6163,7 @@ window.grantPersonalizeConsentAndLink = async function grantPersonalizeConsentAn
   const orig = btn ? btn.textContent : "";
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "⏳ Saving Consent & Linking Chrome Accounts...";
+    btn.textContent = "Linking...";
   }
   try {
     const res = await fetch(getApiEndpoint("/api/harness/personalize/consent"), {
@@ -6206,7 +6177,7 @@ window.grantPersonalizeConsentAndLink = async function grantPersonalizeConsentAn
       applyPersonalizationToUI(data);
       const fb = document.getElementById("pers-save-feedback");
       if (fb) {
-        fb.textContent = "✓ Consent saved & Chrome accounts linked!";
+        fb.textContent = "Chrome accounts linked.";
         setTimeout(() => {
           fb.textContent = "";
         }, 4000);
@@ -6240,7 +6211,7 @@ window.revokePersonalizeConsent = async function revokePersonalizeConsent(btn) {
       applyPersonalizationToUI(data);
       const fb = document.getElementById("pers-save-feedback");
       if (fb) {
-        fb.textContent = "🔒 Consent revoked & personal accounts unlinked.";
+        fb.textContent = "Accounts unlinked.";
         setTimeout(() => {
           fb.textContent = "";
         }, 4000);
@@ -6277,9 +6248,10 @@ window.switchPersonalizeTab = function switchPersonalizeTab(tabKey) {
     const active = k === tabKey;
     if (pane) pane.style.display = active ? "block" : "none";
     if (btn) {
-      btn.style.background = active ? "#0f172a" : "#ffffff";
-      btn.style.color = active ? "#ffffff" : "#334155";
-      btn.style.borderColor = active ? "#0f172a" : "#cbd5e1";
+      btn.style.background = "transparent";
+      btn.style.color = active ? "#0f172a" : "#64748b";
+      btn.style.fontWeight = active ? "600" : "500";
+      btn.style.borderBottom = active ? "2px solid #0f172a" : "2px solid transparent";
     }
   });
   if (tabKey === "dashboard") {
@@ -6383,10 +6355,10 @@ window.refreshPersonalDashboardNow = async function refreshPersonalDashboardNow(
   const cont = document.getElementById("pers-dashboard-container");
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "⏳ Building Daily Dashboard...";
+    btn.textContent = "Refreshing...";
   }
   if (cont) {
-    cont.innerHTML = `<div style="padding:20px;text-align:center;color:#0f172a;font-size:0.84rem;">🔄 Logging into configured feeds, checking priority email reminders, matching Naukri/LinkedIn jobs, and scanning X/Twitter learning opportunities...</div>`;
+    cont.innerHTML = `<div style="padding:20px;text-align:center;color:#64748b;font-size:0.81rem;">Syncing feeds, email reminders, job matches, and learning topics...</div>`;
   }
   try {
     await savePersonalizationSettings(true);
@@ -6398,11 +6370,11 @@ window.refreshPersonalDashboardNow = async function refreshPersonalDashboardNow(
       renderPersonalDashboardInModal(data.dashboard);
     }
   } catch (e) {
-    if (cont) cont.innerHTML = `<div style="padding:16px;color:#dc2626;">Failed to build dashboard: ${escapeHtml(String(e))}</div>`;
+    if (cont) cont.innerHTML = `<div style="padding:16px;color:#dc2626;">Failed to build briefing: ${escapeHtml(String(e))}</div>`;
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = "⚡ Build & Refresh Dashboard Now";
+      btn.textContent = "Refresh Briefing";
     }
   }
 };
@@ -6411,7 +6383,7 @@ function renderPersonalDashboardInModal(dash) {
   const cont = document.getElementById("pers-dashboard-container");
   const ts = document.getElementById("pers-dash-timestamp");
   if (!cont || !dash) return;
-  if (ts) ts.textContent = dash.generated_at ? `(Updated: ${dash.generated_at})` : "";
+  if (ts) ts.textContent = dash.generated_at ? `Updated ${dash.generated_at}` : "";
 
   const newsItems = (dash.news && dash.news.items) || [];
   const emailItems = (dash.emails && dash.emails.emails) || [];
@@ -6422,10 +6394,10 @@ function renderPersonalDashboardInModal(dash) {
     .slice(0, 4)
     .map(
       (n) => `
-      <div style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:0.8rem;">
-        <a href="${escapeHtml(n.url)}" target="_blank" style="font-weight:700;color:#0f172a;text-decoration:none;">${escapeHtml(n.title)}</a>
-        <span style="font-size:0.72rem;color:#64748b;margin-left:6px;">(${escapeHtml(n.source)} · ${escapeHtml(n.engagement || "")})</span>
-        <div style="font-size:0.76rem;color:#475569;margin-top:2px;">${escapeHtml(n.summary || "")}</div>
+      <div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:0.79rem;">
+        <a href="${escapeHtml(n.url)}" target="_blank" style="font-weight:600;color:#0f172a;text-decoration:none;">${escapeHtml(n.title)}</a>
+        <span style="font-size:0.71rem;color:#64748b;margin-left:6px;">${escapeHtml(n.source)}</span>
+        <div style="font-size:0.74rem;color:#475569;margin-top:2px;">${escapeHtml(n.summary || "")}</div>
       </div>`
     )
     .join("");
@@ -6434,19 +6406,18 @@ function renderPersonalDashboardInModal(dash) {
     .slice(0, 4)
     .map((em) => {
       const isReplied = em.status === "replied";
-      const badgeColor = em.priority === "HIGH" ? "#dc2626" : "#d97706";
       return `
-      <div style="padding:9px 10px;border-bottom:1px solid #f1f5f9;font-size:0.8rem;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+      <div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:0.79rem;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
         <div>
-          <span style="background:${badgeColor};color:#fff;padding:1px 6px;border-radius:4px;font-size:0.68rem;font-weight:700;">${escapeHtml(em.priority)}</span>
-          <strong style="color:#0f172a;margin-left:6px;">${escapeHtml(em.subject)}</strong>
-          <div style="font-size:0.74rem;color:#475569;margin-top:2px;">From: <code>${escapeHtml(em.sender)}</code> — <em>${escapeHtml(em.reminder_note)}</em></div>
+          <span style="background:#f1f5f9;color:#334155;padding:1px 6px;border-radius:4px;font-size:0.67rem;font-weight:600;">${escapeHtml(em.priority)}</span>
+          <strong style="color:#0f172a;margin-left:6px;font-weight:600;">${escapeHtml(em.subject)}</strong>
+          <div style="font-size:0.73rem;color:#64748b;margin-top:2px;">${escapeHtml(em.sender)} — ${escapeHtml(em.reminder_note)}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;">
           ${
             isReplied
-              ? `<span style="color:#059669;font-size:0.74rem;font-weight:700;">✓ Replied</span>`
-              : `<button type="button" onclick="markPersonalEmailReplied('${escapeHtml(em.id)}')" style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:5px;padding:3px 8px;font-size:0.72rem;font-weight:600;cursor:pointer;">✓ Mark Replied</button>`
+              ? `<span style="color:#059669;font-size:0.72rem;font-weight:500;">Replied</span>`
+              : `<button type="button" onclick="markPersonalEmailReplied('${escapeHtml(em.id)}')" style="background:#ffffff;color:#334155;border:1px solid #cbd5e1;border-radius:5px;padding:3px 8px;font-size:0.71rem;font-weight:500;cursor:pointer;">Mark Replied</button>`
           }
         </div>
       </div>`;
@@ -6462,17 +6433,17 @@ function renderPersonalDashboardInModal(dash) {
       const safePortal = escapeHtml(j.portal).replace(/'/g, "\\'");
       const safeUrl = escapeHtml(j.url).replace(/'/g, "\\'");
       return `
-      <div style="padding:9px 10px;border-bottom:1px solid #f1f5f9;font-size:0.8rem;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:0.79rem;display:flex;justify-content:space-between;align-items:center;gap:10px;">
         <div>
-          <span style="background:#0f172a;color:#fff;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">${escapeHtml(j.match_score)} Match</span>
-          <a href="${escapeHtml(j.url)}" target="_blank" style="font-weight:700;color:#0f172a;margin-left:6px;text-decoration:none;">${escapeHtml(j.title)}</a>
-          <div style="font-size:0.73rem;color:#64748b;margin-top:2px;">${escapeHtml(j.portal)} · ${escapeHtml(j.location)} · Skills: ${escapeHtml((j.matched_skills || []).join(", "))}</div>
+          <span style="background:#f1f5f9;color:#0f172a;padding:1px 6px;border-radius:4px;font-size:0.68rem;font-weight:600;">${escapeHtml(j.match_score)}</span>
+          <a href="${escapeHtml(j.url)}" target="_blank" style="font-weight:600;color:#0f172a;margin-left:6px;text-decoration:none;">${escapeHtml(j.title)}</a>
+          <div style="font-size:0.72rem;color:#64748b;margin-top:2px;">${escapeHtml(j.portal)} · ${escapeHtml(j.location)}</div>
         </div>
         <div style="flex-shrink:0;">
           ${
             applied
-              ? `<span style="background:#dcfce7;color:#15803d;padding:4px 9px;border-radius:6px;font-size:0.73rem;font-weight:700;">✓ Applied</span>`
-              : `<button type="button" onclick="applyToPersonalJob('${safeId}', '${safeTitle}', '${safePortal}', '${safeUrl}')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:0.74rem;font-weight:600;cursor:pointer;">🚀 Apply (${escapeHtml(j.portal)})</button>`
+              ? `<span style="color:#059669;font-size:0.72rem;font-weight:500;">Applied</span>`
+              : `<button type="button" onclick="applyToPersonalJob('${safeId}', '${safeTitle}', '${safePortal}', '${safeUrl}')" style="background:#0f172a;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:0.72rem;font-weight:500;cursor:pointer;">Apply</button>`
           }
         </div>
       </div>`;
@@ -6483,30 +6454,30 @@ function renderPersonalDashboardInModal(dash) {
     .slice(0, 4)
     .map(
       (l) => `
-      <div style="padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:0.8rem;">
-        <a href="${escapeHtml(l.url)}" target="_blank" style="font-weight:700;color:#0f172a;text-decoration:none;">${escapeHtml(l.title)}</a>
-        <span style="font-size:0.72rem;color:#2563eb;margin-left:6px;">[${escapeHtml(l.platform)}]</span>
-        <div style="font-size:0.75rem;color:#475569;margin-top:2px;">${escapeHtml(l.summary || "")}</div>
+      <div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:0.79rem;">
+        <a href="${escapeHtml(l.url)}" target="_blank" style="font-weight:600;color:#0f172a;text-decoration:none;">${escapeHtml(l.title)}</a>
+        <span style="font-size:0.71rem;color:#64748b;margin-left:6px;">${escapeHtml(l.platform)}</span>
+        <div style="font-size:0.74rem;color:#475569;margin-top:2px;">${escapeHtml(l.summary || "")}</div>
       </div>`
     )
     .join("");
 
   cont.innerHTML = `
     <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
-      <div style="background:#f8fafc;padding:8px 12px;font-weight:700;font-size:0.82rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">📰 1. Social Media &amp; News Digest (${newsItems.length} items)</div>
-      ${newsHtml || '<div style="padding:10px;font-size:0.78rem;color:#64748b;">No items yet.</div>'}
+      <div style="background:#f8fafc;padding:7px 12px;font-weight:600;font-size:0.78rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">News &amp; Topics (${newsItems.length})</div>
+      ${newsHtml || '<div style="padding:10px 12px;font-size:0.76rem;color:#64748b;">No items yet.</div>'}
     </div>
     <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
-      <div style="background:#f8fafc;padding:8px 12px;font-weight:700;font-size:0.82rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">📧 2. Email Tracker &amp; Important Reply Reminders</div>
-      ${emailHtml || '<div style="padding:10px;font-size:0.78rem;color:#64748b;">No pending email reminders.</div>'}
+      <div style="background:#f8fafc;padding:7px 12px;font-weight:600;font-size:0.78rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">Email Reminders</div>
+      ${emailHtml || '<div style="padding:10px 12px;font-size:0.76rem;color:#64748b;">No pending email reminders.</div>'}
     </div>
     <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
-      <div style="background:#f8fafc;padding:8px 12px;font-weight:700;font-size:0.82rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">💼 3. Relevant Jobs (Naukri.com · LinkedIn · Wellfound)</div>
-      ${jobsHtml || '<div style="padding:10px;font-size:0.78rem;color:#64748b;">No matched jobs yet.</div>'}
+      <div style="background:#f8fafc;padding:7px 12px;font-weight:600;font-size:0.78rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">Matched Jobs</div>
+      ${jobsHtml || '<div style="padding:10px 12px;font-size:0.76rem;color:#64748b;">No matched jobs yet.</div>'}
     </div>
     <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
-      <div style="background:#f8fafc;padding:8px 12px;font-weight:700;font-size:0.82rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">🎓 4. New Learning Opportunities (X/Twitter &amp; Internet)</div>
-      ${learnHtml || '<div style="padding:10px;font-size:0.78rem;color:#64748b;">No learning items yet.</div>'}
+      <div style="background:#f8fafc;padding:7px 12px;font-weight:600;font-size:0.78rem;color:#0f172a;border-bottom:1px solid #e2e8f0;">Learning Feeds</div>
+      ${learnHtml || '<div style="padding:10px 12px;font-size:0.76rem;color:#64748b;">No learning items yet.</div>'}
     </div>
   `;
 }
