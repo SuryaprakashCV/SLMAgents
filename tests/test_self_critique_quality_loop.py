@@ -187,6 +187,36 @@ def test_local_project_build_creates_files_runs_tests_and_completes_project():
     assert "Local Project Built & Verified on Disk" in outcome_followup.final_text
     assert "http://localhost:8000/projects/autotest_hub/index.html" in outcome_followup.final_text
 
+    # 3. Verify plan for "build an interviwer app" has zero <slug> or ... placeholders
+    plan_outcome = kernel.run_turn(
+        user_query="build an interviwer app",
+        session_id="test_interviewer_session",
+        client_surface="desktop",
+    )
+    assert "<slug>" not in plan_outcome.final_text
+    assert "projects/..." not in plan_outcome.final_text
+    assert "AI Interviewer Studio" in plan_outcome.final_text
+
+    # 4. Confirming "build an interviwer app" builds projects/interviewer_app with zero pre-filled values
+    build_interviewer = kernel.run_turn(
+        user_query="build an interviwer app",
+        session_id="test_interviewer_session",
+        clarification_choice="✅ Looks great — go ahead and build it!",
+        client_surface="desktop",
+    )
+    assert "http://localhost:8000/projects/interviewer_app/index.html" in build_interviewer.final_text
+    assert "TESTS PASSED" in build_interviewer.final_text
+
+    # 5. Building resume builder app creates projects/interact_user_resume_app with zero pre-filled values
+    build_resume = kernel.run_turn(
+        user_query="build an app for mr which can interact with user and build a resume for them",
+        session_id="test_resume_session",
+        clarification_choice="it should have a chat interface and ask iuser about their details..",
+        client_surface="desktop",
+    )
+    assert "http://localhost:8000/projects/interact_user_resume_app/index.html" in build_resume.final_text
+    assert "TESTS PASSED" in build_resume.final_text
+
 
 if __name__ == "__main__":
     test_inspect_response_quality_detects_hollow_replies()

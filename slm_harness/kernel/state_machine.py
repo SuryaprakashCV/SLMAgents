@@ -542,65 +542,23 @@ class TurnStateMachine:
             }
 
         if not clarification_choice and (is_explicit_plan_cmd or is_complex_build_ask or is_complex_test_ask):
+            from ..tools.project_builder import _derive_project_identity
+            from ..tools.project_templates import build_dynamic_project_plan
+
             action_focus = "building and testing" if (is_complex_build_ask and is_complex_test_ask) else (
                 "testing and verifying" if is_complex_test_ask else "building"
             )
-            steps = [
-                {
-                    "node_id": "plan_1",
-                    "agent": "slm_task_planner",
-                    "instruction": f"Step 1 — Scaffold local project workspace & architecture on disk for: {q_clean[:85]}",
-                    "depends_on": [],
-                },
-                {
-                    "node_id": "plan_2",
-                    "agent": "slm_code_interpreter",
-                    "instruction": "Step 2 — Create complete source files on disk (HTML/CSS/JS frontend, Python backend engine & server)",
-                    "depends_on": ["plan_1"],
-                },
-                {
-                    "node_id": "plan_3",
-                    "agent": "slm_code_interpreter",
-                    "instruction": "Step 3 — Build & run automated test suite (happy path, boundary cases & security checks) locally",
-                    "depends_on": ["plan_2"],
-                },
-                {
-                    "node_id": "plan_4",
-                    "agent": primary_agent,
-                    "instruction": "Step 4 — Mount live local web app URL & package downloadable project ZIP",
-                    "depends_on": ["plan_3"],
-                },
-            ]
-            question = "Does this plan look good to you, or would you like to tweak anything before I build the files locally?"
-            options = [
-                "✅ Looks great — go ahead and build it!",
-                "🧪 Go ahead + include an expanded test & edge-case suite",
-                "⚡ Keep it lightweight — build a clean, fast MVP first",
-            ]
-            plan_markdown = (
-                f"I'd love to help you with **{action_focus}** this locally! Since this is a multi-file project, let's quickly align on the plan before I create the files on your disk and run the test suite:\n\n"
-                f"### 🗺️ Proposed Local Build Plan for: *{q_clean}*\n\n"
-                f"1. **Step 1 — Local Project Scaffolding (`projects/<slug>/`)**\n"
-                f"   I'll create a dedicated local project directory on your machine with clean frontend, backend, and test folders.\n"
-                f"2. **Step 2 — Complete Multi-File Source Code Creation on Disk**\n"
-                f"   I'll write the working files directly to disk (`index.html`, `styles.css`, `app.js`, `engine.py`, `server.py`, and `README.md`) with full edge-case and security guards.\n"
-                f"3. **Step 3 — Automated Local Testing & Verification (`unittest`)**\n"
-                f"   I'll create `tests/test_project.py` and execute it locally on your CPU to verify that all functional, boundary, and security checks pass.\n"
-                f"4. **Step 4 — Live Local Web App & Project ZIP Package**\n"
-                f"   I'll mount the built web application at a live `http://localhost:8000/projects/...` URL so you can open it immediately, plus provide a `.zip` package of the entire project.\n\n"
-                f"---\n"
-                f"💬 **{question}**\n"
-                f"*(Click one of the quick options below or reply **\"build it locally\"** / **\"yes, go ahead\"** to create all files and complete the project right away!)*"
+            proj_name, proj_slug, proj_kind = _derive_project_identity(q_clean)
+            plan_obj = build_dynamic_project_plan(
+                q_clean=q_clean,
+                project_name=proj_name,
+                project_slug=proj_slug,
+                project_kind=proj_kind,
+                primary_agent=primary_agent,
+                action_focus=action_focus,
             )
-            return {
-                "needs_blocking_clarification": True,
-                "question": question,
-                "options": options,
-                "steps": steps,
-                "plan_markdown": plan_markdown,
-                "plan_context": "",
-                "original_query": q_clean,
-            }
+            plan_obj["original_query"] = q_clean
+            return plan_obj
 
         # When the user's request is clear (or already confirmed), plan internally and answer naturally
         if primary_agent == "slm_code_interpreter" or _CODING_INTENT_RE.search(q_clean):

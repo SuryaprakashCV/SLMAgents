@@ -57,9 +57,9 @@ class ProjectBuildOutcome:
     structured_data: Dict[str, Any] = field(default_factory=dict)
 
 
-# Follow-up phrases where the user tells the assistant to actually build/create files for the discussed project
+# Follow-up phrases where the user tells the assistant to actually build/create files or run/launch the discussed project
 _FOLLOWUP_BUILD_COMMAND_RE = re.compile(
-    r"^\s*(?:please\s+|now\s+|can\s+you\s+|just\s+)?"
+    r"^\s*(?:no\s+|yes\s+)?(?:i\s+want\s+you\s+to\s+|iwant\s+you\s+to\s+|please\s+|now\s+|can\s+you\s+|just\s+)?"
     r"(?:"
     r"build\s+(?:it|this|that|the\s+project|the\s+app|the\s+application|the\s+website|the\s+system|the\s+suite|everything)(?:\s+locally|\s+now|\s+for\s+me)?"
     r"|create\s+(?:the\s+|all\s+|all\s+the\s+)?(?:files?|project\s+files?|source\s+files?|code\s+files?|folders?|project)(?:\s+and\s+build\s+it)?(?:\s+locally)?"
@@ -68,6 +68,10 @@ _FOLLOWUP_BUILD_COMMAND_RE = re.compile(
     r"|implement\s+(?:it|this|the\s+project|the\s+full\s+project)(?:\s+locally)?"
     r"|make\s+(?:the\s+)?(?:files?|project)\s+locally"
     r"|scaffold\s+(?:it|the\s+project|this\s+locally)"
+    r"|(?:run|launch|start|open|host|serve)\s+(?:it|the\s+app|the\s+application|the\s+project|the\s+website|this)(?:\s+locally)?(?:\s+and\s+give\s+me\s+(?:the\s+)?(?:link|url))?"
+    r"|give\s+me\s+(?:the\s+)?(?:link|url)(?:\s+to\s+run\s+it|\s+for\s+the\s+app)?"
+    r"|yes[,\s]+(?:go\s+ahead|build\s+it|create\s+it|run\s+it)(?:\s+locally)?"
+    r"|go\s+ahead(?:\s+and\s+(?:build|create|run)\s+it)?"
     r")\s*[.!?\s]*(?:/no_think|/fast|/low|/medium|/high)?\s*$",
     re.IGNORECASE,
 )
@@ -76,8 +80,8 @@ _FOLLOWUP_BUILD_COMMAND_RE = re.compile(
 _PROJECT_BUILD_TOPIC_RE = re.compile(
     r"\b(?:build|create|develop|architect|implement|scaffold|construct|make)\b"
     r".*\b(?:website|web\s+app|web\s+application|application|app|platform|dashboard|portal|"
-    r"test\s+suite|testing\s+platform|autotest|evaluator|microservice|service|fullstack|full-stack|"
-    r"system|project|tool|engine|workbench|studio)\b",
+    r"test\s+suite|testing\s+platform|autotest|evaluator|interviewer|interviwer|resume|microservice|"
+    r"service|fullstack|full-stack|system|project|tool|engine|workbench|studio)\b",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -155,7 +159,7 @@ def resolve_project_goal(user_query: str, last_user_query: str = "", lineage_que
     if dup_m:
         q_clean = dup_m.group(1).strip()
 
-    if not is_followup_build_command(q_clean) and len(q_clean.split()) >= 5:
+    if not is_followup_build_command(q_clean) and len(q_clean.split()) >= 3:
         return q_clean
 
     candidates = list(lineage_queries) + ([last_user_query] if last_user_query else [])
@@ -165,10 +169,10 @@ def resolve_project_goal(user_query: str, last_user_query: str = "", lineage_que
         dup_c = re.match(r"^(.+?)\s*\(\1\)\s*$", c_clean, flags=re.IGNORECASE | re.DOTALL)
         if dup_c:
             c_clean = dup_c.group(1).strip()
-        if c_clean and not is_followup_build_command(c_clean) and len(c_clean.split()) >= 4:
+        if c_clean and not is_followup_build_command(c_clean) and len(c_clean.split()) >= 3:
             return c_clean
 
-    return q_clean or "Automated Application Testing & Evaluation Web Platform"
+    return q_clean or "Interactive Web Application"
 
 
 def _derive_project_identity(goal: str) -> tuple[str, str, str]:
@@ -176,6 +180,18 @@ def _derive_project_identity(goal: str) -> tuple[str, str, str]:
     Returns `(project_name, project_slug, project_kind)` from the resolved user goal.
     """
     g_low = (goal or "").lower()
+    if any(w in g_low for w in ("interviewer", "interviwer", "interview", "interviw", "mock interview")):
+        return (
+            "AI Interviewer Studio",
+            "interviewer_app",
+            "interviewer_app",
+        )
+    if any(w in g_low for w in ("resume", "cv", "curriculum vitae")):
+        return (
+            "Interactive Resume Builder Studio",
+            "interact_user_resume_app",
+            "resume_builder_app",
+        )
     if any(w in g_low for w in ("test suite", "test suit", "automat", "evaluate", "testing", "qa", "autotesthub", "autotest")):
         return (
             "AutoTestHub — Automated Application Testing & Evaluation Suite",
@@ -187,7 +203,7 @@ def _derive_project_identity(goal: str) -> tuple[str, str, str]:
     stop = {
         "i", "want", "to", "build", "create", "develop", "make", "a", "an", "the", "for", "which",
         "that", "and", "or", "with", "in", "on", "of", "locally", "please", "can", "you", "website",
-        "web", "app", "application", "project", "system", "platform",
+        "web", "app", "application", "project", "system", "platform", "me", "mr", "my",
     }
     words = [w for w in re.findall(r"[a-zA-Z][a-zA-Z0-9]{2,}", g_low) if w not in stop]
     if not words:
@@ -418,8 +434,22 @@ class LocalProjectBuilder:
         clarification_choice: str,
     ) -> List[tuple[str, str, str]]:
         """
-        Generates the complete multi-file source code for the target project.
+        Generates the complete multi-file source code for the target project
+        with zero pre-filled user inputs or pre-populated form values.
         """
+        from .project_templates import (
+            generate_custom_interactive_app_files,
+            generate_interviewer_app_files,
+            generate_resume_builder_app_files,
+        )
+
+        if project_kind == "interviewer_app":
+            return generate_interviewer_app_files(project_name, project_slug, resolved_goal)
+        if project_kind == "resume_builder_app":
+            return generate_resume_builder_app_files(project_name, project_slug, resolved_goal)
+        if project_kind == "custom_web_project":
+            return generate_custom_interactive_app_files(project_name, project_slug, resolved_goal)
+
         engine_py = '''#!/usr/bin/env python3
 """
 Core Automated Application Testing & Evaluation Engine (`engine.py`).
@@ -1153,8 +1183,9 @@ if __name__ == "__main__":
       <div class="panel-header">
         <h2>1. Target Application Under Test</h2>
         <div class="sample-bar">
-          <label for="sample-select">Preset App:</label>
-          <select id="sample-select" aria-label="Select Preset Sample Application">
+          <label for="sample-select">Optional Preset:</label>
+          <select id="sample-select" aria-label="Select Optional Preset Application">
+            <option value="" selected>-- Paste or upload your own code (or pick an optional sample) --</option>
             <option value="sample_checkout">✅ Hardened Checkout App (HTML/JS)</option>
             <option value="vulnerable_login">⚠️ Legacy Vulnerable Login App (XSS/Secret Demo)</option>
             <option value="python_order_api">🐍 Python Order Microservice (order_service.py)</option>
@@ -1167,10 +1198,10 @@ if __name__ == "__main__":
       </div>
 
       <div class="meta-row">
-        <input id="app-name-input" type="text" value="sample_checkout_app.html" maxlength="120" aria-label="Application Filename" placeholder="e.g. app.html or service.py" />
+        <input id="app-name-input" type="text" value="" maxlength="120" aria-label="Application Filename" placeholder="Enter filename (e.g. app.html or service.py)..." />
       </div>
 
-      <textarea id="code-editor" spellcheck="false" aria-label="Application Source Code Editor"></textarea>
+      <textarea id="code-editor" spellcheck="false" aria-label="Application Source Code Editor" placeholder="Paste or type your HTML, JavaScript, Python, or JSON application code here..."></textarea>
 
       <div class="profiles-box">
         <h3>2. Active Automated Test Suites</h3>
@@ -1869,7 +1900,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const nameInput = document.getElementById("app-name-input");
 
   function loadPreset(key) {
-    const item = PRESET_SAMPLES[key] || PRESET_SAMPLES.sample_checkout;
+    if (!key) {
+      nameInput.value = "";
+      editor.value = "";
+      return;
+    }
+    const item = PRESET_SAMPLES[key];
+    if (!item) return;
     nameInput.value = item.name;
     editor.value = item.code;
     runEvaluation();
@@ -1900,8 +1937,6 @@ document.addEventListener("DOMContentLoaded", () => {
     a.click();
     URL.revokeObjectURL(url);
   });
-
-  loadPreset("sample_checkout");
 });
 '''
 

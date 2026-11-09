@@ -1585,6 +1585,41 @@ def mount_harness_routes(app: FastAPI) -> None:
             return rep.to_dict()
         raise HTTPException(status_code=500, detail="AutoTestHub engine unavailable")
 
+    @app.post("/api/projects/{project_slug}/action")
+    async def execute_built_project_action(project_slug: str, request: Request) -> Dict[str, Any]:
+        import importlib.util
+        import sys
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        clean_slug = re.sub(r"[^A-Za-z0-9_.\-]", "", project_slug or "")
+        ws_dir = os.path.abspath(get_config().workspace_dir)
+        engine_path = os.path.join(ws_dir, "projects", clean_slug, "engine.py")
+        if not os.path.isfile(engine_path):
+            raise HTTPException(status_code=404, detail=f"Project engine not found: {clean_slug}")
+
+        mod_name = f"built_proj_{clean_slug}_engine"
+        spec = importlib.util.spec_from_file_location(mod_name, engine_path)
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            for cls_name in ("InterviewEngine", "ResumeBuilderEngine", "CustomAppEngine", "AutoTestEvaluationEngine"):
+                cls_obj = getattr(mod, cls_name, None)
+                if cls_obj is not None:
+                    inst = cls_obj()
+                    if hasattr(inst, "handle_action"):
+                        return inst.handle_action(body)
+                    if hasattr(inst, "evaluate_application"):
+                        rep = inst.evaluate_application(
+                            code=str(body.get("code") or ""),
+                            app_name=str(body.get("app_name") or "app.html"),
+                        )
+                        return rep.to_dict()
+        raise HTTPException(status_code=500, detail=f"Unable to execute engine for {clean_slug}")
+
     @app.get("/projects/{project_slug}")
     @app.get("/projects/{project_slug}/{file_path:path}")
     async def serve_built_project_file(project_slug: str, file_path: str = "index.html") -> FileResponse:

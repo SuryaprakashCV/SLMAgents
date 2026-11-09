@@ -355,35 +355,14 @@ class PersonalConciergeEngine:
             "consent_timestamp": "",
             "onboarded": False,
             "full_name": "",
-            "current_role": "AI & Software Systems Engineer",
-            "experience_years": "4",
-            "skills": [
-                "Python",
-                "Small Language Models (SLMs)",
-                "ONNX Runtime",
-                "FastAPI",
-                "Agentic Architectures",
-                "Distributed Systems",
-                "SQL",
-            ],
-            "target_roles": [
-                "Staff AI Engineer",
-                "Principal Machine Learning Engineer",
-                "Lead Backend & Agentic Systems Engineer",
-            ],
-            "preferred_locations": ["Bangalore", "Hyderabad", "Remote", "Chennai", "Pune"],
-            "interests": [
-                "Small Language Models & Edge AI",
-                "Multi-Agent Harnesses & Code Generation",
-                "Systems Architecture & High-Performance Python",
-                "AI Startups & Open-Source Releases",
-            ],
-            "learning_goals": [
-                "Quantized ONNX & GGUF Inference Optimization",
-                "Autonomous Agent Planning & Tool Use",
-                "Rust & High-Concurrency Systems for AI",
-            ],
-            "vip_email_senders": ["recruiter", "hiring", "cto", "founder", "client", "urgent", "offer"],
+            "current_role": "",
+            "experience_years": "",
+            "skills": [],
+            "target_roles": [],
+            "preferred_locations": [],
+            "interests": [],
+            "learning_goals": [],
+            "vip_email_senders": [],
             "news_sources": ["Hacker News", "X / Twitter Tech", "Reddit r/LocalLLaMA", "TechCrunch AI"],
             "job_portals": ["Naukri.com", "LinkedIn Jobs", "Wellfound", "Indeed"],
             "daily_job_enabled": False,
@@ -460,8 +439,17 @@ class PersonalConciergeEngine:
         prof = self.get_profile()
         prof["consent_given"] = False
         prof["enabled"] = False
+        prof["onboarded"] = False
         prof["consent_timestamp"] = ""
         prof["full_name"] = ""
+        prof["current_role"] = ""
+        prof["experience_years"] = ""
+        prof["skills"] = []
+        prof["target_roles"] = []
+        prof["preferred_locations"] = []
+        prof["interests"] = []
+        prof["learning_goals"] = []
+        prof["vip_email_senders"] = []
         prof["linked_chrome_profiles"] = []
         prof["linked_emails"] = []
         prof["linked_sso_accounts"] = []
