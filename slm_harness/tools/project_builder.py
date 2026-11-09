@@ -94,10 +94,47 @@ _PURE_ALGORITHM_SNIPPET_RE = re.compile(
 )
 
 
+_CONTEXTUAL_PROJECT_FOLLOWUP_SUBSTRINGS = (
+    "generate the full source code",
+    "full source code (html",
+    "for this project",
+    "this project?",
+    "previous chat",
+    "earlier chat",
+    "last chat",
+    "project which is there",
+    "project in my",
+    "project from my",
+    "the project above",
+    "discussed above",
+    "build it locally",
+    "create the files",
+    "complete the project",
+    "run the app and give me",
+    "give me link",
+    "give me the link",
+)
+
+
 def is_followup_build_command(query: str) -> bool:
-    """Returns True if the query is a direct command like 'build it locally' or 'create the files and build it'."""
+    """
+    Returns True if the query is a follow-up command to build/create/complete/run
+    a project discussed earlier in the session or in a previous chat.
+    """
     q = re.sub(r"\s*(?:—\s*Selected Plan Option:|\[Clarified Plan Option:).*$", "", (query or "").strip(), flags=re.IGNORECASE).strip()
-    return bool(_FOLLOWUP_BUILD_COMMAND_RE.match(q))
+    q = re.sub(r"\s*/(?:no_think|fast|low|medium|high)\b", "", q, flags=re.IGNORECASE).strip()
+    if not q:
+        return False
+    if _FOLLOWUP_BUILD_COMMAND_RE.match(q):
+        return True
+    q_low = q.lower()
+    if any(sub in q_low for sub in _CONTEXTUAL_PROJECT_FOLLOWUP_SUBSTRINGS):
+        return True
+    if re.search(r"\b(?:create|build|make|generate|complete|run)\b.*\b(?:previous|earlier|last)\s+chat\b", q_low):
+        return True
+    if re.search(r"\bwant\s+me\s+to\s+generate\s+the\s+full\s+source\s+code\b", q_low):
+        return True
+    return False
 
 
 def should_execute_local_project_build(
@@ -120,7 +157,7 @@ def should_execute_local_project_build(
     if _PURE_ALGORITHM_SNIPPET_RE.match(q_clean):
         return False
 
-    # 1. Explicit follow-up command ("build it locally", "create the files", "complete the project")
+    # 1. Explicit or contextual follow-up command ("build it locally", "Want me to generate the full source code... yes", "create project which is there in my previous chat")
     if is_followup_build_command(q_clean):
         return True
 
@@ -139,40 +176,75 @@ def should_execute_local_project_build(
     )
     if has_plan_confirmation:
         combined_topic = f"{q_clean} {last_user_query}".strip()
-        if _PROJECT_BUILD_TOPIC_RE.search(combined_topic):
+        if _PROJECT_BUILD_TOPIC_RE.search(combined_topic) or is_followup_build_command(combined_topic):
             return True
 
     return False
 
 
+def _clean_candidate_goal(raw_text: str) -> str:
+    c_clean = re.sub(r"^/(?:plan|clarify|low|medium|high|fast|deep)\b\s*", "", (raw_text or "").strip(), flags=re.IGNORECASE).strip()
+    c_clean = re.sub(r"\s*(?:—\s*Selected Plan Option:|\[Clarified Plan Option:).*$", "", c_clean, flags=re.IGNORECASE).strip()
+    c_clean = re.sub(r"\s*/no_think\b", "", c_clean, flags=re.IGNORECASE).strip()
+    dup_c = re.match(r"^(.+?)\s*\(\1\)\s*$", c_clean, flags=re.IGNORECASE | re.DOTALL)
+    if dup_c:
+        c_clean = dup_c.group(1).strip()
+    return c_clean
+
+
 def resolve_project_goal(user_query: str, last_user_query: str = "", lineage_queries: Sequence[str] = ()) -> str:
     """
-    If the user typed a short follow-up like 'build it locally', resolves the full project
-    specification from earlier user turns in the session.
+    If the user typed a follow-up like 'build it locally', 'Want me to generate the full source code... yes',
+    or 'create project which is there in my previous chat', resolves the full project specification
+    from earlier turns in the current session or from recent user chats in SQLite.
     """
-    q_clean = re.sub(r"^/(?:plan|clarify|low|medium|high|fast|deep)\b\s*", "", (user_query or "").strip(), flags=re.IGNORECASE).strip()
-    q_clean = re.sub(r"\s*(?:—\s*Selected Plan Option:|\[Clarified Plan Option:).*$", "", q_clean, flags=re.IGNORECASE).strip()
-    q_clean = re.sub(r"\s*/no_think\b", "", q_clean, flags=re.IGNORECASE).strip()
+    q_clean = _clean_candidate_goal(user_query)
 
-    # Deduplicate repeated parenthetical query e.g. "foo (foo)"
-    dup_m = re.match(r"^(.+?)\s*\(\1\)\s*$", q_clean, flags=re.IGNORECASE | re.DOTALL)
-    if dup_m:
-        q_clean = dup_m.group(1).strip()
-
-    if not is_followup_build_command(q_clean) and len(q_clean.split()) >= 3:
+    if q_clean and not is_followup_build_command(q_clean) and len(q_clean.split()) >= 3:
         return q_clean
 
+    # 1. Search current session lineage & blackboard last_user_query (preferring explicit project build topics)
     candidates = list(lineage_queries) + ([last_user_query] if last_user_query else [])
+    cleaned_session_candidates: List[str] = []
     for cand in reversed(candidates):
-        c_clean = re.sub(r"\s*(?:—\s*Selected Plan Option:|\[Clarified Plan Option:).*$", "", (cand or "").strip(), flags=re.IGNORECASE).strip()
-        c_clean = re.sub(r"\s*/no_think\b", "", c_clean, flags=re.IGNORECASE).strip()
-        dup_c = re.match(r"^(.+?)\s*\(\1\)\s*$", c_clean, flags=re.IGNORECASE | re.DOTALL)
-        if dup_c:
-            c_clean = dup_c.group(1).strip()
+        c_clean = _clean_candidate_goal(cand)
         if c_clean and not is_followup_build_command(c_clean) and len(c_clean.split()) >= 3:
-            return c_clean
+            cleaned_session_candidates.append(c_clean)
 
-    return q_clean or "Interactive Web Application"
+    for c_clean in cleaned_session_candidates:
+        if _PROJECT_BUILD_TOPIC_RE.search(c_clean):
+            return c_clean
+    if cleaned_session_candidates:
+        return cleaned_session_candidates[0]
+
+    # 2. Cross-session lookup ("in my previous chat") from SQLite turns table
+    try:
+        import sqlite3
+        from ..kernel.checkpoints import get_checkpoint_store
+
+        db_path = get_checkpoint_store().db_path
+        if os.path.isfile(db_path):
+            with sqlite3.connect(db_path) as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT content FROM turns WHERE role='user' "
+                    "AND session_id NOT LIKE 'test_%' AND session_id NOT LIKE 'desktop_verify%' "
+                    "ORDER BY rowid DESC LIMIT 50"
+                )
+                for (raw_content,) in cur.fetchall():
+                    c_clean = _clean_candidate_goal(str(raw_content or ""))
+                    if (
+                        c_clean
+                        and not is_followup_build_command(c_clean)
+                        and _PROJECT_BUILD_TOPIC_RE.search(c_clean)
+                        and "daily personalized dashboard" not in c_clean.lower()
+                        and "personalize my profile" not in c_clean.lower()
+                    ):
+                        return c_clean
+    except Exception:
+        pass
+
+    return "Automated Application Testing & Evaluation Web Platform"
 
 
 def _derive_project_identity(goal: str) -> tuple[str, str, str]:

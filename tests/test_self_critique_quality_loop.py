@@ -217,6 +217,26 @@ def test_local_project_build_creates_files_runs_tests_and_completes_project():
     assert "http://localhost:8000/projects/interact_user_resume_app/index.html" in build_resume.final_text
     assert "TESTS PASSED" in build_resume.final_text
 
+    # 6. Replying "Want me to generate the full source code (HTML, JS, Python) for this project? yes"
+    # or "create project which is there in my previous chat" builds the actual project from history (never Fibonacci!)
+    outcome_gen_src = kernel.run_turn(
+        user_query="Want me to generate the full source code (HTML, JS, Python) for this project? yes",
+        session_id="test_local_build_session",
+        client_surface="desktop",
+    )
+    assert "Local Project Built & Verified on Disk" in outcome_gen_src.final_text
+    assert "http://localhost:8000/projects/autotest_hub/index.html" in outcome_gen_src.final_text
+    assert "fibonacci" not in outcome_gen_src.final_text.lower()
+
+    outcome_prev_chat = kernel.run_turn(
+        user_query="create project which is there in my previous chat",
+        session_id="test_interviewer_session",
+        client_surface="desktop",
+    )
+    assert "Local Project Built & Verified on Disk" in outcome_prev_chat.final_text
+    assert "http://localhost:8000/projects/interviewer_app/index.html" in outcome_prev_chat.final_text
+    assert "fibonacci" not in outcome_prev_chat.final_text.lower()
+
 
 if __name__ == "__main__":
     test_inspect_response_quality_detects_hollow_replies()

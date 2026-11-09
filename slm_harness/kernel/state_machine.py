@@ -2438,13 +2438,17 @@ class TurnStateMachine:
         if _CREATOR_IDENTITY_RE.search(q_clean) and "suryaprakash" not in stripped.lower():
             return False, "creator identity query missing Suryaprakash attribution"
 
-        # 8. Detect project build requests that only printed a chat overview or simulated link instead of creating local files on disk
+        # 8. Detect project build requests that only printed a chat overview, simulated link, or hallucinated Fibonacci instead of creating local files on disk
+        low_text = stripped.lower()
+        q_low_clean = q_clean.lower()
         if (
             should_execute_local_project_build(q_clean)
-            or "this is a simulated link" in stripped.lower()
-            or "want me to generate the full source code" in stripped.lower()
-        ) and "local project built & verified on disk" not in stripped.lower():
-            return False, "project build request printed chat overview instead of creating local files"
+            or "this is a simulated link" in low_text
+            or "want me to generate the full source code" in low_text
+            or "save the html and javascript code in index.html" in low_text
+            or ("fibonacci sequence" in low_text and "fibon" not in q_low_clean)
+        ) and "local project built & verified on disk" not in low_text:
+            return False, "project build request printed chat overview or unrequested fibonacci instead of creating local files"
 
         # 9. Detect overly brief / truncated stub responses on substantive queries
         if len(stripped) < 28 and len(q_clean.split()) >= 4:
@@ -2513,11 +2517,18 @@ class TurnStateMachine:
         if "project build" in reason:
             try:
                 prev_q = str(get_blackboard().get(session_id, "last_user_query") or "").strip()
+                ckpt_store = get_checkpoint_store()
+                lin_qs = [
+                    str(t.get("content") or "")
+                    for t in ckpt_store.get_lineage(session_id)
+                    if t.get("role") == "user"
+                ]
                 build_out = LocalProjectBuilder(workspace_dir=self.config.workspace_dir).build_project(
                     user_query=q_clean,
                     session_id=session_id,
                     run_id=run_id,
                     last_user_query=prev_q,
+                    lineage_queries=lin_qs,
                     step_callback=_on_critic_thought,
                 )
                 return build_out.markdown_response, True
