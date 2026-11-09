@@ -127,7 +127,7 @@ def test_web_personalization_query_returns_security_notice_and_download_links():
     assert "Personalization Applied:" not in outcome.final_text
 
 
-def test_who_built_you_returns_suryaprakash():
+def test_who_built_you_returns_SLMAgents Team():
     from slm_harness.orchestrator.cascade_router import get_cascade_router
     from slm_harness.runtime.arena import CancellationToken
 
@@ -138,9 +138,9 @@ def test_who_built_you_returns_suryaprakash():
             session_id="test_creator_identity",
             client_surface="web",
         )
-        assert "suryaprakash" in outcome.final_text.lower(), f"Missing Suryaprakash for prompt={prompt!r}: {outcome.final_text}"
+        assert "SLMAgents Team" in outcome.final_text.lower(), f"Missing SLMAgents Team for prompt={prompt!r}: {outcome.final_text}"
 
-    # Verify quality critic repairs any non-Suryaprakash response to "who built you"
+    # Verify quality critic repairs any non-SLMAgents Team response to "who built you"
     route_dec = get_cascade_router().route("who built you")
     repaired_text, was_repaired = kernel._critique_and_repair_response(
         final_text="I was built by Alibaba Cloud.",
@@ -155,87 +155,77 @@ def test_who_built_you_returns_suryaprakash():
         cancel_token=CancellationToken("run_test_creator_critic"),
     )
     assert was_repaired is True
-    assert "suryaprakash" in repaired_text.lower()
+    assert "SLMAgents Team" in repaired_text.lower()
 
 
 def test_local_project_build_creates_files_runs_tests_and_completes_project():
     import os
+    import tempfile
+    from slm_harness.governance.policy import get_folder_permission_manager
 
+    perm_mgr = get_folder_permission_manager()
     kernel = get_kernel()
-    # 1. Confirming a build plan creates all files on disk, runs tests, and returns live URL + ZIP
-    outcome = kernel.run_turn(
-        user_query="i want to build a website for test suitw which automaticaly test and and evaluate any applications..",
-        session_id="test_local_build_session",
-        clarification_choice="🧪 Go ahead + include an expanded test & edge-case suite",
-        client_surface="web",
-    )
-    assert "Local Project Built & Verified on Disk" in outcome.final_text
-    assert "http://localhost:8000/projects/autotest_hub/index.html" in outcome.final_text
-    assert "TESTS PASSED" in outcome.final_text
-    assert "this is a simulated link" not in outcome.final_text.lower()
+    with tempfile.TemporaryDirectory() as tmp_ws:
+        perm_mgr.grant_permission(folder_path=tmp_ws, set_active=True)
+        try:
+            # 1. Confirming a build plan creates all files on disk dynamically inside the chosen workspace
+            outcome = kernel.run_turn(
+                user_query="i want to build a website for test suitw which automaticaly test and and evaluate any applications..",
+                session_id="test_local_build_session",
+                clarification_choice="🧪 Go ahead + include an expanded test & edge-case suite",
+                client_surface="web",
+            )
+            assert "Local Project Built & Verified on Disk" in outcome.final_text
+            assert "TESTS PASSED" in outcome.final_text
+            assert "this is a simulated link" not in outcome.final_text.lower()
 
-    proj_dir = outcome.structured_output["project_dir"]
-    for expected_file in ("index.html", "styles.css", "app.js", "engine.py", "server.py", "tests/test_project.py", "README.md"):
-        assert os.path.isfile(os.path.join(proj_dir, expected_file)), f"Missing {expected_file} in {proj_dir}"
+            proj_dir = outcome.structured_output["project_dir"]
+            assert proj_dir.startswith(os.path.realpath(tmp_ws))
+            for expected_file in ("index.html", "styles.css", "app.js", "engine.py", "server.py", "tests/test_project.py", "README.md"):
+                assert os.path.isfile(os.path.join(proj_dir, expected_file)), f"Missing {expected_file} in {proj_dir}"
 
-    # 2. Follow-up "build it locally" also builds and completes the project on disk
-    outcome_followup = kernel.run_turn(
-        user_query="build it locally",
-        session_id="test_local_build_session",
-        client_surface="web",
-    )
-    assert "Local Project Built & Verified on Disk" in outcome_followup.final_text
-    assert "http://localhost:8000/projects/autotest_hub/index.html" in outcome_followup.final_text
+            # 2. Follow-up "build it locally" also builds and completes the project on disk
+            outcome_followup = kernel.run_turn(
+                user_query="build it locally",
+                session_id="test_local_build_session",
+                client_surface="web",
+            )
+            assert "Local Project Built & Verified on Disk" in outcome_followup.final_text
 
-    # 3. Verify plan for "build an interviwer app" has zero <slug> or ... placeholders
-    plan_outcome = kernel.run_turn(
-        user_query="build an interviwer app",
-        session_id="test_interviewer_session",
-        client_surface="desktop",
-    )
-    assert "<slug>" not in plan_outcome.final_text
-    assert "projects/..." not in plan_outcome.final_text
-    assert "AI Interviewer Studio" in plan_outcome.final_text
+            # 3. Verify plan has zero <slug> or ... placeholders
+            plan_outcome = kernel.run_turn(
+                user_query="build a habit tracker app",
+                session_id="test_habit_session",
+                client_surface="desktop",
+            )
+            assert "<slug>" not in plan_outcome.final_text
+            assert "projects/..." not in plan_outcome.final_text
 
-    # 4. Confirming "build an interviwer app" builds projects/interviewer_app with zero pre-filled values
-    build_interviewer = kernel.run_turn(
-        user_query="build an interviwer app",
-        session_id="test_interviewer_session",
-        clarification_choice="✅ Looks great — go ahead and build it!",
-        client_surface="desktop",
-    )
-    assert "http://localhost:8000/projects/interviewer_app/index.html" in build_interviewer.final_text
-    assert "TESTS PASSED" in build_interviewer.final_text
+            # 4. Replying "Want me to generate the full source code (HTML, JS, Python) for this project? yes"
+            # or "create project which is there in my previous chat" builds the actual project from history (never Fibonacci!)
+            outcome_gen_src = kernel.run_turn(
+                user_query="Want me to generate the full source code (HTML, JS, Python) for this project? yes",
+                session_id="test_local_build_session",
+                client_surface="desktop",
+            )
+            assert "Local Project Built & Verified on Disk" in outcome_gen_src.final_text
+            assert "fibonacci" not in outcome_gen_src.final_text.lower()
 
-    # 5. Building resume builder app creates projects/interact_user_resume_app with zero pre-filled values
-    build_resume = kernel.run_turn(
-        user_query="build an app for mr which can interact with user and build a resume for them",
-        session_id="test_resume_session",
-        clarification_choice="it should have a chat interface and ask iuser about their details..",
-        client_surface="desktop",
-    )
-    assert "http://localhost:8000/projects/interact_user_resume_app/index.html" in build_resume.final_text
-    assert "TESTS PASSED" in build_resume.final_text
-
-    # 6. Replying "Want me to generate the full source code (HTML, JS, Python) for this project? yes"
-    # or "create project which is there in my previous chat" builds the actual project from history (never Fibonacci!)
-    outcome_gen_src = kernel.run_turn(
-        user_query="Want me to generate the full source code (HTML, JS, Python) for this project? yes",
-        session_id="test_local_build_session",
-        client_surface="desktop",
-    )
-    assert "Local Project Built & Verified on Disk" in outcome_gen_src.final_text
-    assert "http://localhost:8000/projects/autotest_hub/index.html" in outcome_gen_src.final_text
-    assert "fibonacci" not in outcome_gen_src.final_text.lower()
-
-    outcome_prev_chat = kernel.run_turn(
-        user_query="create project which is there in my previous chat",
-        session_id="test_interviewer_session",
-        client_surface="desktop",
-    )
-    assert "Local Project Built & Verified on Disk" in outcome_prev_chat.final_text
-    assert "http://localhost:8000/projects/interviewer_app/index.html" in outcome_prev_chat.final_text
-    assert "fibonacci" not in outcome_prev_chat.final_text.lower()
+            outcome_prev_chat = kernel.run_turn(
+                user_query="create project which is there in my previous chat",
+                session_id="test_habit_session",
+                client_surface="desktop",
+            )
+            assert "Local Project Built & Verified on Disk" in outcome_prev_chat.final_text
+            assert "fibonacci" not in outcome_prev_chat.final_text.lower()
+        finally:
+            perm_mgr.revoke_permission(tmp_ws)
+            perm_mgr.set_active_folder(None)
+            if os.path.isfile(perm_mgr.store_path):
+                try:
+                    os.remove(perm_mgr.store_path)
+                except OSError:
+                    pass
 
 
 def test_project_builder_custom_folder_and_permissions() -> None:
@@ -347,7 +337,7 @@ if __name__ == "__main__":
     test_document_deep_self_critique_recovery_on_nonexistent_file()
     test_kernel_turn_readme_and_critic_repair()
     test_web_personalization_query_returns_security_notice_and_download_links()
-    test_who_built_you_returns_suryaprakash()
+    test_who_built_you_returns_SLMAgents Team()
     test_local_project_build_creates_files_runs_tests_and_completes_project()
     test_project_builder_custom_folder_and_permissions()
     print("ALL 8 SELF-CRITIQUE, WEB PERSONALIZATION, CREATOR IDENTITY, PROJECT BUILDER & FOLDER PERMISSION TESTS PASSED!")

@@ -1551,74 +1551,20 @@ def mount_harness_routes(app: FastAPI) -> None:
 
         return StreamingResponse(_oai_sse(), media_type="text/event-stream")
 
-    # --- Built Local Projects Live Hosting & Project Builder Studio API (`/projects/<slug>/...`) ---
-
-    def _collect_built_projects_summary() -> List[Dict[str, Any]]:
-        from ..governance.policy import get_folder_permission_manager
-
-        perm_mgr = get_folder_permission_manager()
-        ws_dir = os.path.abspath(get_config().workspace_dir)
-        default_root = os.path.join(ws_dir, "projects")
-        seen_dirs: set[str] = set()
-        projects_list: List[Dict[str, Any]] = []
-
-        candidates: List[tuple[str, str]] = []
-        if os.path.isdir(default_root):
-            for entry in sorted(os.listdir(default_root)):
-                full_p = os.path.join(default_root, entry)
-                if os.path.isdir(full_p) and not entry.startswith("."):
-                    candidates.append((entry, os.path.realpath(full_p)))
-
-        for g in perm_mgr.list_granted_folders():
-            fp = g.get("folder_path")
-            slug = g.get("project_slug") or (os.path.basename(fp) if fp else "")
-            if fp and os.path.isdir(fp):
-                candidates.append((slug, os.path.realpath(fp)))
-
-        for slug, real_dir in candidates:
-            if real_dir in seen_dirs:
-                continue
-            seen_dirs.add(real_dir)
-            has_index = os.path.isfile(os.path.join(real_dir, "index.html"))
-            perm_info = perm_mgr.check_permission(real_dir, operation="all")
-            file_count = 0
-            for _r, _d, _files in os.walk(real_dir):
-                file_count += len([f for f in _files if not f.startswith(".")])
-            projects_list.append({
-                "project_slug": slug,
-                "project_name": perm_info.get("project_name") or slug.replace("_", " ").title(),
-                "project_dir": real_dir,
-                "live_url": f"http://localhost:8000/projects/{slug}/index.html" if has_index else "",
-                "has_index": has_index,
-                "files_count": file_count,
-                "permitted": bool(perm_info.get("permitted")),
-                "permissions": perm_info.get("permissions", {}),
-            })
-        return projects_list
+    # --- On-Demand Project Workspace Path & Permission API ---
 
     @app.get("/api/projects/builder/state")
     async def get_project_builder_state() -> Dict[str, Any]:
         from ..governance.policy import get_folder_permission_manager
 
         perm_mgr = get_folder_permission_manager()
-        ws_dir = os.path.abspath(get_config().workspace_dir)
-        default_projects_dir = os.path.join(ws_dir, "projects")
-        active_folder = perm_mgr.get_active_folder() or default_projects_dir
-        active_perm = perm_mgr.check_permission(active_folder, operation="all")
-        home = os.path.expanduser("~")
-        suggested = [
-            {"label": "Workspace ./projects", "path": default_projects_dir},
-            {"label": "~/Desktop", "path": os.path.join(home, "Desktop")},
-            {"label": "~/Documents", "path": os.path.join(home, "Documents")},
-            {"label": "~/Developer", "path": os.path.join(home, "Developer")},
-        ]
+        active_folder = perm_mgr.get_active_folder() or ""
+        active_perm = perm_mgr.check_permission(active_folder, operation="all") if active_folder else {"permitted": False}
         return {
             "status": "ok",
             "active_folder": active_folder,
             "active_permission": active_perm,
             "granted_folders": perm_mgr.list_granted_folders(),
-            "projects": _collect_built_projects_summary(),
-            "suggested_paths": suggested,
         }
 
     @app.post("/api/projects/builder/pick-folder")
@@ -1629,7 +1575,7 @@ def mount_harness_routes(app: FastAPI) -> None:
         chosen_path = ""
         if sys.platform == "darwin":
             try:
-                script = 'POSIX path of (choose folder with prompt "Select a Project Folder for SLMAgents Builder (Create / Edit / Delete / Run / Execute):")'
+                script = 'POSIX path of (choose folder with prompt "Select Workspace Folder Path:")'
                 proc = subprocess.run(
                     ["osascript", "-e", script],
                     capture_output=True,
@@ -1639,7 +1585,7 @@ def mount_harness_routes(app: FastAPI) -> None:
                 if proc.returncode == 0 and (proc.stdout or "").strip():
                     chosen_path = (proc.stdout or "").strip().rstrip("/")
             except Exception as exc:
-                return {"status": "cancelled", "message": f"Folder dialog closed or unavailable: {exc}"}
+                return {"status": "cancelled", "message": f"Folder dialog closed: {exc}"}
 
         if not chosen_path:
             return {"status": "cancelled", "message": "No folder selected."}
@@ -1650,43 +1596,6 @@ def mount_harness_routes(app: FastAPI) -> None:
             "status": "ok",
             "folder_path": norm_path,
             "permission": perm_info,
-        }
-
-    @app.post("/api/projects/builder/browse-dirs")
-    async def browse_local_directories(request: Request) -> Dict[str, Any]:
-        from ..governance.policy import get_folder_permission_manager
-
-        try:
-            body = await request.json()
-        except Exception:
-            body = {}
-        perm_mgr = get_folder_permission_manager()
-        raw_path = str(body.get("path") or os.path.expanduser("~"))
-        norm_path = perm_mgr.normalize_folder_path(raw_path)
-        if not os.path.isdir(norm_path):
-            parent = os.path.dirname(norm_path)
-            if os.path.isdir(parent):
-                norm_path = parent
-            else:
-                norm_path = os.path.expanduser("~")
-
-        subdirs: List[Dict[str, str]] = []
-        try:
-            for entry in sorted(os.listdir(norm_path)):
-                if entry.startswith("."):
-                    continue
-                full_p = os.path.join(norm_path, entry)
-                if os.path.isdir(full_p):
-                    subdirs.append({"name": entry, "path": full_p})
-        except PermissionError:
-            pass
-
-        return {
-            "status": "ok",
-            "current_path": norm_path,
-            "parent_path": os.path.dirname(norm_path),
-            "directories": subdirs[:80],
-            "permission": perm_mgr.check_permission(norm_path, operation="all"),
         }
 
     @app.post("/api/projects/builder/check-permission")
@@ -1724,21 +1633,18 @@ def mount_harness_routes(app: FastAPI) -> None:
                 "execute": True,
                 "full_access": True,
             }
-        project_name = str(body.get("project_name") or "")
-        project_slug = str(body.get("project_slug") or "")
         perm_mgr = get_folder_permission_manager()
         granted = perm_mgr.grant_permission(
             folder_path=folder_path,
             permissions=permissions,
-            project_name=project_name,
-            project_slug=project_slug,
+            project_name=str(body.get("project_name") or ""),
+            project_slug=str(body.get("project_slug") or ""),
             set_active=bool(body.get("set_active", True)),
             create_if_missing=True,
         )
         return {
             "status": "ok",
             "permission": granted,
-            "granted_folders": perm_mgr.list_granted_folders(),
             "active_folder": perm_mgr.get_active_folder(),
         }
 
@@ -1752,12 +1658,13 @@ def mount_harness_routes(app: FastAPI) -> None:
             body = {}
         folder_path = str(body.get("folder_path") or "").strip()
         perm_mgr = get_folder_permission_manager()
-        res = perm_mgr.revoke_permission(folder_path)
-        return {
-            "status": "ok",
-            **res,
-            "granted_folders": perm_mgr.list_granted_folders(),
-        }
+        if folder_path:
+            res = perm_mgr.revoke_permission(folder_path)
+        else:
+            af = perm_mgr.get_active_folder()
+            res = perm_mgr.revoke_permission(af) if af else {"revoked": False, "active_folder": None}
+            perm_mgr.set_active_folder(None)
+        return {"status": "ok", **res}
 
     @app.post("/api/projects/builder/create-project")
     async def create_project_in_chosen_folder(request: Request) -> Dict[str, Any]:
@@ -1782,7 +1689,6 @@ def mount_harness_routes(app: FastAPI) -> None:
             perm_mgr.get_active_folder() or os.path.join(ws_dir, "projects")
         )
 
-        # Check if user has granted permission for this folder path. If not and grant_permission is False, ask user for consent!
         perm_check = perm_mgr.check_permission(target_root, operation="all")
         if not perm_check.get("permitted") and not grant_permission:
             return {
@@ -1790,17 +1696,9 @@ def mount_harness_routes(app: FastAPI) -> None:
                 "requires_consent": True,
                 "folder_path": target_root,
                 "permission": perm_check,
-                "requested_permissions": {
-                    "create": True,
-                    "edit": True,
-                    "delete": True,
-                    "run": True,
-                    "execute": True,
-                    "full_access": True,
-                },
                 "message": (
-                    f"SLMAgents Builder needs your permission to access '{target_root}' "
-                    "and all files under it (Create, Edit, Delete, Run, and Execute)."
+                    f"Allow SLMAgents full permission under '{target_root}' "
+                    "to create, edit, delete, run, and execute files?"
                 ),
             }
 
@@ -1813,37 +1711,15 @@ def mount_harness_routes(app: FastAPI) -> None:
                 create_if_missing=True,
             )
 
-        lineage_queries: List[str] = []
-        try:
-            lineage = get_checkpoint_store().get_lineage(session_id)
-            lineage_queries = [
-                str(t.get("content") or "")
-                for t in lineage
-                if t.get("role") == "user" and str(t.get("content") or "").strip()
-            ]
-        except Exception:
-            pass
-
         builder = LocalProjectBuilder(workspace_dir=ws_dir)
         outcome = builder.build_project(
-            user_query=project_goal or project_name or "create project from my previous chat",
+            user_query=project_goal or project_name or "custom project",
             session_id=session_id,
-            lineage_queries=lineage_queries,
             target_folder=target_root,
             custom_project_name=project_name,
             grant_permission=True,
             permissions=permissions,
         )
-
-        # Record the build turn in session history so it also shows in chat
-        try:
-            store = get_checkpoint_store()
-            user_msg = f"Create project '{outcome.project_name}' in folder `{outcome.project_dir}`"
-            store.append_turn(session_id, "user", user_msg, {"source": "project_builder_studio"})
-            store.append_turn(session_id, "assistant", outcome.markdown_response, outcome.structured_data)
-        except Exception:
-            pass
-
         return {
             "status": "ok",
             "project_name": outcome.project_name,
@@ -1851,24 +1727,10 @@ def mount_harness_routes(app: FastAPI) -> None:
             "project_dir": outcome.project_dir,
             "live_url": outcome.live_url,
             "zip_download_url": outcome.zip_download_url,
-            "zip_size_kb": outcome.zip_size_kb,
             "test_passed": outcome.test_passed,
             "tests_run": outcome.tests_run,
-            "test_duration_ms": outcome.test_duration_ms,
-            "test_stdout": outcome.test_stdout,
             "markdown_response": outcome.markdown_response,
-            "files_created": [
-                {
-                    "rel_path": f.rel_path,
-                    "abs_path": f.abs_path,
-                    "size_bytes": f.size_bytes,
-                    "line_count": f.line_count,
-                    "role": f.role,
-                }
-                for f in outcome.files_created
-            ],
             "permission": perm_mgr.check_permission(outcome.project_dir, operation="all"),
-            "projects": _collect_built_projects_summary(),
         }
 
     @app.post("/api/projects/builder/fs-op")
@@ -1894,38 +1756,6 @@ def mount_harness_routes(app: FastAPI) -> None:
             command=command,
         )
 
-    @app.post("/api/projects/autotest/evaluate")
-    async def evaluate_autotest_project_endpoint(request: Request) -> Dict[str, Any]:
-        import importlib.util
-
-        try:
-            body = await request.json()
-        except Exception:
-            body = {}
-        code = str(body.get("code") or "")
-        app_name = str(body.get("app_name") or "target_app.html")
-        profiles = body.get("profiles") or ["functional", "edge_cases", "security", "performance"]
-
-        ws_dir = os.path.abspath(get_config().workspace_dir)
-        engine_path = os.path.join(ws_dir, "projects", "autotest_hub", "engine.py")
-        if not os.path.isfile(engine_path):
-            from ..tools.project_builder import LocalProjectBuilder
-
-            LocalProjectBuilder(workspace_dir=ws_dir).build_project(
-                user_query="build a website for test suite which automatically tests and evaluates any applications",
-                session_id="autotest_init",
-            )
-        spec = importlib.util.spec_from_file_location("autotest_hub_engine", engine_path)
-        if spec and spec.loader:
-            import sys
-            mod = importlib.util.module_from_spec(spec)
-            sys.modules["autotest_hub_engine"] = mod
-            spec.loader.exec_module(mod)
-            eng = mod.AutoTestEvaluationEngine()
-            rep = eng.evaluate_application(code=code, app_name=app_name, profiles=profiles)
-            return rep.to_dict()
-        raise HTTPException(status_code=500, detail="AutoTestHub engine unavailable")
-
     @app.post("/api/projects/{project_slug}/action")
     async def execute_built_project_action(project_slug: str, request: Request) -> Dict[str, Any]:
         import importlib.util
@@ -1949,161 +1779,16 @@ def mount_harness_routes(app: FastAPI) -> None:
             mod = importlib.util.module_from_spec(spec)
             sys.modules[mod_name] = mod
             spec.loader.exec_module(mod)
-            for cls_name in ("InterviewEngine", "ResumeBuilderEngine", "CustomAppEngine", "AutoTestEvaluationEngine"):
-                cls_obj = getattr(mod, cls_name, None)
-                if cls_obj is not None:
-                    inst = cls_obj()
-                    if hasattr(inst, "handle_action"):
-                        return inst.handle_action(body)
-                    if hasattr(inst, "evaluate_application"):
-                        rep = inst.evaluate_application(
-                            code=str(body.get("code") or ""),
-                            app_name=str(body.get("app_name") or "app.html"),
-                        )
-                        return rep.to_dict()
+            cls_obj = getattr(mod, "CustomAppEngine", None)
+            if cls_obj is not None:
+                inst = cls_obj()
+                if hasattr(inst, "handle_action"):
+                    return inst.handle_action(body)
         raise HTTPException(status_code=500, detail=f"Unable to execute engine for {clean_slug}")
-
-    _UNIVERSAL_BUILDER_WIDGET_HTML = """
-<!-- SLMAgents Universal Project Builder & Folder Permission Widget -->
-<div id="slm-universal-builder-bar" style="position:fixed;bottom:16px;right:16px;z-index:99990;display:flex;gap:8px;align-items:center;">
-  <button type="button" onclick="openUniversalBuilderModal()" style="background:#0f172a;color:#ffffff;border:1.5px solid #10b981;border-radius:999px;padding:9px 16px;font-family:system-ui,-apple-system,sans-serif;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 10px 25px rgba(15,23,42,0.35);display:flex;align-items:center;gap:7px;">
-    <span>🛠️ Create Project &amp; Folder Permissions</span>
-    <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span>
-  </button>
-</div>
-<div id="slm-univ-builder-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:18px;font-family:system-ui,-apple-system,sans-serif;" onclick="if(event.target===this)this.style.display='none'">
-  <div style="background:#ffffff;color:#0f172a;border-radius:16px;max-width:860px;width:96%;max-height:90vh;overflow-y:auto;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,0.35);">
-    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;padding-bottom:12px;margin-bottom:14px;">
-      <div>
-        <h3 style="margin:0;font-size:18px;color:#0f172a;">🛠️ Create Project &amp; Folder Permission Manager</h3>
-        <p style="margin:4px 0 0 0;font-size:12.5px;color:#64748b;">Choose any folder path on your machine and grant SLMAgents permission under that folder to Create, Edit, Delete, Run, and Execute.</p>
-      </div>
-      <button type="button" onclick="document.getElementById('slm-univ-builder-modal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#64748b;">&times;</button>
-    </div>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:14px;">
-      <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:6px;">1. Target Folder Path</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-        <input type="text" id="slm-ub-folder" style="flex:1;min-width:240px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-family:monospace;font-size:13px;" placeholder="/Users/.../Documents/SLMAgents/projects" oninput="checkUnivFolderPerm()">
-        <button type="button" onclick="pickUnivNativeFolder(this)" style="background:#0f172a;color:#fff;border:none;border-radius:8px;padding:8px 13px;font-size:12.5px;font-weight:600;cursor:pointer;">📂 Choose Folder...</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div>
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Project Name</label>
-          <input type="text" id="slm-ub-name" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;" placeholder="e.g., my_new_app">
-        </div>
-        <div>
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Project Goal / Description</label>
-          <input type="text" id="slm-ub-goal" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;" placeholder="What should this project build?">
-        </div>
-      </div>
-    </div>
-    <div id="slm-ub-perm-box" style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:14px;margin-bottom:14px;">
-      <div id="slm-ub-perm-title" style="font-size:13.5px;font-weight:700;color:#92400e;">🔒 Permission Request — Allow All Operations Under Selected Folder</div>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;margin:10px 0;font-size:12.5px;font-weight:600;color:#0f172a;">
-        <label><input type="checkbox" id="slm-ub-p-create" checked> 📄 Create</label>
-        <label><input type="checkbox" id="slm-ub-p-edit" checked> ✏️ Edit</label>
-        <label><input type="checkbox" id="slm-ub-p-delete" checked> 🗑️ Delete</label>
-        <label><input type="checkbox" id="slm-ub-p-run" checked> ▶️ Run</label>
-        <label><input type="checkbox" id="slm-ub-p-exec" checked> ⚡ Execute</label>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" onclick="grantUnivFolderPerm()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer;">✅ Grant All Permissions Under Folder</button>
-        <button type="button" onclick="createUnivProject(this)" style="background:#0f172a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer;">🚀 Create &amp; Build Project in Folder</button>
-      </div>
-    </div>
-    <div id="slm-ub-status" style="font-size:12.5px;color:#047857;font-weight:600;margin-bottom:8px;"></div>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
-      <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <input type="text" id="slm-ub-cmd" style="flex:1;padding:6px 10px;border:1px solid #cbd5e1;border-radius:7px;font-family:monospace;font-size:12px;" value="python3 -m unittest discover -s tests -v">
-        <button type="button" onclick="execUnivFolderCmd()" style="background:#0f172a;color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">▶ Run / Execute</button>
-      </div>
-      <pre id="slm-ub-out" style="background:#0f172a;color:#e2e8f0;padding:8px 10px;border-radius:8px;font-size:11.5px;max-height:120px;overflow-y:auto;margin:0;white-space:pre-wrap;">Ready to execute in permitted folder.</pre>
-    </div>
-  </div>
-</div>
-<script>
-async function openUniversalBuilderModal(){
-  var m=document.getElementById('slm-univ-builder-modal');
-  if(m)m.style.display='flex';
-  try{
-    var r=await fetch('/api/projects/builder/state');
-    var d=await r.json();
-    var f=document.getElementById('slm-ub-folder');
-    if(f&&!f.value&&d.active_folder)f.value=d.active_folder;
-    await checkUnivFolderPerm();
-  }catch(e){}
-}
-async function checkUnivFolderPerm(){
-  var f=document.getElementById('slm-ub-folder');
-  if(!f||!f.value)return;
-  var r=await fetch('/api/projects/builder/check-permission',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder_path:f.value})});
-  var d=await r.json();
-  var box=document.getElementById('slm-ub-perm-box');
-  var t=document.getElementById('slm-ub-perm-title');
-  if(d&&d.permitted){
-    box.style.background='#ecfdf5';box.style.borderColor='#6ee7b7';
-    t.style.color='#065f46';t.textContent='🟢 Full Permissions Granted Under: '+d.folder_path+' (Create · Edit · Delete · Run · Execute)';
-  }else{
-    box.style.background='#fffbeb';box.style.borderColor='#fcd34d';
-    t.style.color='#92400e';t.textContent='🔒 Permission Required Under: '+(d.folder_path||f.value);
-  }
-}
-async function pickUnivNativeFolder(btn){
-  var orig=btn.textContent;btn.textContent='Opening...';
-  try{
-    var r=await fetch('/api/projects/builder/pick-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-    var d=await r.json();
-    if(d&&d.folder_path){document.getElementById('slm-ub-folder').value=d.folder_path;await checkUnivFolderPerm();}
-  }catch(e){}finally{btn.textContent=orig;}
-}
-async function grantUnivFolderPerm(){
-  var f=document.getElementById('slm-ub-folder').value;
-  var perms={
-    create:document.getElementById('slm-ub-p-create').checked,
-    edit:document.getElementById('slm-ub-p-edit').checked,
-    delete:document.getElementById('slm-ub-p-delete').checked,
-    run:document.getElementById('slm-ub-p-run').checked,
-    execute:document.getElementById('slm-ub-p-exec').checked
-  };
-  await fetch('/api/projects/builder/grant-permission',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder_path:f,permissions:perms,set_active:true})});
-  await checkUnivFolderPerm();
-  document.getElementById('slm-ub-status').textContent='✅ Granted permissions under '+f;
-}
-async function createUnivProject(btn){
-  var f=document.getElementById('slm-ub-folder').value;
-  var n=document.getElementById('slm-ub-name').value;
-  var g=document.getElementById('slm-ub-goal').value;
-  var cr=await fetch('/api/projects/builder/check-permission',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder_path:f})});
-  var cd=await cr.json();
-  if(!cd||!cd.permitted){
-    if(!window.confirm('Allow SLMAgents Builder full permission under '+f+' to Create, Edit, Delete, Run, and Execute files?'))return;
-  }
-  var orig=btn.textContent;btn.textContent='⏳ Building...';
-  try{
-    var r=await fetch('/api/projects/builder/create-project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder_path:f,project_name:n,project_goal:g,grant_permission:true})});
-    var d=await r.json();
-    if(d&&d.status==='ok'){
-      document.getElementById('slm-ub-folder').value=d.project_dir;
-      document.getElementById('slm-ub-status').innerHTML='✅ Built <strong>'+d.project_name+'</strong> in <code>'+d.project_dir+'</code> — <a href="'+d.live_url+'" target="_blank" style="color:#059669;">Open Live App</a>';
-      if(d.test_stdout)document.getElementById('slm-ub-out').textContent=d.test_stdout;
-      await checkUnivFolderPerm();
-    }
-  }catch(e){}finally{btn.textContent=orig;}
-}
-async function execUnivFolderCmd(){
-  var f=document.getElementById('slm-ub-folder').value;
-  var c=document.getElementById('slm-ub-cmd').value;
-  var r=await fetch('/api/projects/builder/fs-op',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder_path:f,operation:'execute',command:c})});
-  var d=await r.json();
-  document.getElementById('slm-ub-out').textContent=((d.stdout||'')+'\\n'+(d.stderr||'')).trim()||d.message||'Done';
-}
-</script>
-"""
 
     @app.get("/projects/{project_slug}")
     @app.get("/projects/{project_slug}/{file_path:path}")
-    async def serve_built_project_file(project_slug: str, file_path: str = "index.html"):
-        from fastapi.responses import HTMLResponse
+    async def serve_built_project_file(project_slug: str, file_path: str = "index.html") -> FileResponse:
         from ..governance.policy import get_folder_permission_manager
 
         clean_slug = re.sub(r"[^A-Za-z0-9_.\-]", "", project_slug or "")
@@ -2113,17 +1798,5 @@ async function execUnivFolderCmd(){
         target = os.path.abspath(os.path.join(proj_root, rel))
         if not target.startswith(proj_root) or not os.path.isfile(target):
             raise HTTPException(status_code=404, detail=f"Project file not found: {clean_slug}/{rel}")
-        if target.endswith(".html"):
-            try:
-                with open(target, "r", encoding="utf-8", errors="replace") as f:
-                    html_str = f.read()
-                if "slm-universal-builder-bar" not in html_str:
-                    if "</body>" in html_str:
-                        html_str = html_str.replace("</body>", _UNIVERSAL_BUILDER_WIDGET_HTML + "\n</body>", 1)
-                    else:
-                        html_str = html_str + "\n" + _UNIVERSAL_BUILDER_WIDGET_HTML
-                return HTMLResponse(content=html_str)
-            except Exception:
-                pass
         return FileResponse(target)
 

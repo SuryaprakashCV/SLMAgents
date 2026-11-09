@@ -322,11 +322,6 @@
             CPU Ready
           </span>
 
-          <button type="button" class="btn-harness-top" id="btn-project-builder-studio" onclick="openProjectBuilderModal()" title="Create Project, Choose Folder Path &amp; Grant Folder Permissions (Create / Edit / Delete / Run / Execute)" style="display: inline-flex; align-items: center; gap: 6px;">
-            <span>🛠️ Create Project</span>
-            <span id="project-builder-top-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
-          </button>
-
           <button type="button" class="btn-harness-top" id="btn-personalize-studio" onclick="openPersonalizeModal()" title="Opt-In Personalization &amp; Consent-Gated Account Linking" style="display: inline-flex; align-items: center; gap: 6px;">
             <span>✨ Personalize</span>
             <span id="personalize-top-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
@@ -361,10 +356,6 @@
               <div class="popover-divider"></div>
               <div class="popover-section-label">Workspace &amp; Session</div>
 
-              <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openProjectBuilderModal()" id="btn-popover-project-builder" style="display: flex;" title="Create Project, Choose Folder Path &amp; Grant Folder Permissions (Create / Edit / Delete / Run / Execute)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
-                <span>Create Project &amp; Folder Permissions</span>
-              </button>
               <button type="button" class="popover-menu-item" onclick="closeAllFloatingPopovers(); openPersonalizeModal()" id="btn-popover-personalize" style="display: flex;" title="Opt-In Personalization, Social/News Dashboard, Email Reminders &amp; Naukri Job Assistant">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 <span>Personalize &amp; Concierge</span>
@@ -552,8 +543,25 @@
         <!-- Slash Command & Skill Repository Autocomplete Palette -->
         <div class="chat-slash-palette" id="chat-slash-palette" style="display: none;"></div>
 
+        <!-- Simple Active Project Workspace Bar (Only shown when user sets a workspace path) -->
+        <div id="simple-active-workspace-bar" style="display: none; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 12px; margin-bottom: 6px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 999px; font-size: 0.76rem; color: #065f46;">
+          <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <span>📁 <strong>Workspace:</strong> <code id="simple-active-workspace-label" style="background: rgba(255,255,255,0.7); padding: 1px 6px; border-radius: 4px;"></code></span>
+            <span style="color: #059669; font-weight: 600;">✓ Full Access Granted</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+            <button type="button" onclick="openSimpleProjectPathModal()" style="background: #ffffff; color: #065f46; border: 1px solid #6ee7b7; border-radius: 999px; padding: 2px 8px; font-size: 0.71rem; font-weight: 600; cursor: pointer;">Change</button>
+            <button type="button" onclick="clearSimpleWorkspacePath()" title="Remove workspace path" style="background: none; border: none; color: #065f46; font-size: 0.95rem; font-weight: 700; cursor: pointer; line-height: 1;">&times;</button>
+          </div>
+        </div>
+
         <!-- Sleek Single-Line Floating Composer -->
         <form class="chat-command-form" id="chat-input-form" onsubmit="handleChatSubmit(event)">
+          <!-- Simple Create a Project Button (Right near chatbox) -->
+          <button type="button" id="btn-dock-create-project" onclick="openSimpleProjectPathModal()" title="Create a Project — Choose Workspace Folder Path" style="display: inline-flex; align-items: center; gap: 5px; background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 999px; padding: 5px 11px; font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
+            <span>📁 Create a Project</span>
+          </button>
+
           <!-- Attach File Icon Button (Inside Composer) -->
           <button type="button" class="btn-dock-icon" title="Attach Document, Audio, Video, Dataset, Image, or Code" onclick="document.getElementById('chat-file-input').click()">
             <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -1092,322 +1100,83 @@
     </div>
   </div>
 
-  <!-- Project Builder & Folder Permission Governance Studio Modal -->
-  <div class="chat-modal-backdrop" id="project-builder-modal-backdrop" style="display: none; position: fixed; inset: 0; z-index: 99999; background: rgba(15, 23, 42, 0.58); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;" onclick="closeProjectBuilderModal(event)">
-    <div class="chat-issue-modal-card" style="max-width: 920px; width: 96%; max-height: 92vh; display: flex; flex-direction: column; background: #ffffff; border-radius: 16px; box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.08); overflow: hidden;" onclick="event.stopPropagation()">
-      <div class="issue-modal-header" style="border-bottom: 1px solid #e2e8f0; padding: 14px 20px;">
-        <div class="issue-modal-title">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 1.35rem;">🛠️</span>
-            <div>
-              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <h3 style="margin: 0; font-size: 1.05rem; color: #0f172a;">Project Builder Studio &amp; Folder Permission Manager</h3>
-                <span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 999px; padding: 2px 9px; font-size: 0.7rem; font-weight: 700;">Create · Edit · Delete · Run · Execute</span>
-              </div>
-              <p class="issue-modal-sub" style="margin: 3px 0 0 0; font-size: 0.78rem; color: #64748b; display: block;">
-                Create a local project, choose any target folder path on your machine, and grant permission for SLMAgents to get full permissions under that folder (create, edit, delete, run, and execute).
-              </p>
-            </div>
-          </div>
-        </div>
-        <button type="button" class="btn-close-modal" onclick="closeProjectBuilderModal()" title="Close">&times;</button>
+  <!-- Simple Create a Project — Choose Workspace Path Dialog -->
+  <div class="chat-modal-backdrop" id="simple-project-path-modal" style="display: none; position: fixed; inset: 0; z-index: 99999; background: rgba(15, 23, 42, 0.52); backdrop-filter: blur(3px); align-items: center; justify-content: center; padding: 16px;" onclick="closeSimpleProjectPathModal(event)">
+    <div style="background: #ffffff; border-radius: 14px; max-width: 480px; width: 100%; padding: 20px; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25); border: 1px solid #e2e8f0;" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 style="margin: 0; font-size: 1rem; color: #0f172a;">📁 Create a Project</h3>
+        <button type="button" onclick="closeSimpleProjectPathModal()" style="background: none; border: none; font-size: 1.3rem; color: #64748b; cursor: pointer; line-height: 1;">&times;</button>
       </div>
 
-      <div class="issue-modal-body" style="overflow-y: auto; padding: 18px 20px; flex: 1;">
-        <!-- 1. Choose Folder Path & Project Details -->
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;">
-          <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-            <span>📂 1. Choose Target Project Folder Path</span>
-            <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="pb-suggested-paths-bar"></div>
-          </div>
-
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px;">
-            <input type="text" id="pb-folder-path" class="issue-input" style="flex: 1; min-width: 260px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem;" placeholder="/Users/.../Documents/SLMAgents/projects/my_project" oninput="onProjectFolderInputChanged()">
-            <button type="button" onclick="pickNativeProjectFolder(this)" style="background: #0f172a; color: #ffffff; border: none; border-radius: 8px; padding: 8px 13px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
-              📂 Choose Folder...
-            </button>
-            <button type="button" onclick="toggleInlineFolderBrowser()" style="background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
-              🗂️ Browse Folders
-            </button>
-          </div>
-
-          <!-- Inline Interactive Directory Browser Drawer -->
-          <div id="pb-inline-browser" style="display: none; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
-              <div style="font-size: 0.76rem; color: #334155;">
-                <strong>Current Folder:</strong> <code id="pb-browser-current-path" style="color: #0f172a;">~</code>
-              </div>
-              <div style="display: flex; gap: 6px;">
-                <button type="button" onclick="browseDirectoryUp()" style="background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 6px; padding: 3px 9px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">⬆ Parent Folder</button>
-                <button type="button" onclick="selectCurrentBrowsedFolder()" style="background: #059669; color: #ffffff; border: none; border-radius: 6px; padding: 3px 10px; font-size: 0.73rem; font-weight: 700; cursor: pointer;">✓ Select This Folder</button>
-              </div>
-            </div>
-            <div id="pb-browser-dirs-list" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 135px; overflow-y: auto; padding: 4px 0;"></div>
-          </div>
-
-          <div class="issue-form-row" style="margin-top: 8px;">
-            <div class="issue-form-group half">
-              <label for="pb-project-name">Project / Subfolder Name (Optional)</label>
-              <input type="text" id="pb-project-name" class="issue-input" placeholder="e.g., my_autotest_app or interviewer_studio">
-            </div>
-            <div class="issue-form-group half">
-              <label for="pb-project-goal">What Project Should Be Created &amp; Built?</label>
-              <input type="text" id="pb-project-goal" class="issue-input" placeholder="Describe project or leave blank to use your current/previous chat">
-            </div>
-          </div>
-        </div>
-
-        <!-- 2. Folder Permissions Request & Explicit User Consent Gate -->
-        <div id="pb-permission-banner" style="background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 260px;">
-              <div id="pb-perm-title" style="font-size: 0.86rem; font-weight: 700; color: #92400e;">
-                🔒 Folder Permission Request — Grant Access Under Selected Folder
-              </div>
-              <div id="pb-perm-desc" style="font-size: 0.76rem; color: #78350f; margin-top: 3px;">
-                Grant SLMAgents Builder permission under <code id="pb-perm-folder-label" style="background: rgba(255,255,255,0.7); padding: 1px 5px; border-radius: 4px;">./projects</code> to perform all project actions:
-              </div>
-              <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 0.77rem; font-weight: 600; color: #0f172a;">
-                <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
-                  <input type="checkbox" id="pb-perm-create" checked style="accent-color: #059669;">
-                  <span>📄 Create Files &amp; Folders</span>
-                </label>
-                <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
-                  <input type="checkbox" id="pb-perm-edit" checked style="accent-color: #059669;">
-                  <span>✏️ Edit &amp; Modify</span>
-                </label>
-                <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
-                  <input type="checkbox" id="pb-perm-delete" checked style="accent-color: #059669;">
-                  <span>🗑️ Delete &amp; Clean</span>
-                </label>
-                <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
-                  <input type="checkbox" id="pb-perm-run" checked style="accent-color: #059669;">
-                  <span>▶️ Run Apps/Servers</span>
-                </label>
-                <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
-                  <input type="checkbox" id="pb-perm-execute" checked style="accent-color: #059669;">
-                  <span>⚡ Execute Commands &amp; Tests</span>
-                </label>
-              </div>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-              <button type="button" id="btn-pb-grant-perm" onclick="grantSelectedFolderPermission(this)" style="background: #059669; color: #ffffff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-                ✅ Grant All Permissions Under Folder
-              </button>
-              <button type="button" id="btn-pb-revoke-perm" onclick="revokeSelectedFolderPermission(this)" style="display: none; background: #ffffff; color: #b91c1c; border: 1px solid #fecaca; border-radius: 8px; padding: 6px 12px; font-size: 0.74rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                🔒 Revoke Folder Permission
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. Build Outcome & Live Workspace Explorer (Create / Edit / Delete / Run / Execute) -->
-        <div id="pb-build-status-box" style="display: none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 0.81rem; color: #065f46;"></div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-          <!-- Left Column: Files in Permitted Folder (Create / Edit / Delete) -->
-          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
-              <strong style="font-size: 0.82rem; color: #0f172a;">📁 Folder Files (Create / Edit / Delete)</strong>
-              <div style="display: flex; gap: 6px;">
-                <button type="button" onclick="promptNewFileInProjectFolder()" style="background: #0f172a; color: #fff; border: none; border-radius: 6px; padding: 4px 9px; font-size: 0.72rem; font-weight: 600; cursor: pointer;">+ New File</button>
-                <button type="button" onclick="refreshProjectFolderFiles()" style="background: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 9px; font-size: 0.72rem; font-weight: 600; cursor: pointer;">↻ Refresh</button>
-              </div>
-            </div>
-            <div id="pb-files-list" style="max-height: 150px; overflow-y: auto; font-size: 0.76rem; color: #475569; display: flex; flex-direction: column; gap: 4px;">
-              <div>Select &amp; authorize a folder to browse, create, edit, or delete files.</div>
-            </div>
-            <!-- Inline File Editor -->
-            <div id="pb-file-editor-wrap" style="display: none; margin-top: 10px; border-top: 1px solid #cbd5e1; padding-top: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <code id="pb-editing-file-label" style="font-size: 0.75rem; font-weight: 700; color: #0f172a;">file.py</code>
-                <div style="display: flex; gap: 6px;">
-                  <button type="button" onclick="saveEditedProjectFile()" style="background: #059669; color: #fff; border: none; border-radius: 5px; padding: 3px 9px; font-size: 0.72rem; font-weight: 600; cursor: pointer;">💾 Save</button>
-                  <button type="button" onclick="deleteEditedProjectFile()" style="background: #dc2626; color: #fff; border: none; border-radius: 5px; padding: 3px 9px; font-size: 0.72rem; font-weight: 600; cursor: pointer;">🗑️ Delete</button>
-                </div>
-              </div>
-              <textarea id="pb-editing-file-content" style="width: 100%; height: 115px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.74rem; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px;"></textarea>
-            </div>
-          </div>
-
-          <!-- Right Column: Run / Execute Commands & Built Projects -->
-          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between;">
-            <div>
-              <strong style="font-size: 0.82rem; color: #0f172a; display: block; margin-bottom: 8px;">⚡ Run &amp; Execute Under Folder</strong>
-              <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                <input type="text" id="pb-exec-cmd" class="issue-input" style="flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem;" value="python3 -m unittest discover -s tests -p &quot;test_*.py&quot; -v" placeholder="Command to execute inside folder...">
-                <button type="button" onclick="runCommandInProjectFolder(this)" style="background: #0f172a; color: #ffffff; border: none; border-radius: 7px; padding: 6px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-                  ▶ Execute
-                </button>
-              </div>
-              <pre id="pb-exec-output" style="background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 0.72rem; max-height: 110px; overflow-y: auto; margin: 0 0 10px 0; white-space: pre-wrap;">Ready to execute tests or commands inside the permitted folder.</pre>
-            </div>
-            <div>
-              <strong style="font-size: 0.78rem; color: #334155; display: block; margin-bottom: 6px;">🚀 Built Local Projects</strong>
-              <div id="pb-built-projects-list" style="display: flex; flex-direction: column; gap: 5px; max-height: 95px; overflow-y: auto;"></div>
-            </div>
-          </div>
-        </div>
+      <label for="simple-workspace-path-input" style="display: block; font-size: 0.8rem; font-weight: 600; color: #334155; margin-bottom: 6px;">
+        Choose Workspace Folder Path
+      </label>
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <input type="text" id="simple-workspace-path-input" class="issue-input" style="flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem;" placeholder="e.g. ~/Desktop/my_project">
+        <button type="button" onclick="browseNativeWorkspaceFolder(this)" style="background: #0f172a; color: #ffffff; border: none; border-radius: 8px; padding: 8px 13px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+          📂 Browse...
+        </button>
       </div>
 
-      <div class="issue-modal-footer" style="border-top: 1px solid #e2e8f0; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <span id="pb-modal-feedback" style="font-size: 0.78rem; color: #059669; font-weight: 600;"></span>
-        <div style="display: flex; gap: 8px;">
-          <button type="button" class="btn-issue-secondary" onclick="closeProjectBuilderModal()">Close</button>
-          <button type="button" class="btn-issue-primary" id="btn-pb-create-build" onclick="createAndBuildProjectInFolder(this)">
-            <span>🚀 Create &amp; Build Project in Folder</span>
-          </button>
-        </div>
+      <label style="display: flex; align-items: flex-start; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 9px; padding: 10px 12px; font-size: 0.77rem; color: #334155; cursor: pointer; margin-bottom: 14px;">
+        <input type="checkbox" id="simple-workspace-perm-checkbox" checked style="margin-top: 2px; accent-color: #059669; width: 15px; height: 15px;">
+        <span>Grant permission to get all permissions under this folder (<strong>create, edit, delete, run &amp; execute</strong>).</span>
+      </label>
+
+      <div id="simple-workspace-feedback" style="font-size: 0.76rem; color: #dc2626; margin-bottom: 8px; display: none;"></div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn-issue-secondary" onclick="closeSimpleProjectPathModal()">Cancel</button>
+        <button type="button" class="btn-issue-primary" onclick="confirmSimpleWorkspacePath(this)">Continue</button>
       </div>
     </div>
   </div>
 
   <script>
-    function openProjectBuilderModal(prefillGoal, prefillFolder) {
-      var modal = document.getElementById('project-builder-modal-backdrop');
-      if (!modal) return;
-      modal.style.display = 'flex';
-      if (prefillGoal) {
-        var gInput = document.getElementById('pb-project-goal');
-        if (gInput) gInput.value = prefillGoal;
-      }
-      if (prefillFolder) {
-        var fInput = document.getElementById('pb-folder-path');
-        if (fInput) fInput.value = prefillFolder;
-      }
-      loadProjectBuilderState();
-    }
-
-    function closeProjectBuilderModal(ev) {
-      if (ev && ev.target && ev.target.id !== 'project-builder-modal-backdrop') return;
-      var modal = document.getElementById('project-builder-modal-backdrop');
-      if (modal) modal.style.display = 'none';
-    }
-
-    function _getSelectedBuilderPermissions() {
-      var c = document.getElementById('pb-perm-create');
-      var e = document.getElementById('pb-perm-edit');
-      var d = document.getElementById('pb-perm-delete');
-      var r = document.getElementById('pb-perm-run');
-      var x = document.getElementById('pb-perm-execute');
-      var createOk = c ? !!c.checked : true;
-      var editOk = e ? !!e.checked : true;
-      var deleteOk = d ? !!d.checked : true;
-      var runOk = r ? !!r.checked : true;
-      var execOk = x ? !!x.checked : true;
-      return {
-        create: createOk,
-        edit: editOk,
-        delete: deleteOk,
-        run: runOk,
-        execute: execOk,
-        full_access: createOk && editOk && deleteOk && runOk && execOk
-      };
-    }
-
-    function _renderPermissionBanner(perm) {
-      var banner = document.getElementById('pb-permission-banner');
-      var titleEl = document.getElementById('pb-perm-title');
-      var descEl = document.getElementById('pb-perm-desc');
-      var grantBtn = document.getElementById('btn-pb-grant-perm');
-      var revokeBtn = document.getElementById('btn-pb-revoke-perm');
-      var folderInput = document.getElementById('pb-folder-path');
-      var folderVal = (perm && perm.folder_path) || (folderInput ? folderInput.value : './projects');
-
-      if (!banner || !titleEl || !descEl) return;
-      if (perm && perm.permitted) {
-        banner.style.background = '#ecfdf5';
-        banner.style.borderColor = '#6ee7b7';
-        titleEl.style.color = '#065f46';
-        titleEl.innerHTML = '🟢 Full Folder Permissions Granted Under This Path';
-        descEl.style.color = '#047857';
-        descEl.innerHTML = 'SLMAgents Builder has active user permission under <code>' + folderVal + '</code> to <strong>Create, Edit, Delete, Run, and Execute</strong>.';
-        if (grantBtn) grantBtn.textContent = '✓ Update Folder Permissions';
-        if (revokeBtn) revokeBtn.style.display = 'inline-block';
+    function _updateSimpleWorkspaceBar(folderPath) {
+      var bar = document.getElementById('simple-active-workspace-bar');
+      var lbl = document.getElementById('simple-active-workspace-label');
+      var chatInput = document.getElementById('chat-text-input');
+      if (!bar || !lbl) return;
+      if (folderPath) {
+        lbl.textContent = folderPath;
+        bar.style.display = 'flex';
+        if (chatInput) {
+          chatInput.placeholder = 'Describe the project to build in ' + folderPath + '...';
+        }
       } else {
-        banner.style.background = '#fffbeb';
-        banner.style.borderColor = '#fcd34d';
-        titleEl.style.color = '#92400e';
-        titleEl.innerHTML = '🔒 Permission Required — Allow Access Under Selected Folder';
-        descEl.style.color = '#78350f';
-        descEl.innerHTML = 'Please grant permission for SLMAgents Builder to get all permissions under <code>' + folderVal + '</code> (Create, Edit, Delete, Run, and Execute):';
-        if (grantBtn) grantBtn.textContent = '✅ Grant All Permissions Under Folder';
-        if (revokeBtn) revokeBtn.style.display = 'none';
+        lbl.textContent = '';
+        bar.style.display = 'none';
+        if (chatInput) {
+          chatInput.placeholder = 'Ask anything, attach files, or type / for skills...';
+        }
       }
     }
 
-    async function loadProjectBuilderState() {
+    async function openSimpleProjectPathModal() {
+      var modal = document.getElementById('simple-project-path-modal');
+      var fb = document.getElementById('simple-workspace-feedback');
+      if (fb) fb.style.display = 'none';
+      if (modal) modal.style.display = 'flex';
       try {
         var res = await fetch('/api/projects/builder/state');
         var data = await res.json();
-        if (!data || data.status !== 'ok') return;
-        var fInput = document.getElementById('pb-folder-path');
-        if (fInput && !fInput.value.trim() && data.active_folder) {
-          fInput.value = data.active_folder;
+        var inp = document.getElementById('simple-workspace-path-input');
+        if (inp && data && data.active_folder) {
+          inp.value = data.active_folder;
         }
-        _renderPermissionBanner(data.active_permission);
-
-        var sugBar = document.getElementById('pb-suggested-paths-bar');
-        if (sugBar && Array.isArray(data.suggested_paths)) {
-          sugBar.innerHTML = data.suggested_paths.map(function(sp) {
-            var safeP = String(sp.path || '').replace(/'/g, "\\'");
-            return '<button type="button" onclick="selectSuggestedProjectFolder(\'' + safeP + '\')" style="background:#ffffff;color:#0f172a;border:1px solid #cbd5e1;border-radius:999px;padding:2px 9px;font-size:0.71rem;font-weight:600;cursor:pointer;">' + sp.label + '</button>';
-          }).join('');
-        }
-        _renderBuiltProjectsList(data.projects || []);
-        refreshProjectFolderFiles();
       } catch (e) {}
     }
 
-    function _renderBuiltProjectsList(projects) {
-      var box = document.getElementById('pb-built-projects-list');
-      if (!box) return;
-      if (!projects || !projects.length) {
-        box.innerHTML = '<div style="font-size:0.74rem;color:#64748b;">No built projects yet.</div>';
-        return;
-      }
-      box.innerHTML = projects.map(function(p) {
-        var safeDir = String(p.project_dir || '').replace(/'/g, "\\'");
-        var openLink = p.live_url ? '<a href="' + p.live_url + '" target="_blank" style="background:#059669;color:#fff;text-decoration:none;padding:2px 8px;border-radius:5px;font-size:0.7rem;font-weight:700;">🌐 Open App</a>' : '';
-        return '<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:7px;padding:5px 8px;font-size:0.73rem;">' +
-          '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:62%;" title="' + (p.project_dir || '') + '"><strong>' + (p.project_name || p.project_slug) + '</strong> <span style="color:#64748b;">(' + (p.files_count || 0) + ' files)</span></div>' +
-          '<div style="display:flex;gap:5px;align-items:center;">' +
-            '<button type="button" onclick="selectSuggestedProjectFolder(\'' + safeDir + '\')" style="background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;border-radius:5px;padding:2px 7px;font-size:0.7rem;cursor:pointer;">📂 Load Folder</button>' +
-            openLink +
-          '</div>' +
-        '</div>';
-      }).join('');
+    function closeSimpleProjectPathModal(ev) {
+      if (ev && ev.target && ev.target.id !== 'simple-project-path-modal') return;
+      var modal = document.getElementById('simple-project-path-modal');
+      if (modal) modal.style.display = 'none';
     }
 
-    async function selectSuggestedProjectFolder(pathStr) {
-      var fInput = document.getElementById('pb-folder-path');
-      if (fInput) fInput.value = pathStr;
-      await onProjectFolderInputChanged();
-      await refreshProjectFolderFiles();
-    }
-
-    var _pbFolderCheckTimer = null;
-    async function onProjectFolderInputChanged() {
-      var fInput = document.getElementById('pb-folder-path');
-      var pathVal = fInput ? fInput.value.trim() : '';
-      if (!pathVal) return;
-      clearTimeout(_pbFolderCheckTimer);
-      _pbFolderCheckTimer = setTimeout(async function() {
-        try {
-          var res = await fetch('/api/projects/builder/check-permission', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder_path: pathVal })
-          });
-          var info = await res.json();
-          _renderPermissionBanner(info);
-        } catch (e) {}
-      }, 150);
-    }
-
-    async function pickNativeProjectFolder(btn) {
-      var orig = btn ? btn.textContent : '📂 Choose Folder...';
-      if (btn) { btn.disabled = true; btn.textContent = 'Opening Finder...'; }
+    async function browseNativeWorkspaceFolder(btn) {
+      var orig = btn ? btn.textContent : '📂 Browse...';
+      if (btn) { btn.disabled = true; btn.textContent = 'Opening...'; }
       try {
         var res = await fetch('/api/projects/builder/pick-folder', {
           method: 'POST',
@@ -1416,363 +1185,79 @@
         });
         var data = await res.json();
         if (data && data.status === 'ok' && data.folder_path) {
-          var fInput = document.getElementById('pb-folder-path');
-          if (fInput) fInput.value = data.folder_path;
-          _renderPermissionBanner(data.permission);
-          refreshProjectFolderFiles();
-        } else {
-          toggleInlineFolderBrowser(true);
+          var inp = document.getElementById('simple-workspace-path-input');
+          if (inp) inp.value = data.folder_path;
         }
-      } catch (e) {
-        toggleInlineFolderBrowser(true);
-      } finally {
+      } catch (e) {} finally {
         if (btn) { btn.disabled = false; btn.textContent = orig; }
       }
     }
 
-    var _pbCurrentBrowsePath = '';
-    var _pbParentBrowsePath = '';
-    async function toggleInlineFolderBrowser(forceOpen) {
-      var drawer = document.getElementById('pb-inline-browser');
-      if (!drawer) return;
-      if (forceOpen === true || drawer.style.display === 'none') {
-        drawer.style.display = 'block';
-        var fInput = document.getElementById('pb-folder-path');
-        await browseToDirectory(fInput && fInput.value.trim() ? fInput.value.trim() : '');
-      } else {
-        drawer.style.display = 'none';
-      }
-    }
-
-    async function browseToDirectory(targetPath) {
-      try {
-        var res = await fetch('/api/projects/builder/browse-dirs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: targetPath || '' })
-        });
-        var data = await res.json();
-        if (!data || data.status !== 'ok') return;
-        _pbCurrentBrowsePath = data.current_path || '';
-        _pbParentBrowsePath = data.parent_path || '';
-        var lbl = document.getElementById('pb-browser-current-path');
-        if (lbl) lbl.textContent = _pbCurrentBrowsePath;
-        var listEl = document.getElementById('pb-browser-dirs-list');
-        if (listEl) {
-          var dirs = data.directories || [];
-          if (!dirs.length) {
-            listEl.innerHTML = '<span style="font-size:0.74rem;color:#64748b;">No subdirectories in this folder. Click "✓ Select This Folder" above.</span>';
-          } else {
-            listEl.innerHTML = dirs.map(function(d) {
-              var safeP = String(d.path || '').replace(/'/g, "\\'");
-              return '<button type="button" onclick="browseToDirectory(\'' + safeP + '\')" style="background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1;border-radius:6px;padding:4px 9px;font-size:0.73rem;cursor:pointer;">📁 ' + d.name + '</button>';
-            }).join('');
-          }
+    async function confirmSimpleWorkspacePath(btn) {
+      var inp = document.getElementById('simple-workspace-path-input');
+      var chk = document.getElementById('simple-workspace-perm-checkbox');
+      var fb = document.getElementById('simple-workspace-feedback');
+      var pathVal = inp ? inp.value.trim() : '';
+      if (!pathVal) {
+        if (fb) {
+          fb.textContent = 'Please choose or enter a workspace folder path.';
+          fb.style.display = 'block';
         }
-      } catch (e) {}
-    }
-
-    function browseDirectoryUp() {
-      if (_pbParentBrowsePath) browseToDirectory(_pbParentBrowsePath);
-    }
-
-    async function selectCurrentBrowsedFolder() {
-      if (_pbCurrentBrowsePath) {
-        var fInput = document.getElementById('pb-folder-path');
-        if (fInput) fInput.value = _pbCurrentBrowsePath;
-        var drawer = document.getElementById('pb-inline-browser');
-        if (drawer) drawer.style.display = 'none';
-        await onProjectFolderInputChanged();
-        await refreshProjectFolderFiles();
+        return;
       }
-    }
-
-    async function grantSelectedFolderPermission(btn) {
-      var fInput = document.getElementById('pb-folder-path');
-      var folderPath = fInput ? fInput.value.trim() : '';
-      var fb = document.getElementById('pb-modal-feedback');
-      if (!folderPath) {
-        if (fb) fb.textContent = 'Please enter or choose a folder path first.';
-        return null;
+      if (chk && !chk.checked) {
+        if (fb) {
+          fb.textContent = 'Please grant folder permission to create, edit, delete, run, and execute files.';
+          fb.style.display = 'block';
+        }
+        return;
       }
-      var nInput = document.getElementById('pb-project-name');
-      var perms = _getSelectedBuilderPermissions();
       if (btn) btn.disabled = true;
       try {
         var res = await fetch('/api/projects/builder/grant-permission', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            folder_path: folderPath,
-            project_name: nInput ? nInput.value.trim() : '',
-            permissions: perms,
+            folder_path: pathVal,
+            permissions: {
+              create: true,
+              edit: true,
+              delete: true,
+              run: true,
+              execute: true,
+              full_access: true
+            },
             set_active: true
           })
         });
         var data = await res.json();
-        if (data && data.status === 'ok') {
-          _renderPermissionBanner(data.permission);
-          if (fb) fb.textContent = '✅ Full permissions granted under ' + (data.permission.folder_path || folderPath);
-          await refreshProjectFolderFiles();
-          return data.permission;
-        }
+        var activePath = (data && data.active_folder) || pathVal;
+        _updateSimpleWorkspaceBar(activePath);
+        closeSimpleProjectPathModal();
+        var chatInput = document.getElementById('chat-text-input');
+        if (chatInput) chatInput.focus();
       } catch (e) {} finally {
         if (btn) btn.disabled = false;
       }
-      return null;
     }
 
-    async function revokeSelectedFolderPermission(btn) {
-      var fInput = document.getElementById('pb-folder-path');
-      var folderPath = fInput ? fInput.value.trim() : '';
-      var fb = document.getElementById('pb-modal-feedback');
-      if (!folderPath) return;
+    async function clearSimpleWorkspacePath() {
       try {
-        var res = await fetch('/api/projects/builder/revoke-permission', {
+        await fetch('/api/projects/builder/revoke-permission', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folder_path: folderPath })
+          body: JSON.stringify({ folder_path: '' })
         });
-        await res.json();
-        await onProjectFolderInputChanged();
-        if (fb) fb.textContent = '🔒 Revoked folder permissions for ' + folderPath;
       } catch (e) {}
+      _updateSimpleWorkspaceBar('');
     }
 
-    async function createAndBuildProjectInFolder(btn) {
-      var fInput = document.getElementById('pb-folder-path');
-      var nInput = document.getElementById('pb-project-name');
-      var gInput = document.getElementById('pb-project-goal');
-      var fb = document.getElementById('pb-modal-feedback');
-      var statusBox = document.getElementById('pb-build-status-box');
-
-      var folderPath = fInput ? fInput.value.trim() : '';
-      var projectName = nInput ? nInput.value.trim() : '';
-      var projectGoal = gInput ? gInput.value.trim() : '';
-      var perms = _getSelectedBuilderPermissions();
-
-      // First check if permission is already granted for this folder; if not, ask the user for explicit permission!
-      var checkRes = await fetch('/api/projects/builder/check-permission', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder_path: folderPath })
-      });
-      var checkData = await checkRes.json();
-      if (!checkData || !checkData.permitted) {
-        var targetLabel = (checkData && checkData.folder_path) || folderPath || './projects';
-        var confirmed = window.confirm(
-          "SLMAgents Builder Permission Request:\n\n" +
-          "Do you grant SLMAgents permission under:\n" + targetLabel + "\n\n" +
-          "Permissions requested under this folder:\n" +
-          "• Create files & directories\n" +
-          "• Edit & modify files\n" +
-          "• Delete & clean files\n" +
-          "• Run & execute tests, scripts, and local servers\n\n" +
-          "Click OK to grant all permissions under this folder and build the project."
-        );
-        if (!confirmed) {
-          if (fb) fb.textContent = '⚠️ Build cancelled — folder permission was not granted.';
-          return;
-        }
+    // Load active workspace on page load if user previously set one
+    fetch('/api/projects/builder/state').then(function(r) { return r.json(); }).then(function(d) {
+      if (d && d.active_folder && d.active_permission && d.active_permission.permitted) {
+        _updateSimpleWorkspaceBar(d.active_folder);
       }
-
-      var origLabel = btn ? btn.innerHTML : '';
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span>⏳ Creating Files, Running Tests &amp; Building Project...</span>';
-      }
-      if (fb) fb.textContent = 'Scaffolding files and executing local test suite...';
-
-      try {
-        var activeSession = (typeof currentSessionId !== 'undefined' && currentSessionId) ? currentSessionId : 'builder_studio';
-        var res = await fetch('/api/projects/builder/create-project', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            folder_path: folderPath,
-            project_name: projectName,
-            project_goal: projectGoal,
-            grant_permission: true,
-            permissions: perms,
-            session_id: activeSession
-          })
-        });
-        var data = await res.json();
-        if (data && data.status === 'ok') {
-          if (fInput && data.project_dir) fInput.value = data.project_dir;
-          _renderPermissionBanner(data.permission);
-          if (statusBox) {
-            statusBox.style.display = 'block';
-            statusBox.innerHTML =
-              '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">' +
-                '<div><strong>✅ Built &amp; Verified: ' + data.project_name + '</strong><br>' +
-                '<span>📂 Folder: <code>' + data.project_dir + '</code> · 🧪 ' + data.tests_run + ' tests passed</span></div>' +
-                '<div style="display:flex;gap:8px;">' +
-                  '<a href="' + data.live_url + '" target="_blank" style="background:#059669;color:#fff;text-decoration:none;padding:6px 12px;border-radius:7px;font-weight:700;font-size:0.78rem;">🌐 Open Live App (' + data.project_slug + ')</a>' +
-                  '<a href="' + data.zip_download_url + '" style="background:#0f172a;color:#fff;text-decoration:none;padding:6px 12px;border-radius:7px;font-weight:600;font-size:0.78rem;">⬇ Download ZIP</a>' +
-                '</div>' +
-              '</div>';
-          }
-          var outPre = document.getElementById('pb-exec-output');
-          if (outPre && data.test_stdout) outPre.textContent = data.test_stdout;
-          if (fb) fb.textContent = '✅ Project built and mounted live at ' + data.live_url;
-          _renderBuiltProjectsList(data.projects || []);
-          await refreshProjectFolderFiles();
-        } else {
-          if (fb) fb.textContent = (data && data.message) || 'Unable to build project.';
-        }
-      } catch (e) {
-        if (fb) fb.textContent = 'Error building project: ' + e;
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = origLabel;
-        }
-      }
-    }
-
-    async function refreshProjectFolderFiles() {
-      var fInput = document.getElementById('pb-folder-path');
-      var listEl = document.getElementById('pb-files-list');
-      if (!fInput || !listEl || !fInput.value.trim()) return;
-      try {
-        var res = await fetch('/api/projects/builder/fs-op', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folder_path: fInput.value.trim(), operation: 'list' })
-        });
-        var data = await res.json();
-        if (data.status === 'permission_required') {
-          listEl.innerHTML = '<div style="color:#b45309;">🔒 Grant permission above to list, create, edit, or delete files in this folder.</div>';
-          return;
-        }
-        var files = data.files || [];
-        if (!files.length) {
-          listEl.innerHTML = '<div style="color:#64748b;">Folder is currently empty. Click "🚀 Create &amp; Build Project" or "+ New File".</div>';
-          return;
-        }
-        listEl.innerHTML = files.map(function(f) {
-          var safeRel = String(f.rel_path || '').replace(/'/g, "\\'");
-          return '<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;">' +
-            '<span style="font-family:ui-monospace,monospace;">' + f.rel_path + ' <small style="color:#94a3b8;">(' + f.size_bytes + ' B)</small></span>' +
-            '<div style="display:flex;gap:4px;">' +
-              '<button type="button" onclick="openProjectFileForEdit(\'' + safeRel + '\')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:4px;padding:2px 7px;font-size:0.7rem;cursor:pointer;">✏️ Edit</button>' +
-              '<button type="button" onclick="deleteProjectFileByRel(\'' + safeRel + '\')" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:4px;padding:2px 7px;font-size:0.7rem;cursor:pointer;">🗑️</button>' +
-            '</div>' +
-          '</div>';
-        }).join('');
-      } catch (e) {}
-    }
-
-    var _pbActiveRelFile = '';
-    async function openProjectFileForEdit(relPath) {
-      var fInput = document.getElementById('pb-folder-path');
-      if (!fInput || !fInput.value.trim()) return;
-      var res = await fetch('/api/projects/builder/fs-op', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder_path: fInput.value.trim(), operation: 'read', rel_path: relPath })
-      });
-      var data = await res.json();
-      if (data && data.status === 'ok') {
-        _pbActiveRelFile = relPath;
-        var wrap = document.getElementById('pb-file-editor-wrap');
-        var lbl = document.getElementById('pb-editing-file-label');
-        var ta = document.getElementById('pb-editing-file-content');
-        if (wrap) wrap.style.display = 'block';
-        if (lbl) lbl.textContent = relPath;
-        if (ta) ta.value = data.content || '';
-      }
-    }
-
-    function promptNewFileInProjectFolder() {
-      var rel = window.prompt('Enter relative file path to create inside the project folder (e.g., notes.txt or src/helper.py):');
-      if (!rel || !rel.trim()) return;
-      _pbActiveRelFile = rel.trim();
-      var wrap = document.getElementById('pb-file-editor-wrap');
-      var lbl = document.getElementById('pb-editing-file-label');
-      var ta = document.getElementById('pb-editing-file-content');
-      if (wrap) wrap.style.display = 'block';
-      if (lbl) lbl.textContent = _pbActiveRelFile + ' (New File)';
-      if (ta) ta.value = '';
-    }
-
-    async function saveEditedProjectFile() {
-      var fInput = document.getElementById('pb-folder-path');
-      var ta = document.getElementById('pb-editing-file-content');
-      var fb = document.getElementById('pb-modal-feedback');
-      if (!fInput || !_pbActiveRelFile || !ta) return;
-      var res = await fetch('/api/projects/builder/fs-op', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          folder_path: fInput.value.trim(),
-          operation: 'edit',
-          rel_path: _pbActiveRelFile,
-          content: ta.value
-        })
-      });
-      var data = await res.json();
-      if (fb) fb.textContent = data.message || 'Saved file.';
-      await refreshProjectFolderFiles();
-    }
-
-    async function deleteEditedProjectFile() {
-      if (_pbActiveRelFile) await deleteProjectFileByRel(_pbActiveRelFile);
-    }
-
-    async function deleteProjectFileByRel(relPath) {
-      var fInput = document.getElementById('pb-folder-path');
-      var fb = document.getElementById('pb-modal-feedback');
-      if (!fInput || !relPath) return;
-      var res = await fetch('/api/projects/builder/fs-op', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          folder_path: fInput.value.trim(),
-          operation: 'delete',
-          rel_path: relPath
-        })
-      });
-      var data = await res.json();
-      if (fb) fb.textContent = data.message || 'Deleted file.';
-      var wrap = document.getElementById('pb-file-editor-wrap');
-      if (wrap && _pbActiveRelFile === relPath) wrap.style.display = 'none';
-      await refreshProjectFolderFiles();
-    }
-
-    async function runCommandInProjectFolder(btn) {
-      var fInput = document.getElementById('pb-folder-path');
-      var cmdInput = document.getElementById('pb-exec-cmd');
-      var outPre = document.getElementById('pb-exec-output');
-      var fb = document.getElementById('pb-modal-feedback');
-      if (!fInput || !fInput.value.trim()) return;
-      var orig = btn ? btn.textContent : '▶ Execute';
-      if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
-      try {
-        var res = await fetch('/api/projects/builder/fs-op', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            folder_path: fInput.value.trim(),
-            operation: 'execute',
-            command: cmdInput ? cmdInput.value.trim() : ''
-          })
-        });
-        var data = await res.json();
-        if (data.status === 'permission_required') {
-          if (outPre) outPre.textContent = '🔒 ' + (data.message || 'Permission required to execute commands in this folder.');
-          return;
-        }
-        var combined = ((data.stdout || '') + '\n' + (data.stderr || '')).trim();
-        if (outPre) outPre.textContent = combined || ('Command exited with code ' + data.returncode + ' (' + data.duration_ms + ' ms)');
-        if (fb) fb.textContent = '⚡ Executed command in ' + data.duration_ms + ' ms (exit code ' + data.returncode + ')';
-      } catch (e) {
-        if (outPre) outPre.textContent = 'Execution error: ' + e;
-      } finally {
-        if (btn) { btn.disabled = false; btn.textContent = orig; }
-      }
-    }
+    }).catch(function() {});
   </script>
 
   <script>
