@@ -1836,6 +1836,8 @@ def mount_harness_routes(app: FastAPI) -> None:
             command=command,
         )
 
+    _built_engine_cache: Dict[str, tuple[float, Any]] = {}
+
     @app.post("/api/projects/{project_slug}/action")
     async def execute_built_project_action(project_slug: str, request: Request) -> Dict[str, Any]:
         import importlib.util
@@ -1853,17 +1855,28 @@ def mount_harness_routes(app: FastAPI) -> None:
         if not os.path.isfile(engine_path):
             raise HTTPException(status_code=404, detail=f"Project engine not found: {clean_slug}")
 
+        mtime = os.path.getmtime(engine_path)
+        cached = _built_engine_cache.get(engine_path)
+        if cached and cached[0] == mtime:
+            inst = cached[1]
+            return await asyncio.to_thread(inst.handle_action, body)
+
         mod_name = f"built_proj_{clean_slug}_engine"
         spec = importlib.util.spec_from_file_location(mod_name, engine_path)
         if spec and spec.loader:
             mod = importlib.util.module_from_spec(spec)
             sys.modules[mod_name] = mod
             spec.loader.exec_module(mod)
-            cls_obj = getattr(mod, "CustomAppEngine", None)
+            cls_obj = (
+                getattr(mod, "AutomationTestEngine", None)
+                or getattr(mod, "CustomAppEngine", None)
+                or getattr(mod, "AppEngine", None)
+            )
             if cls_obj is not None:
                 inst = cls_obj()
                 if hasattr(inst, "handle_action"):
-                    return inst.handle_action(body)
+                    _built_engine_cache[engine_path] = (mtime, inst)
+                    return await asyncio.to_thread(inst.handle_action, body)
         raise HTTPException(status_code=500, detail=f"Unable to execute engine for {clean_slug}")
 
     @app.get("/projects/{project_slug}")

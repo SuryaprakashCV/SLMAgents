@@ -161,7 +161,13 @@ def should_execute_local_project_build(
     if is_followup_build_command(q_clean):
         return True
 
-    # 2. User explicitly asked to build locally & create files in a single turn
+    # 2. Direct project / web app / studio build request — generate and build immediately on request
+    # (no pre-prepared plan card unless user explicitly typed /plan or /clarify)
+    is_explicit_plan_only = bool(re.match(r"^/(?:plan|clarify)\b", q_raw, flags=re.IGNORECASE))
+    if not is_explicit_plan_only and _PROJECT_BUILD_TOPIC_RE.search(q_clean):
+        return True
+
+    # 3. User explicitly asked to build locally & create files in a single turn
     q_low = q_clean.lower()
     if (
         any(p in q_low for p in ("build it locally", "create files and build", "create the files and build", "build locally and complete"))
@@ -169,7 +175,7 @@ def should_execute_local_project_build(
     ):
         return True
 
-    # 3. User confirmed a complex build/test plan (clicked one of the plan options or replied yes/go ahead)
+    # 4. User confirmed a complex build/test plan (clicked one of the plan options or replied yes/go ahead)
     has_plan_confirmation = bool(
         clarification_choice
         or "[clarified plan option:" in q_raw.lower()
@@ -183,8 +189,9 @@ def should_execute_local_project_build(
 
 
 def _clean_candidate_goal(raw_text: str) -> str:
-    c_clean = re.sub(r"^/(?:plan|clarify|low|medium|high|fast|deep)\b\s*", "", (raw_text or "").strip(), flags=re.IGNORECASE).strip()
+    c_clean = re.sub(r"^/(?:plan|clarify|low|medium|high|fast|deep|goal)\b\s*", "", (raw_text or "").strip(), flags=re.IGNORECASE).strip()
     c_clean = re.sub(r"\s*(?:—\s*Selected Plan Option:|\[Clarified Plan Option:).*$", "", c_clean, flags=re.IGNORECASE).strip()
+    c_clean = re.sub(r"\s*\((?:✅|🧪|⚡|Looks great|Go ahead)[^)]*\)\s*$", "", c_clean, flags=re.IGNORECASE).strip()
     c_clean = re.sub(r"\s*/no_think\b", "", c_clean, flags=re.IGNORECASE).strip()
     dup_c = re.match(r"^(.+?)\s*\(\1\)\s*$", c_clean, flags=re.IGNORECASE | re.DOTALL)
     if dup_c:
@@ -679,8 +686,35 @@ class LocalProjectBuilder:
         """
         from .project_templates import generate_custom_interactive_app_files
 
-        full_goal = resolved_goal
-        if clarification_choice and clarification_choice not in full_goal:
-            full_goal = f"{resolved_goal} ({clarification_choice})"
-        return generate_custom_interactive_app_files(project_name, project_slug, full_goal)
+        clean_goal = _clean_candidate_goal(resolved_goal)
+        slm_blueprint = ""
+        try:
+            from ..config import MODEL_CATALOG
+            from ..runtime.inference_pool import get_inference_pool
+
+            pool = get_inference_pool()
+            spec = MODEL_CATALOG.get("slm_code_interpreter")
+            if spec is not None:
+                res = pool.generate(
+                    spec,
+                    [
+                        {
+                            "role": "system",
+                            "content": "You are a concise software architect. Summarize the key backend modules and endpoints needed for the user's project in 3 bullet points.",
+                        },
+                        {"role": "user", "content": clean_goal},
+                    ],
+                    max_tokens=96,
+                    temperature=0.2,
+                )
+                slm_blueprint = (res.text or "").strip()
+        except Exception:
+            slm_blueprint = ""
+
+        return generate_custom_interactive_app_files(
+            project_name=project_name,
+            project_slug=project_slug,
+            resolved_goal=clean_goal,
+            slm_blueprint=slm_blueprint,
+        )
 
