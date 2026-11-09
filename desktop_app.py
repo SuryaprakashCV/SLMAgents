@@ -228,16 +228,22 @@ def find_free_port(preferred_ports: tuple[int, ...] = (8000, 7860, 8080)) -> int
 
 
 def start_or_attach_server(host: str, port: Optional[int]) -> tuple[int, bool]:
-    """Returns `(selected_port, already_alive)` and starts Uvicorn in a daemon thread if not yet running."""
+    """Returns `(selected_port, already_alive)` and starts Uvicorn in a daemon thread (with automatic failover supervision if attached to an external server)."""
+    already_alive = False
     if port is None:
         for candidate_port in (8000, 7860):
             if is_server_alive(host, candidate_port):
-                return candidate_port, True
-        selected_port = find_free_port((8000, 7860, 8080))
+                selected_port = candidate_port
+                already_alive = True
+                break
+        else:
+            selected_port = find_free_port((8000, 7860, 8080))
     else:
         if is_server_alive(host, port):
-            return port, True
-        selected_port = port
+            selected_port = port
+            already_alive = True
+        else:
+            selected_port = port
 
     def _serve() -> None:
         try:
@@ -249,8 +255,22 @@ def start_or_attach_server(host: str, port: Optional[int]) -> tuple[int, bool]:
         except Exception as exc:
             print(f"[SLMAgents Desktop] Server thread error: {exc}")
 
-    threading.Thread(target=_serve, daemon=True, name="slm-desktop-uvicorn").start()
-    return selected_port, False
+    if not already_alive:
+        threading.Thread(target=_serve, daemon=True, name="slm-desktop-uvicorn").start()
+    else:
+        def _supervise_external_server() -> None:
+            while True:
+                time.sleep(2.0)
+                if not is_server_alive(host, selected_port, timeout=1.2):
+                    time.sleep(0.5)
+                    if not is_server_alive(host, selected_port, timeout=1.2):
+                        print(f"[SLMAgents Desktop] External server on {host}:{selected_port} stopped; starting embedded server...")
+                        _serve()
+                        return
+
+        threading.Thread(target=_supervise_external_server, daemon=True, name="slm-desktop-watchdog").start()
+
+    return selected_port, already_alive
 
 
 def _apply_macos_dock_icon() -> None:

@@ -3736,15 +3736,43 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
       };
       
       const chatEndpoint = getApiEndpoint("/api/chat");
-      const response = await fetch(chatEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: abortController.signal
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Server returned HTTP ${response.status}`);
+      const candidateEndpoints = [chatEndpoint];
+      if (isDesktopSurface || window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
+        for (const fallbackUrl of ["http://127.0.0.1:8000/api/chat", "http://127.0.0.1:7860/api/chat"]) {
+          if (!candidateEndpoints.includes(fallbackUrl)) {
+            candidateEndpoints.push(fallbackUrl);
+          }
+        }
+      }
+      let response = null;
+      let lastFetchErr = null;
+      for (let attempt = 0; attempt < 2 && !response; attempt++) {
+        if (attempt > 0) {
+          await new Promise(r => setTimeout(r, 700));
+        }
+        for (const ep of candidateEndpoints) {
+          try {
+            const candidateResp = await fetch(ep, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: abortController.signal
+            });
+            if (candidateResp.ok) {
+              response = candidateResp;
+              break;
+            }
+            lastFetchErr = new Error(`Server returned HTTP ${candidateResp.status}`);
+          } catch (fetchErr) {
+            if (fetchErr && fetchErr.name === "AbortError") {
+              throw fetchErr;
+            }
+            lastFetchErr = fetchErr;
+          }
+        }
+      }
+      if (!response) {
+        throw lastFetchErr || new Error("Unable to connect to local SLMAgents server.");
       }
       
       const reader = response.body.getReader();

@@ -93,7 +93,7 @@ def build_llama_grammar(spec: Optional[GrammarSpec]) -> Any:
         return None
     try:
         from llama_cpp import LlamaGrammar
-    except ImportError:
+    except Exception:
         return None
 
     if spec.mode == "gbnf" and spec.gbnf_source:

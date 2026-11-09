@@ -32,15 +32,50 @@ from .onnx_cpu import (
     format_chatml_prompt,
 )
 
+def _ensure_llama_cpp_shared_lib() -> None:
+    """Discovers bundled or user-installed `libllama.dylib`/`.so`/`.dll` for frozen macOS/Windows/Linux apps."""
+    if os.environ.get("LLAMA_CPP_LIB"):
+        return
+    import sys
+
+    candidates = []
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", "")
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        for base in (
+            meipass,
+            os.path.abspath(os.path.join(exe_dir, "..", "Frameworks")),
+            os.path.abspath(os.path.join(exe_dir, "..", "Resources")),
+        ):
+            if base:
+                candidates.append(os.path.join(base, "llama_cpp", "lib", "libllama.dylib"))
+                candidates.append(os.path.join(base, "lib", "libllama.dylib"))
+    candidates.extend(
+        [
+            os.path.expanduser("~/Library/Python/3.9/lib/python/site-packages/llama_cpp/lib/libllama.dylib"),
+            os.path.expanduser("~/Library/Python/3.11/lib/python/site-packages/llama_cpp/lib/libllama.dylib"),
+            "/opt/homebrew/lib/python3.11/site-packages/llama_cpp/lib/libllama.dylib",
+            "/Applications/SLMAgents.app/Contents/Frameworks/llama_cpp/lib/libllama.dylib",
+            "/Applications/SLMAgents.app/Contents/Resources/llama_cpp/lib/libllama.dylib",
+        ]
+    )
+    for path in candidates:
+        if path and os.path.isfile(path):
+            os.environ["LLAMA_CPP_LIB"] = path
+            break
+
+
+_ensure_llama_cpp_shared_lib()
+
 try:
     from llama_cpp import Llama, StoppingCriteriaList
-except ImportError:
+except Exception:
     Llama = None
     StoppingCriteriaList = None
 
 try:
     from llama_cpp.llama_speculative import LlamaPromptLookupDecoding
-except ImportError:
+except Exception:
     LlamaPromptLookupDecoding = None
 
 
