@@ -127,7 +127,7 @@ def test_web_personalization_query_returns_security_notice_and_download_links():
     assert "Personalization Applied:" not in outcome.final_text
 
 
-def test_who_built_you_returns_SLMAgents Team():
+def test_who_built_you_returns_suryaprakash():
     from slm_harness.orchestrator.cascade_router import get_cascade_router
     from slm_harness.runtime.arena import CancellationToken
 
@@ -138,9 +138,9 @@ def test_who_built_you_returns_SLMAgents Team():
             session_id="test_creator_identity",
             client_surface="web",
         )
-        assert "SLMAgents Team" in outcome.final_text.lower(), f"Missing SLMAgents Team for prompt={prompt!r}: {outcome.final_text}"
+        assert "suryaprakash" in outcome.final_text.lower(), f"Missing Suryaprakash for prompt={prompt!r}: {outcome.final_text}"
 
-    # Verify quality critic repairs any non-SLMAgents Team response to "who built you"
+    # Verify quality critic repairs any non-Suryaprakash response to "who built you"
     route_dec = get_cascade_router().route("who built you")
     repaired_text, was_repaired = kernel._critique_and_repair_response(
         final_text="I was built by Alibaba Cloud.",
@@ -155,7 +155,7 @@ def test_who_built_you_returns_SLMAgents Team():
         cancel_token=CancellationToken("run_test_creator_critic"),
     )
     assert was_repaired is True
-    assert "SLMAgents Team" in repaired_text.lower()
+    assert "suryaprakash" in repaired_text.lower()
 
 
 def test_local_project_build_creates_files_runs_tests_and_completes_project():
@@ -331,16 +331,67 @@ def test_project_builder_custom_folder_and_permissions() -> None:
         assert check_after["permitted"] is False
 
 
+def test_iterative_project_edit_and_canvas_payload() -> None:
+    import os
+    import tempfile
+    from slm_harness.governance.policy import get_folder_permission_manager
+    from slm_harness.tools.project_builder import (
+        LocalProjectBuilder,
+        should_execute_local_project_build,
+    )
+
+    perm_mgr = get_folder_permission_manager()
+    prev_active = perm_mgr.get_active_folder()
+    try:
+        with tempfile.TemporaryDirectory() as tmp_ws:
+            perm_mgr.grant_permission(
+                folder_path=tmp_ws,
+                permissions={"create": True, "edit": True, "delete": True, "run": True, "execute": True, "full_access": True},
+                set_active=True,
+            )
+            builder = LocalProjectBuilder()
+            emitted_steps = []
+            outcome1 = builder.build_project(
+                user_query="create automation test studio web app that takes any url and tests all aspects and creates a report",
+                step_callback=lambda a, m: emitted_steps.append(m),
+            )
+            assert outcome1.test_passed is True
+            assert outcome1.structured_data.get("open_canvas") is True
+            assert len(outcome1.structured_data.get("files", [])) >= 6
+            assert any("Live Canvas Ready" in s for s in emitted_steps)
+
+            # Iterative edit request should be recognized and update existing project in-place
+            edit_prompt = "Modify [Automation Test Studio]: add light/dark theme toggle and CSV export"
+            assert should_execute_local_project_build(edit_prompt) is True
+            outcome2 = builder.build_project(user_query=edit_prompt)
+            assert outcome2.project_dir == outcome1.project_dir
+            assert outcome2.structured_data.get("iterative_edit") is True
+            assert outcome2.test_passed is True
+            with open(os.path.join(outcome2.project_dir, "index.html"), "r", encoding="utf-8") as fh:
+                html_content = fh.read()
+            assert "btn-theme-toggle" in html_content
+            assert "btn-export-csv" in html_content
+    finally:
+        if prev_active:
+            perm_mgr.grant_permission(
+                folder_path=prev_active,
+                permissions={"create": True, "edit": True, "delete": True, "run": True, "execute": True, "full_access": True},
+                set_active=True,
+            )
+
+
 if __name__ == "__main__":
     test_inspect_response_quality_detects_hollow_replies()
     test_document_deep_self_critique_recovery_when_source_missing()
     test_document_deep_self_critique_recovery_on_nonexistent_file()
     test_kernel_turn_readme_and_critic_repair()
     test_web_personalization_query_returns_security_notice_and_download_links()
-    test_who_built_you_returns_SLMAgents Team()
+    test_who_built_you_returns_suryaprakash()
     test_local_project_build_creates_files_runs_tests_and_completes_project()
     test_project_builder_custom_folder_and_permissions()
-    print("ALL 8 SELF-CRITIQUE, WEB PERSONALIZATION, CREATOR IDENTITY, PROJECT BUILDER & FOLDER PERMISSION TESTS PASSED!")
+    test_iterative_project_edit_and_canvas_payload()
+    print("ALL 9 SELF-CRITIQUE, WEB PERSONALIZATION, CREATOR IDENTITY, PROJECT BUILDER, ITERATIVE CANVAS & FOLDER PERMISSION TESTS PASSED!")
+
 
 
 

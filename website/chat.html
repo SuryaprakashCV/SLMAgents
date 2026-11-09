@@ -550,6 +550,7 @@
             <span style="color: #059669; font-weight: 600;">✓ Full Access Granted</span>
           </div>
           <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+            <button type="button" onclick="openAgenticCodeCanvas()" style="background: #0f172a; color: #ffffff; border: none; border-radius: 999px; padding: 2px 10px; font-size: 0.71rem; font-weight: 600; cursor: pointer;">💻 Code &amp; Preview</button>
             <button type="button" onclick="openSimpleProjectPathModal()" style="background: #ffffff; color: #065f46; border: 1px solid #6ee7b7; border-radius: 999px; padding: 2px 8px; font-size: 0.71rem; font-weight: 600; cursor: pointer;">Change</button>
             <button type="button" onclick="clearSimpleWorkspacePath()" title="Remove workspace path" style="background: none; border: none; color: #065f46; font-size: 0.95rem; font-weight: 700; cursor: pointer; line-height: 1;">&times;</button>
           </div>
@@ -560,6 +561,11 @@
           <!-- Simple Create a Project Button (Right near chatbox) -->
           <button type="button" id="btn-dock-create-project" onclick="openSimpleProjectPathModal()" title="Create a Project — Choose Workspace Folder Path" style="display: inline-flex; align-items: center; gap: 5px; background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 999px; padding: 5px 11px; font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
             <span>📁 Create a Project</span>
+          </button>
+
+          <!-- Claude Artifacts / Copilot Workspace / Codex Code & Preview Canvas Toggle -->
+          <button type="button" id="btn-dock-code-canvas" onclick="toggleAgenticCodeCanvas()" title="Open Split-Screen Code Editor, Live App Preview &amp; Terminal Canvas" style="display: inline-flex; align-items: center; gap: 5px; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 999px; padding: 5px 11px; font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
+            <span>💻 Code Canvas</span>
           </button>
 
           <!-- Attach File Icon Button (Inside Composer) -->
@@ -614,6 +620,106 @@
 
 
     </main>
+
+    <!-- Claude Artifacts / Copilot Workspace / Codex Split-Screen Code & Live Preview Canvas -->
+    <aside id="agentic-code-canvas" style="display: none; width: 52%; min-width: 440px; max-width: 86vw; height: 100vh; flex-direction: column; background: #0b0f19; color: #f8fafc; border-left: 1px solid #1e293b; z-index: 45; flex-shrink: 0; box-shadow: -12px 0 36px rgba(2, 6, 23, 0.35);">
+      <!-- Top Canvas Header -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: #111827; border-bottom: 1px solid #1e293b;">
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+          <span style="background: linear-gradient(135deg, #4f46e5, #0ea5e9); color: #fff; font-size: 0.75rem; font-weight: 800; padding: 4px 8px; border-radius: 7px;">⚡ CANVAS</span>
+          <div style="min-width: 0; flex: 1;">
+            <div id="canvas-project-title" style="font-size: 0.84rem; font-weight: 700; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Workspace Project</div>
+            <div id="canvas-project-dir" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">No folder selected</div>
+          </div>
+        </div>
+
+        <!-- Mode Switcher (Preview / Code / Terminal) -->
+        <div style="display: flex; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 2px; gap: 2px;">
+          <button type="button" id="canvas-tab-btn-preview" onclick="switchAgenticCanvasTab('preview')" style="background: #4f46e5; color: #ffffff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">👁️ Preview</button>
+          <button type="button" id="canvas-tab-btn-code" onclick="switchAgenticCanvasTab('code')" style="background: transparent; color: #94a3b8; border: none; border-radius: 6px; padding: 5px 10px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">📝 Code</button>
+          <button type="button" id="canvas-tab-btn-terminal" onclick="switchAgenticCanvasTab('terminal')" style="background: transparent; color: #94a3b8; border: none; border-radius: 6px; padding: 5px 10px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">🐚 Terminal</button>
+        </div>
+
+        <!-- Canvas Window Controls -->
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <button type="button" onclick="reloadAgenticCanvasPreview()" title="Reload Live Preview &amp; Files" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; font-size: 0.74rem; cursor: pointer;">↻</button>
+          <button type="button" onclick="toggleAgenticCanvasExpand(this)" title="Expand / Restore Canvas Width" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; font-size: 0.74rem; cursor: pointer;">⤢</button>
+          <a id="canvas-external-link" href="#" target="_blank" rel="noopener noreferrer" title="Open App in Full Browser Tab" style="background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; font-size: 0.74rem; text-decoration: none; font-weight: 700;">↗</a>
+          <button type="button" onclick="closeAgenticCodeCanvas()" title="Close Canvas" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 0 4px; line-height: 1;">&times;</button>
+        </div>
+      </div>
+
+      <!-- TAB 1: LIVE INTERACTIVE APP PREVIEW (Claude Artifacts / Replit / v0 style) -->
+      <div id="canvas-pane-preview" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 12px; background: #0f172a; border-bottom: 1px solid #1e293b;">
+          <div style="display: flex; align-items: center; gap: 6px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 3px 9px; flex: 1; min-width: 0;">
+            <span style="color: #10b981; font-size: 0.7rem;">● LIVE</span>
+            <code id="canvas-preview-url-bar" style="font-size: 0.72rem; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">http://localhost:8000/projects/...</code>
+          </div>
+          <div style="display: flex; gap: 4px;">
+            <button type="button" onclick="setCanvasViewportWidth('100%')" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 5px; padding: 3px 7px; font-size: 0.69rem; cursor: pointer;">💻 100%</button>
+            <button type="button" onclick="setCanvasViewportWidth('768px')" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 5px; padding: 3px 7px; font-size: 0.69rem; cursor: pointer;">📱 768px</button>
+            <button type="button" onclick="setCanvasViewportWidth('375px')" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 5px; padding: 3px 7px; font-size: 0.69rem; cursor: pointer;">📲 375px</button>
+          </div>
+        </div>
+        <div style="flex: 1; display: flex; justify-content: center; background: #020617; overflow: auto; min-height: 0;">
+          <iframe id="canvas-live-preview-iframe" title="Live Application Preview" style="width: 100%; height: 100%; border: none; background: #0b0f19; transition: width 0.2s ease;"></iframe>
+        </div>
+      </div>
+
+      <!-- TAB 2: CODE & FILE EXPLORER (Copilot Workspace / Cursor / Codex style) -->
+      <div id="canvas-pane-code" style="display: none; flex: 1; min-height: 0; flex-direction: row;">
+        <!-- File Tree Sidebar -->
+        <div style="width: 195px; background: #0f172a; border-right: 1px solid #1e293b; display: flex; flex-direction: column; min-height: 0;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #1e293b;">
+            <span style="font-size: 0.7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em;">Files</span>
+            <button type="button" onclick="createNewFileInCanvas()" style="background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 5px; padding: 2px 6px; font-size: 0.68rem; font-weight: 600; cursor: pointer;">+ File</button>
+          </div>
+          <div id="canvas-file-tree" style="flex: 1; overflow-y: auto; padding: 6px;"></div>
+        </div>
+
+        <!-- Source Code Editor -->
+        <div style="flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #0b0f19;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; background: #111827; border-bottom: 1px solid #1e293b;">
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+              <code id="canvas-active-file-label" style="font-size: 0.76rem; font-weight: 700; color: #38bdf8;">index.html</code>
+              <span id="canvas-file-stats-label" style="font-size: 0.69rem; color: #64748b;"></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span id="canvas-save-status" style="font-size: 0.7rem; color: #10b981; display: none;">✓ Saved</span>
+              <button type="button" onclick="saveActiveCanvasFile()" style="background: #059669; color: #ffffff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.72rem; font-weight: 600; cursor: pointer;">💾 Save &amp; Reload (⌘S)</button>
+              <button type="button" onclick="deleteActiveCanvasFile()" style="background: #1e293b; color: #fca5a5; border: 1px solid #7f1d1d; border-radius: 6px; padding: 4px 8px; font-size: 0.71rem; cursor: pointer;">🗑️</button>
+            </div>
+          </div>
+          <textarea id="canvas-code-textarea" spellcheck="false" style="flex: 1; width: 100%; background: #0b0f19; color: #e2e8f0; border: none; padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12.5px; line-height: 1.55; resize: none; outline: none; tab-size: 2;"></textarea>
+        </div>
+      </div>
+
+      <!-- TAB 3: INTEGRATED TERMINAL & TEST RUNNER (Claude Code / Codex CLI style) -->
+      <div id="canvas-pane-terminal" style="display: none; flex: 1; min-height: 0; flex-direction: column; background: #090d16;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 12px; background: #111827; border-bottom: 1px solid #1e293b; flex-wrap: wrap;">
+          <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 600;">Quick Actions:</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" onclick="runCanvasTerminalCmd('python3 -m unittest discover -s tests -p &quot;test_*.py&quot; -v')" style="background: #065f46; color: #6ee7b7; border: 1px solid #059669; border-radius: 6px; padding: 3px 9px; font-size: 0.71rem; font-weight: 600; cursor: pointer;">▶ Run Unit Tests</button>
+            <button type="button" onclick="runCanvasTerminalCmd('ls -la')" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 6px; padding: 3px 9px; font-size: 0.71rem; cursor: pointer;">📂 ls -la</button>
+            <button type="button" onclick="runCanvasTerminalCmd('python3 -m py_compile engine.py server.py')" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 6px; padding: 3px 9px; font-size: 0.71rem; cursor: pointer;">🐍 Syntax Check</button>
+          </div>
+        </div>
+        <pre id="canvas-terminal-output" style="flex: 1; margin: 0; padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #a7f3d0; background: #090d16; overflow-y: auto; white-space: pre-wrap;">$ Ready. Click "▶ Run Unit Tests" or enter any command below to execute inside the project workspace.</pre>
+        <form onsubmit="handleCanvasTerminalSubmit(event)" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #0f172a; border-top: 1px solid #1e293b;">
+          <span style="color: #10b981; font-family: monospace; font-weight: 700;">$</span>
+          <input type="text" id="canvas-terminal-input" placeholder="Enter command to run in workspace folder (e.g. python3 -m unittest discover -s tests -v)..." style="flex: 1; background: transparent; border: none; color: #f8fafc; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; outline: none;">
+          <button type="submit" style="background: #4f46e5; color: #ffffff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">Run</button>
+        </form>
+      </div>
+
+      <!-- Bottom Quick Agent Edit Bar (Claude Artifacts / Copilot Edit style) -->
+      <form onsubmit="submitCanvasIterativeEdit(event)" style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: #111827; border-top: 1px solid #1e293b;">
+        <span style="font-size: 0.85rem;">✨</span>
+        <input type="text" id="canvas-agent-edit-input" placeholder="Ask Coding Agent to modify this app (e.g. 'add light/dark theme toggle', 'add CSV export')..." style="flex: 1; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 7px; padding: 7px 10px; font-size: 0.76rem; outline: none;">
+        <button type="submit" style="background: linear-gradient(135deg, #4f46e5, #0ea5e9); color: #ffffff; border: none; border-radius: 7px; padding: 7px 13px; font-size: 0.75rem; font-weight: 700; cursor: pointer; white-space: nowrap;">Apply Edit</button>
+      </form>
+    </aside>
 
     <!-- Right-Hand Collapsible Artifact, Citation & Waterfall Trace Inspector Drawer -->
     <aside class="harness-inspector-drawer" id="harness-inspector-drawer" style="display: none;">
@@ -1320,10 +1426,315 @@
       _updateSimpleWorkspaceBar('');
     }
 
+    // --- Claude Artifacts / Copilot Workspace / Codex Split-Screen Code & Preview Canvas ---
+    window._canvasState = {
+      projectName: 'Workspace Project',
+      projectSlug: '',
+      projectDir: '',
+      liveUrl: '',
+      activeFile: 'index.html',
+      expanded: false
+    };
+
+    function switchAgenticCanvasTab(tabName) {
+      var tabs = ['preview', 'code', 'terminal'];
+      tabs.forEach(function (t) {
+        var pane = document.getElementById('canvas-pane-' + t);
+        var btn = document.getElementById('canvas-tab-btn-' + t);
+        if (pane) pane.style.display = (t === tabName) ? 'flex' : 'none';
+        if (btn) {
+          btn.style.background = (t === tabName) ? '#4f46e5' : 'transparent';
+          btn.style.color = (t === tabName) ? '#ffffff' : '#94a3b8';
+        }
+      });
+      if (tabName === 'code' && window._canvasState.projectDir) {
+        loadCanvasFileTree(window._canvasState.projectDir, window._canvasState.activeFile || 'index.html');
+      }
+    }
+
+    async function loadCanvasFileTree(folderPath, selectFile) {
+      if (!folderPath) return;
+      try {
+        var res = await fetch('/api/projects/builder/fs-op', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder_path: folderPath, operation: 'list' })
+        });
+        var data = await res.json();
+        var treeEl = document.getElementById('canvas-file-tree');
+        if (!treeEl || !data || !Array.isArray(data.files)) return;
+        treeEl.innerHTML = '';
+        var files = data.files;
+        files.forEach(function (f) {
+          var row = document.createElement('div');
+          var isSelected = f.rel_path === selectFile;
+          row.style.cssText = 'padding:5px 8px;border-radius:6px;cursor:pointer;font-size:0.73rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px;' +
+            (isSelected ? 'background:#1e293b;color:#38bdf8;font-weight:700;' : 'color:#cbd5e1;');
+          var icon = f.rel_path.endsWith('.py') ? '🐍' : (f.rel_path.endsWith('.html') ? '🌐' : (f.rel_path.endsWith('.js') ? '⚡' : (f.rel_path.endsWith('.css') ? '🎨' : '📄')));
+          row.innerHTML = '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + icon + ' ' + f.rel_path + '</span>';
+          row.onclick = function () {
+            loadCanvasFileContent(folderPath, f.rel_path);
+            loadCanvasFileTree(folderPath, f.rel_path);
+          };
+          treeEl.appendChild(row);
+        });
+        if (selectFile) {
+          loadCanvasFileContent(folderPath, selectFile);
+        } else if (files.length > 0) {
+          loadCanvasFileContent(folderPath, files[0].rel_path);
+        }
+      } catch (e) {}
+    }
+
+    async function loadCanvasFileContent(folderPath, relPath) {
+      if (!folderPath || !relPath) return;
+      window._canvasState.activeFile = relPath;
+      var lbl = document.getElementById('canvas-active-file-label');
+      var stats = document.getElementById('canvas-file-stats-label');
+      var editor = document.getElementById('canvas-code-textarea');
+      if (lbl) lbl.textContent = relPath;
+      try {
+        var res = await fetch('/api/projects/builder/fs-op', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder_path: folderPath, operation: 'read', rel_path: relPath })
+        });
+        var data = await res.json();
+        if (data && data.status === 'ok' && typeof data.content === 'string') {
+          if (editor) editor.value = data.content;
+          var lines = data.content.split('\n').length;
+          if (stats) stats.textContent = lines + ' lines · ' + (data.size_bytes || data.content.length) + ' B';
+        }
+      } catch (e) {}
+    }
+
+    async function saveActiveCanvasFile() {
+      var folderPath = window._canvasState.projectDir;
+      var relPath = window._canvasState.activeFile;
+      var editor = document.getElementById('canvas-code-textarea');
+      var badge = document.getElementById('canvas-save-status');
+      if (!folderPath || !relPath || !editor) return;
+      try {
+        var res = await fetch('/api/projects/builder/fs-op', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            folder_path: folderPath,
+            operation: 'edit',
+            rel_path: relPath,
+            content: editor.value
+          })
+        });
+        var data = await res.json();
+        if (data && data.status === 'ok') {
+          if (badge) {
+            badge.style.display = 'inline';
+            setTimeout(function () { badge.style.display = 'none'; }, 1800);
+          }
+          reloadAgenticCanvasPreview();
+        }
+      } catch (e) {}
+    }
+
+    async function createNewFileInCanvas() {
+      var folderPath = window._canvasState.projectDir;
+      if (!folderPath) return;
+      var name = window.prompt('New file relative path (e.g. utils.py or components.js):', '');
+      if (!name || !name.trim()) return;
+      try {
+        await fetch('/api/projects/builder/fs-op', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            folder_path: folderPath,
+            operation: 'create',
+            rel_path: name.trim(),
+            content: ''
+          })
+        });
+        await loadCanvasFileTree(folderPath, name.trim());
+      } catch (e) {}
+    }
+
+    async function deleteActiveCanvasFile() {
+      var folderPath = window._canvasState.projectDir;
+      var relPath = window._canvasState.activeFile;
+      if (!folderPath || !relPath) return;
+      if (!window.confirm('Delete ' + relPath + ' from ' + folderPath + '?')) return;
+      try {
+        await fetch('/api/projects/builder/fs-op', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder_path: folderPath, operation: 'delete', rel_path: relPath })
+        });
+        await loadCanvasFileTree(folderPath, 'index.html');
+      } catch (e) {}
+    }
+
+    async function runCanvasTerminalCmd(cmdStr) {
+      var folderPath = window._canvasState.projectDir;
+      var outEl = document.getElementById('canvas-terminal-output');
+      switchAgenticCanvasTab('terminal');
+      if (!folderPath) {
+        if (outEl) outEl.textContent += '\n$ Error: No active project directory selected.';
+        return;
+      }
+      if (outEl) {
+        outEl.textContent += '\n\n$ ' + cmdStr + '\nRunning in ' + folderPath + '...\n';
+        outEl.scrollTop = outEl.scrollHeight;
+      }
+      try {
+        var res = await fetch('/api/projects/builder/fs-op', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder_path: folderPath, operation: 'execute', command: cmdStr })
+        });
+        var data = await res.json();
+        if (outEl && data) {
+          var combined = ((data.stdout || '') + (data.stderr ? '\n' + data.stderr : '')).trim();
+          outEl.textContent += (combined || '(no output)') + '\n[exit=' + data.returncode + ' · ' + Math.round(data.duration_ms || 0) + ' ms]';
+          outEl.scrollTop = outEl.scrollHeight;
+        }
+      } catch (e) {
+        if (outEl) outEl.textContent += '\nExecution error: ' + String(e);
+      }
+    }
+
+    function handleCanvasTerminalSubmit(ev) {
+      ev.preventDefault();
+      var inp = document.getElementById('canvas-terminal-input');
+      if (!inp || !inp.value.trim()) return;
+      var cmd = inp.value.trim();
+      inp.value = '';
+      runCanvasTerminalCmd(cmd);
+    }
+
+    function submitCanvasIterativeEdit(ev) {
+      ev.preventDefault();
+      var inp = document.getElementById('canvas-agent-edit-input');
+      if (!inp || !inp.value.trim()) return;
+      var instruction = inp.value.trim();
+      inp.value = '';
+      var chatInput = document.getElementById('chat-text-input');
+      var chatForm = document.getElementById('chat-input-form');
+      if (chatInput && chatForm) {
+        var projTitle = window._canvasState.projectName || 'Current Project';
+        chatInput.value = 'Modify [' + projTitle + ']: ' + instruction;
+        if (typeof handleChatSubmit === 'function') {
+          handleChatSubmit(new Event('submit', { cancelable: true }));
+        }
+      }
+    }
+
+    function reloadAgenticCanvasPreview() {
+      var iframe = document.getElementById('canvas-live-preview-iframe');
+      if (iframe && window._canvasState.liveUrl) {
+        var sep = window._canvasState.liveUrl.indexOf('?') === -1 ? '?' : '&';
+        iframe.src = window._canvasState.liveUrl + sep + '_t=' + Date.now();
+      }
+      if (window._canvasState.projectDir) {
+        loadCanvasFileTree(window._canvasState.projectDir, window._canvasState.activeFile || 'index.html');
+      }
+    }
+
+    function toggleAgenticCanvasExpand(btn) {
+      var canvas = document.getElementById('agentic-code-canvas');
+      if (!canvas) return;
+      window._canvasState.expanded = !window._canvasState.expanded;
+      canvas.style.width = window._canvasState.expanded ? '76%' : '52%';
+      if (btn) btn.textContent = window._canvasState.expanded ? '⤡' : '⤢';
+    }
+
+    function setCanvasViewportWidth(w) {
+      var iframe = document.getElementById('canvas-live-preview-iframe');
+      if (iframe) iframe.style.width = w;
+    }
+
+    async function openAgenticCodeCanvas(projectData, initialTab) {
+      var canvas = document.getElementById('agentic-code-canvas');
+      if (!canvas) return;
+      if (!projectData || !projectData.project_dir) {
+        try {
+          var res = await fetch('/api/projects/builder/state');
+          var st = await res.json();
+          if (st && st.latest_project) {
+            projectData = st.latest_project;
+          } else if (st && st.active_folder) {
+            projectData = {
+              project_name: 'Workspace',
+              project_dir: st.active_folder,
+              live_url: ''
+            };
+          }
+        } catch (e) {}
+      }
+      if (projectData) {
+        window._canvasState.projectName = projectData.project_name || 'Workspace Project';
+        window._canvasState.projectSlug = projectData.project_slug || '';
+        window._canvasState.projectDir = projectData.project_dir || '';
+        var rawUrl = projectData.live_url || (projectData.project_slug ? ('/projects/' + projectData.project_slug + '/index.html') : '');
+        if (rawUrl && rawUrl.indexOf('http://localhost:8000') === 0) {
+          rawUrl = rawUrl.replace('http://localhost:8000', '');
+        }
+        window._canvasState.liveUrl = rawUrl;
+      }
+
+      var titleEl = document.getElementById('canvas-project-title');
+      var dirEl = document.getElementById('canvas-project-dir');
+      var urlBar = document.getElementById('canvas-preview-url-bar');
+      var extLink = document.getElementById('canvas-external-link');
+      var iframe = document.getElementById('canvas-live-preview-iframe');
+
+      if (titleEl) titleEl.textContent = window._canvasState.projectName;
+      if (dirEl) dirEl.textContent = window._canvasState.projectDir || 'Select a workspace folder';
+      if (urlBar) urlBar.textContent = window._canvasState.liveUrl ? (window.location.origin + window._canvasState.liveUrl) : 'No live preview mounted';
+      if (extLink) extLink.href = window._canvasState.liveUrl || '#';
+      if (iframe && window._canvasState.liveUrl) {
+        var sep = window._canvasState.liveUrl.indexOf('?') === -1 ? '?' : '&';
+        iframe.src = window._canvasState.liveUrl + sep + '_t=' + Date.now();
+      }
+
+      canvas.style.display = 'flex';
+      switchAgenticCanvasTab(initialTab || 'preview');
+      if (window._canvasState.projectDir) {
+        loadCanvasFileTree(window._canvasState.projectDir, 'index.html');
+      }
+    }
+
+    function closeAgenticCodeCanvas() {
+      var canvas = document.getElementById('agentic-code-canvas');
+      if (canvas) canvas.style.display = 'none';
+    }
+
+    function toggleAgenticCodeCanvas() {
+      var canvas = document.getElementById('agentic-code-canvas');
+      if (canvas && canvas.style.display === 'flex') {
+        closeAgenticCodeCanvas();
+      } else {
+        openAgenticCodeCanvas(null, 'preview');
+      }
+    }
+
+    document.addEventListener('keydown', function (ev) {
+      if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 's') {
+        var editor = document.getElementById('canvas-code-textarea');
+        if (editor && document.activeElement === editor) {
+          ev.preventDefault();
+          saveActiveCanvasFile();
+        }
+      }
+    });
+
     // Load active workspace on page load if user previously set one
     fetch('/api/projects/builder/state').then(function(r) { return r.json(); }).then(function(d) {
       if (d && d.active_folder && d.active_permission && d.active_permission.permitted) {
         _updateSimpleWorkspaceBar(d.active_folder);
+      }
+      if (d && d.latest_project && d.latest_project.project_dir) {
+        window._canvasState.projectName = d.latest_project.project_name || 'Workspace Project';
+        window._canvasState.projectSlug = d.latest_project.project_slug || '';
+        window._canvasState.projectDir = d.latest_project.project_dir || '';
+        window._canvasState.liveUrl = d.latest_project.live_url || '';
       }
     }).catch(function() {});
   </script>
@@ -1409,6 +1820,6 @@
       }
     }
   </script>
-  <script src="app.js?v=114.0"></script>
+  <script src="app.js?v=115.0"></script>
 </body>
 </html>

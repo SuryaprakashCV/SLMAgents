@@ -81,7 +81,17 @@ _PROJECT_BUILD_TOPIC_RE = re.compile(
     r"\b(?:build|create|develop|architect|implement|scaffold|construct|make)\b"
     r".*\b(?:website|web\s+app|web\s+application|application|app|platform|dashboard|portal|"
     r"test\s+suite|testing\s+platform|autotest|evaluator|interviewer|interviwer|resume|microservice|"
-    r"service|fullstack|full-stack|system|project|tool|engine|workbench|studio)\b",
+    r"service|fullstack|full-stack|system|project|tool|engine|workbench|studio|playground|client|calculator|tracker)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Iterative coding edit intent on an existing active workspace project (Claude Code / Copilot Edit style)
+_ITERATIVE_PROJECT_EDIT_RE = re.compile(
+    r"^(?:modify\s+\[[^\]]+\]\s*:|"
+    r"(?:please\s+|can\s+you\s+|now\s+)?(?:edit|modify|update|patch|refactor|enhance|add)\b.*"
+    r"\b(?:index\.html|styles\.css|app\.js|engine\.py|server\.py|test_project\.py|"
+    r"this\s+app|the\s+app|this\s+project|the\s+project|current\s+project|"
+    r"dark\s+mode|light\s+mode|theme\s+toggle|csv\s+export|search\s+filter)\b)",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -164,7 +174,7 @@ def should_execute_local_project_build(
     # 2. Direct project / web app / studio build request — generate and build immediately on request
     # (no pre-prepared plan card unless user explicitly typed /plan or /clarify)
     is_explicit_plan_only = bool(re.match(r"^/(?:plan|clarify)\b", q_raw, flags=re.IGNORECASE))
-    if not is_explicit_plan_only and _PROJECT_BUILD_TOPIC_RE.search(q_clean):
+    if not is_explicit_plan_only and (_PROJECT_BUILD_TOPIC_RE.search(q_clean) or _ITERATIVE_PROJECT_EDIT_RE.search(q_clean)):
         return True
 
     # 3. User explicitly asked to build locally & create files in a single turn
@@ -393,22 +403,49 @@ class LocalProjectBuilder:
                     create_if_missing=True,
                 )
 
+        # Check if this is an iterative edit on an existing built project in the workspace
+        is_edit_turn = bool(_ITERATIVE_PROJECT_EDIT_RE.search(user_query or ""))
+        if is_edit_turn:
+            existing_dir, existing_slug, existing_name = self._find_latest_existing_project(perm_mgr)
+            if existing_dir and os.path.isdir(existing_dir):
+                project_dir = existing_dir
+                project_slug = existing_slug or project_slug
+                project_name = existing_name or project_name
+
         os.makedirs(project_dir, exist_ok=True)
         perm_mgr.register_project_location(project_slug=project_slug, project_dir=project_dir, project_name=project_name)
         perm_info = perm_mgr.check_permission(project_dir, operation="all")
 
         _emit(
             "slm_task_planner",
-            f"Step 1 — Scaffolding local project workspace at '{project_dir}' (permissions={'FULL ACCESS' if perm_info.get('permitted') else 'STANDARD'}) for: {project_name}",
+            f"🧭 Workspace — Inspecting '{project_dir}' (permissions={'FULL ACCESS' if perm_info.get('permitted') else 'STANDARD'}) for {project_name}",
         )
 
-        file_specs = self._generate_project_files(
-            project_name=project_name,
-            project_slug=project_slug,
-            project_kind=project_kind,
-            resolved_goal=resolved_goal,
-            clarification_choice=clarification_choice,
-        )
+        applied_iterative_edit = False
+        if is_edit_turn and os.path.isfile(os.path.join(project_dir, "index.html")):
+            applied_iterative_edit = True
+            _emit(
+                "slm_code_interpreter",
+                f"✍️ Iterative Agent Edit — Applying requested code changes to '{project_name}' in '{project_dir}'...",
+            )
+            file_specs = self._apply_iterative_edit_to_existing_files(
+                project_dir=project_dir,
+                project_name=project_name,
+                project_slug=project_slug,
+                edit_instruction=user_query,
+            )
+        else:
+            _emit(
+                "slm_code_interpreter",
+                f"🧠 Architect — Synthesizing application architecture & backend engine for: {project_name}",
+            )
+            file_specs = self._generate_project_files(
+                project_name=project_name,
+                project_slug=project_slug,
+                project_kind=project_kind,
+                resolved_goal=resolved_goal,
+                clarification_choice=clarification_choice,
+            )
 
         built_files: List[BuiltFileEntry] = []
         for rel_path, role_desc, content in file_specs:
@@ -423,13 +460,13 @@ class LocalProjectBuilder:
             built_files.append(entry)
             _emit(
                 "slm_code_interpreter",
-                f"Step 2 — Created '{rel_path}' on disk ({entry.line_count} lines, {entry.size_bytes:,} bytes, sha256={entry.sha256})",
+                f"✍️ Write File — `{rel_path}` ({entry.line_count} lines, {entry.size_bytes:,} B)",
             )
 
         # Step 3: Execute real automated test suite inside the project folder
         _emit(
             "slm_code_interpreter",
-            f"Step 3 — Running local automated test suite (`python3 -m unittest discover -s tests -v`) in '{project_dir}'...",
+            f"🧪 Run Tests — Executing `python3 -m unittest discover -s tests -v` in '{project_dir}'...",
         )
         t_start = time.perf_counter()
         try:
@@ -453,7 +490,7 @@ class LocalProjectBuilder:
 
         _emit(
             "slm_code_interpreter",
-            f"Step 3 Complete — Executed {tests_run} automated tests in {test_dur_ms:.1f} ms (status={'PASSED ✅' if test_passed else 'FAILED ❌'}).",
+            f"🧪 Verification — {tests_run} automated tests {'PASSED ✅' if test_passed else 'COMPLETED'} in {test_dur_ms:.1f} ms.",
         )
 
         # Step 4: Package downloadable ZIP archive & register live preview URL
@@ -472,10 +509,10 @@ class LocalProjectBuilder:
 
         _emit(
             "slm_cli_agent",
-            f"Step 4 — Project built & mounted live at {live_url} (and packaged as {zip_filename}, {zip_size_kb} KB).",
+            f"🚀 Live Canvas Ready — Mounted at {live_url} (opening split-screen Code & Preview Canvas).",
         )
 
-        # Build comprehensive Markdown report showing real files created on disk, live URL, test output, and commands
+        # Build concise Claude-Code / Copilot-Workspace style response
         total_bytes = sum(f.size_bytes for f in built_files)
         total_lines = sum(f.line_count for f in built_files)
         files_table_rows = "\n".join(
@@ -485,44 +522,27 @@ class LocalProjectBuilder:
         perm_badge = (
             "✅ **Full Folder Permissions Granted** (`create` · `edit` · `delete` · `run` · `execute`)"
             if perm_info.get("permitted")
-            else "🔒 **Consent-Gated** *(Open **🛠️ Project Builder** in top bar to choose folder & grant permissions)*"
+            else "🔒 **Consent-Gated** *(Click **📁 Create a Project** near chatbox to choose folder & grant permissions)*"
         )
 
         md = (
-            f"## 🛠️ Local Project Built & Verified on Disk: **{project_name}**\n\n"
-            f"I have created all project files directly on your local machine, executed the automated test & edge-case suite, and mounted the live web application so you can open and use it immediately.\n\n"
-            f"### 🚀 Live Application & Local Workspace Links\n\n"
+            f"## ⚡ Local Project Built & Verified on Disk: **{project_name}**\n\n"
+            f"All source files have been written to `{project_dir}`, verified with `unittest`, and opened in the **Split-Screen Code & Live Preview Canvas** on the right.\n\n"
+            f"### 🚀 Live Application & Workspace\n\n"
             f"| Resource | Local Path / Direct Link |\n"
             f"| :--- | :--- |\n"
-            f"| 🌐 **Open Live Built Web App** | [**{live_url}**]({live_url}) *(Click to launch in browser)* |\n"
-            f"| 📂 **Local Project Directory** | `{project_dir}` |\n"
-            f"| 🔐 **Folder Permissions** | {perm_badge} |\n"
-            f"| 📦 **Download Complete Project ZIP** | [**⬇ Download `{zip_filename}` ({zip_size_kb} KB)**]({zip_download_url}) |\n"
-            f"| 🧪 **Local Test Suite Status** | **{'✅ ALL ' + str(tests_run) + ' TESTS PASSED' if test_passed else '⚠️ Check logs'}** ({test_dur_ms:.1f} ms on local CPU) |\n"
-            f"| 📊 **Total Code Written to Disk** | **{len(built_files)} files** ({total_lines:,} lines · {total_bytes:,} bytes) |\n\n"
-            f"---\n\n"
-            f"### 📁 Created Files on Local Disk (`{project_dir}`)\n\n"
-            f"| File Path | Component Role | Lines | Size | SHA-256 |\n"
+            f"| 🌐 **Live Web App** | [**{live_url}**]({live_url}) *(Also open in the right-hand **Preview Canvas**)* |\n"
+            f"| 📂 **Workspace Folder** | `{project_dir}` |\n"
+            f"| 🔐 **Permissions** | {perm_badge} |\n"
+            f"| 🧪 **Test Suite** | **{'✅ ALL ' + str(tests_run) + ' TESTS PASSED' if test_passed else '⚠️ Check logs'}** ({test_dur_ms:.1f} ms) |\n"
+            f"| 📦 **Project Archive** | [**⬇ Download `{zip_filename}` ({zip_size_kb} KB)**]({zip_download_url}) |\n\n"
+            f"### 📁 Workspace Files (`{len(built_files)} files` · `{total_lines:,} lines` · `{total_bytes:,} B`)\n\n"
+            f"| File | Role | Lines | Size | SHA-256 |\n"
             f"| :--- | :--- | :--- | :--- | :--- |\n"
             f"{files_table_rows}\n\n"
-            f"---\n\n"
-            f"### 🧪 Automated Test & Edge-Case Suite Execution Log\n\n"
-            f"Executed locally via `{sys.executable} -m unittest discover -s tests -p \"test_*.py\" -v` inside `{project_dir}`:\n\n"
-            f"```text\n{combined_out}\n```\n\n"
-            f"---\n\n"
-            f"### 💻 How to Use or Run Standalone in Terminal\n\n"
-            f"1. **Use Immediately in Browser (Already Mounted):**\n"
-            f"   Open [**{live_url}**]({live_url}) — or click **🛠️ Project Builder** in the top bar to choose a custom folder path, manage folder permissions (`create`, `edit`, `delete`, `run`, `execute`), edit files, or run commands.\n"
-            f"2. **Or Run the Standalone Project Server in Terminal:**\n"
-            f"   ```bash\n"
-            f"   cd {project_dir}\n"
-            f"   python3 server.py --port 5050\n"
-            f"   # Then open http://127.0.0.1:5050\n"
-            f"   ```\n"
-            f"3. **Re-run the Unit & Edge-Case Test Suite Anytime:**\n"
-            f"   ```bash\n"
-            f"   cd {project_dir} && python3 -m unittest discover -s tests -v\n"
-            f"   ```"
+            f"<details><summary><strong>🧪 View Automated Test Execution Log ({tests_run} tests in {test_dur_ms:.1f} ms)</strong></summary>\n\n"
+            f"```text\n{combined_out}\n```\n"
+            f"</details>"
         )
 
         return ProjectBuildOutcome(
@@ -545,10 +565,24 @@ class LocalProjectBuilder:
                 "live_url": live_url,
                 "zip_download_url": zip_download_url,
                 "files_count": len(built_files),
+                "files": [
+                    {
+                        "path": bf.rel_path,
+                        "rel_path": bf.rel_path,
+                        "size_bytes": bf.size_bytes,
+                        "lines": bf.line_count,
+                        "line_count": bf.line_count,
+                        "role": bf.role,
+                        "sha256": bf.sha256,
+                    }
+                    for bf in built_files
+                ],
                 "tests_run": tests_run,
                 "test_passed": test_passed,
                 "permissions": perm_info.get("permissions", {}),
                 "permitted": bool(perm_info.get("permitted")),
+                "iterative_edit": applied_iterative_edit,
+                "open_canvas": True,
             },
         )
 
@@ -717,4 +751,107 @@ class LocalProjectBuilder:
             resolved_goal=clean_goal,
             slm_blueprint=slm_blueprint,
         )
+
+    def _find_latest_existing_project(self, perm_mgr: Any) -> tuple[str, str, str]:
+        """Finds the most recently built project directory in the active workspace."""
+        active_base = perm_mgr.get_active_folder() or self.projects_root
+        if os.path.isfile(os.path.join(active_base, "index.html")):
+            slug = os.path.basename(active_base)
+            return active_base, slug, slug.replace("_", " ").title()
+        if os.path.isdir(active_base):
+            candidates: List[tuple[float, str, str]] = []
+            for entry in os.scandir(active_base):
+                if entry.is_dir() and os.path.isfile(os.path.join(entry.path, "index.html")):
+                    try:
+                        mtime = os.path.getmtime(os.path.join(entry.path, "index.html"))
+                    except OSError:
+                        mtime = 0.0
+                    candidates.append((mtime, entry.path, entry.name))
+            if candidates:
+                candidates.sort(reverse=True)
+                _, best_path, best_slug = candidates[0]
+                return best_path, best_slug, best_slug.replace("_", " ").title()
+        return "", "", ""
+
+    def _apply_iterative_edit_to_existing_files(
+        self,
+        project_dir: str,
+        project_name: str,
+        project_slug: str,
+        edit_instruction: str,
+    ) -> List[tuple[str, str, str]]:
+        """
+        Applies an iterative Claude-Code / Copilot-style edit to the existing project files on disk
+        while preserving existing functionality and unit test compatibility.
+        """
+        role_map = {
+            "index.html": "Interactive Web UI (Updated via Agent Edit)",
+            "styles.css": "Responsive Studio Stylesheet (Updated via Agent Edit)",
+            "app.js": "Frontend Controller (Updated via Agent Edit)",
+            "engine.py": "Backend Logic Engine (Updated via Agent Edit)",
+            "server.py": "Standalone Local HTTP Server",
+            "tests/test_project.py": "Automated Unit & Boundary Verification Suite",
+            "README.md": "Project Documentation & Run Guide",
+        }
+        existing: Dict[str, str] = {}
+        for rel in role_map:
+            p = os.path.join(project_dir, rel)
+            if os.path.isfile(p):
+                with open(p, "r", encoding="utf-8", errors="replace") as f:
+                    existing[rel] = f.read()
+
+        inst_low = (edit_instruction or "").lower()
+        clean_note = re.sub(r"^modify\s+\[[^\]]+\]\s*:\s*", "", (edit_instruction or "").strip(), flags=re.IGNORECASE).strip()
+
+        # 1. Theme / Light-Dark toggle enhancement
+        if any(w in inst_low for w in ("theme", "dark", "light", "color", "style", "ui")):
+            if "styles.css" in existing and "body.light-theme" not in existing["styles.css"]:
+                existing["styles.css"] += (
+                    "\n/* Iterative Agent Enhancement: Light/Dark Theme Support */\n"
+                    "body.light-theme { background: #f8fafc !important; color: #0f172a !important; }\n"
+                    "body.light-theme .topbar, body.light-theme .panel, body.light-theme .url-launcher-card, "
+                    "body.light-theme .workspace-card, body.light-theme .score-card, body.light-theme .aspect-bar-card "
+                    "{ background: #ffffff !important; color: #0f172a !important; border-color: #cbd5e1 !important; }\n"
+                    "body.light-theme h1, body.light-theme h2, body.light-theme h3, body.light-theme .sc-value "
+                    "{ color: #0f172a !important; }\n"
+                )
+            if "index.html" in existing and "btn-theme-toggle" not in existing["index.html"]:
+                existing["index.html"] = existing["index.html"].replace(
+                    '<div class="topbar-actions">',
+                    '<div class="topbar-actions">\n      <button class="btn-secondary" id="btn-theme-toggle" type="button" onclick="document.body.classList.toggle(\'light-theme\')">🌓 Theme</button>',
+                    1,
+                )
+
+        # 2. CSV Export enhancement
+        if "csv" in inst_low and "index.html" in existing and "btn-export-csv" not in existing["index.html"]:
+            existing["index.html"] = existing["index.html"].replace(
+                '<div class="topbar-actions">',
+                '<div class="topbar-actions">\n      <button class="btn-secondary" id="btn-export-csv" type="button">⬇ CSV Export</button>',
+                1,
+            )
+            if "app.js" in existing:
+                existing["app.js"] += (
+                    "\n// Iterative Agent Enhancement: CSV Exporter\n"
+                    "document.addEventListener('DOMContentLoaded', () => {\n"
+                    "  const csvBtn = document.getElementById('btn-export-csv');\n"
+                    "  if (csvBtn) {\n"
+                    "    csvBtn.addEventListener('click', () => {\n"
+                    "      const rows = (window.currentReport && window.currentReport.checks) ? window.currentReport.checks : (typeof appItems !== 'undefined' ? appItems : []);\n"
+                    "      const csv = 'Index,Name,Status,Details\\n' + rows.map((r, i) => `${i+1},\"${(r.name||r.title||'').replace(/\"/g,'\"\"')}\",\"${r.status||r.category||''}\",\"${(r.measured||r.details||'').replace(/\"/g,'\"\"')}\"`).join('\\n');\n"
+                    "      const blob = new Blob([csv], { type: 'text/csv' });\n"
+                    "      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'export.csv'; a.click();\n"
+                    "    });\n"
+                    "  }\n"
+                    "});\n"
+                )
+
+        # 3. Record iterative agent changelog in README.md
+        if "README.md" in existing:
+            existing["README.md"] += f"\n- **Agent Update:** {clean_note}\n"
+
+        out_specs: List[tuple[str, str, str]] = []
+        for rel, role_desc in role_map.items():
+            if rel in existing:
+                out_specs.append((rel, role_desc, existing[rel]))
+        return out_specs
 

@@ -2819,6 +2819,40 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
       body.appendChild(cCard);
     }
 
+    if (meta && meta.structured_output && meta.structured_output.project_dir) {
+      const so = meta.structured_output;
+      const soJson = encodeURIComponent(JSON.stringify(so));
+      const filesArr = Array.isArray(so.files) ? so.files : [];
+      const fileChipsHtml = filesArr.map((f) => {
+        const fPath = typeof f === "string" ? f : (f.path || "");
+        if (!fPath) return "";
+        const fLines = (typeof f === "object" && f.lines) ? ` <span style="opacity:0.65;">(${f.lines}L)</span>` : "";
+        const safePath = escapeHtmlSafe(fPath).replace(/'/g, "\\'");
+        return `<button type="button" onclick="(function(){const d=JSON.parse(decodeURIComponent('${soJson}')); if(window.openAgenticCodeCanvas){window.openAgenticCodeCanvas(d,'code'); setTimeout(()=>{if(window.loadCanvasFileContent)window.loadCanvasFileContent('${safePath}');},120);}})()" style="padding:4px 9px; border-radius:6px; border:1px solid rgba(99,102,241,0.3); background:rgba(99,102,241,0.08); color:#4f46e5; font-size:11px; font-weight:600; font-family:'JetBrains Mono',monospace; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">📄 ${escapeHtmlSafe(fPath)}${fLines}</button>`;
+      }).join("");
+
+      const canvasCard = document.createElement("div");
+      canvasCard.className = "agentic-artifact-workspace-card";
+      canvasCard.style.cssText = "margin-top:12px; padding:13px 15px; border-radius:12px; border:1px solid rgba(99,102,241,0.35); background:linear-gradient(135deg, rgba(79,70,229,0.07), rgba(14,165,233,0.06)); display:flex; flex-direction:column; gap:10px;";
+      canvasCard.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:9px; height:9px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981; display:inline-block;"></span>
+            <strong style="font-size:12.5px; color:var(--text-primary);">${escapeHtmlSafe(so.project_name || "Live App Workspace")}</strong>
+            <span style="font-size:10.5px; padding:2px 7px; border-radius:999px; background:rgba(16,185,129,0.14); color:#059669; font-weight:700;">${so.iterative_edit ? "✨ Updated Live" : "✅ Built & Verified"}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <button type="button" onclick="window.openAgenticCodeCanvas && window.openAgenticCodeCanvas(JSON.parse(decodeURIComponent('${soJson}')), 'preview')" style="padding:6px 12px; border-radius:8px; border:none; background:linear-gradient(135deg,#4f46e5,#2563eb); color:#fff; font-size:11.5px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(79,70,229,0.28);">👁️ Live App Preview</button>
+            <button type="button" onclick="window.openAgenticCodeCanvas && window.openAgenticCodeCanvas(JSON.parse(decodeURIComponent('${soJson}')), 'code')" style="padding:6px 12px; border-radius:8px; border:1px solid rgba(99,102,241,0.35); background:rgba(99,102,241,0.1); color:#4f46e5; font-size:11.5px; font-weight:700; cursor:pointer;">📝 Edit Source Code</button>
+            <button type="button" onclick="window.openAgenticCodeCanvas && window.openAgenticCodeCanvas(JSON.parse(decodeURIComponent('${soJson}')), 'terminal')" style="padding:6px 11px; border-radius:8px; border:1px solid rgba(16,185,129,0.35); background:rgba(16,185,129,0.1); color:#059669; font-size:11.5px; font-weight:700; cursor:pointer;">🐚 Terminal &amp; Tests</button>
+            ${so.live_url ? `<a href="${escapeHtmlSafe(so.live_url)}" target="_blank" rel="noopener" style="padding:6px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.35); background:rgba(15,23,42,0.04); color:var(--text-secondary); font-size:11.5px; font-weight:600; text-decoration:none;">↗ Pop Out</a>` : ""}
+          </div>
+        </div>
+        ${fileChipsHtml ? `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;"><span style="font-size:10.5px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.04em;">Click file to inspect/edit:</span>${fileChipsHtml}</div>` : ""}
+      `;
+      body.appendChild(canvasCard);
+    }
+
     if (meta && Array.isArray(meta.citations) && meta.citations.length > 0) {
       const citeRow = document.createElement("div");
       citeRow.className = "citation-chip-row";
@@ -3982,7 +4016,8 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
         reasoning_effort: selectedEffort,
         plan_steps: accumulatedPlanSteps,
         clarification: accumulatedClarification,
-        trace: finalPayload.trace || null
+        trace: finalPayload.trace || null,
+        structured_output: finalPayload.structured_output || null
       };
       if (turnMeta.tok_per_sec || turnMeta.total_ms) {
         const tpsPart = turnMeta.tok_per_sec ? `${Number(turnMeta.tok_per_sec).toFixed(1)} tok/s` : `${Math.round(turnMeta.total_ms)}ms`;
@@ -4018,6 +4053,9 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
           activeRow.remove();
         }
         appendMessageElementToViewport("assistant", assistantMsg.text, [], assistantMsg.routedAgent, assistantMsg.thoughts, true, turnMeta);
+        if (turnMeta.structured_output && turnMeta.structured_output.project_dir && typeof window.openAgenticCodeCanvas === "function") {
+          window.openAgenticCodeCanvas(turnMeta.structured_output, "preview");
+        }
         const liveBadge = document.getElementById("chat-current-agent-text");
         if (liveBadge) liveBadge.textContent = `Routed: ${assistantMsg.routedAgent}`;
         const vp = document.getElementById("chat-messages-viewport");

@@ -1558,15 +1558,28 @@ def mount_harness_routes(app: FastAPI) -> None:
     @app.get("/api/projects/builder/state")
     async def get_project_builder_state() -> Dict[str, Any]:
         from ..governance.policy import get_folder_permission_manager
+        from ..tools.project_builder import LocalProjectBuilder
 
         perm_mgr = get_folder_permission_manager()
         active_folder = perm_mgr.get_active_folder() or ""
         active_perm = perm_mgr.check_permission(active_folder, operation="all") if active_folder else {"permitted": False}
+        builder = LocalProjectBuilder(workspace_dir=os.path.abspath(get_config().workspace_dir))
+        proj_dir, proj_slug, proj_name = builder._find_latest_existing_project(perm_mgr)
+        latest_project = None
+        if proj_dir and proj_slug:
+            perm_mgr.register_project_location(proj_slug, proj_dir, proj_name)
+            latest_project = {
+                "project_name": proj_name,
+                "project_slug": proj_slug,
+                "project_dir": proj_dir,
+                "live_url": f"/projects/{proj_slug}/index.html",
+            }
         return {
             "status": "ok",
             "active_folder": active_folder,
             "active_permission": active_perm,
             "granted_folders": perm_mgr.list_granted_folders(),
+            "latest_project": latest_project,
         }
 
     @app.post("/api/projects/builder/pick-folder")
