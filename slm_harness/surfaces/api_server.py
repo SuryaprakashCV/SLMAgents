@@ -22,6 +22,8 @@ import base64
 import json
 import os
 import re
+import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -1569,19 +1571,29 @@ def mount_harness_routes(app: FastAPI) -> None:
 
     @app.post("/api/projects/builder/pick-folder")
     async def pick_native_project_folder(request: Request) -> Dict[str, Any]:
+        import subprocess
+        import sys
         from ..governance.policy import get_folder_permission_manager
 
         perm_mgr = get_folder_permission_manager()
         chosen_path = ""
         if sys.platform == "darwin":
             try:
-                script = 'POSIX path of (choose folder with prompt "Select Workspace Folder Path:")'
-                proc = subprocess.run(
-                    ["osascript", "-e", script],
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                )
+                def _run_osascript() -> subprocess.CompletedProcess:
+                    return subprocess.run(
+                        [
+                            "osascript",
+                            "-e",
+                            "activate",
+                            "-e",
+                            'POSIX path of (choose folder with prompt "Select Workspace Folder Path:")',
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                    )
+
+                proc = await asyncio.to_thread(_run_osascript)
                 if proc.returncode == 0 and (proc.stdout or "").strip():
                     chosen_path = (proc.stdout or "").strip().rstrip("/")
             except Exception as exc:
@@ -1597,6 +1609,74 @@ def mount_harness_routes(app: FastAPI) -> None:
             "folder_path": norm_path,
             "permission": perm_info,
         }
+
+    @app.post("/api/projects/builder/browse-dirs")
+    async def browse_project_builder_dirs(request: Request) -> Dict[str, Any]:
+        from ..governance.policy import get_folder_permission_manager
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        raw_path = str(body.get("path") or "").strip()
+        home_dir = os.path.expanduser("~")
+        if not raw_path:
+            desktop = os.path.join(home_dir, "Desktop")
+            target_dir = desktop if os.path.isdir(desktop) else home_dir
+        else:
+            expanded = os.path.expanduser(raw_path)
+            target_dir = os.path.abspath(expanded)
+            while target_dir and not os.path.isdir(target_dir):
+                parent = os.path.dirname(target_dir)
+                if parent == target_dir:
+                    target_dir = home_dir
+                    break
+                target_dir = parent
+
+        parent_dir = os.path.dirname(target_dir)
+        subdirs: List[Dict[str, str]] = []
+        try:
+            for entry in sorted(os.scandir(target_dir), key=lambda e: e.name.lower()):
+                if entry.name.startswith("."):
+                    continue
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        subdirs.append({"name": entry.name, "path": entry.path})
+                except OSError:
+                    continue
+        except OSError:
+            pass
+
+        quick_roots = []
+        for label, rel in [("Desktop", "Desktop"), ("Documents", "Documents"), ("Downloads", "Downloads"), ("Home (~)", "")]:
+            qp = os.path.join(home_dir, rel).rstrip("/") if rel else home_dir
+            if os.path.isdir(qp):
+                quick_roots.append({"label": label, "path": qp})
+
+        perm_mgr = get_folder_permission_manager()
+        perm_info = perm_mgr.check_permission(target_dir, operation="all")
+        return {
+            "status": "ok",
+            "current_path": target_dir,
+            "parent_path": parent_dir if parent_dir != target_dir else "",
+            "directories": subdirs[:120],
+            "quick_roots": quick_roots,
+            "permission": perm_info,
+        }
+
+    @app.post("/api/projects/builder/mkdir")
+    async def create_project_builder_dir(request: Request) -> Dict[str, Any]:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        parent_path = os.path.abspath(os.path.expanduser(str(body.get("parent_path") or "~").strip()))
+        folder_name = str(body.get("folder_name") or "").strip().strip("/\\")
+        if not folder_name:
+            raise HTTPException(status_code=400, detail="folder_name is required")
+        new_dir = os.path.abspath(os.path.join(parent_path, folder_name))
+        os.makedirs(new_dir, exist_ok=True)
+        return {"status": "ok", "folder_path": new_dir}
 
     @app.post("/api/projects/builder/check-permission")
     async def check_project_folder_permission(request: Request) -> Dict[str, Any]:

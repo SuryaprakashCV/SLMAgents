@@ -1111,11 +1111,21 @@
       <label for="simple-workspace-path-input" style="display: block; font-size: 0.8rem; font-weight: 600; color: #334155; margin-bottom: 6px;">
         Choose Workspace Folder Path
       </label>
-      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+      <div style="display: flex; gap: 8px; margin-bottom: 10px;">
         <input type="text" id="simple-workspace-path-input" class="issue-input" style="flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem;" placeholder="e.g. ~/Desktop/my_project">
         <button type="button" onclick="browseNativeWorkspaceFolder(this)" style="background: #0f172a; color: #ffffff; border: none; border-radius: 8px; padding: 8px 13px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
           📂 Browse...
         </button>
+      </div>
+
+      <!-- Inline Folder Browser (opens immediately on Browse + syncs with macOS Finder dialog) -->
+      <div id="simple-inline-folder-browser" style="display: none; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; padding: 10px; margin-bottom: 12px;">
+        <div id="simple-inline-quick-roots" style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px;"></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px;">
+          <div id="simple-inline-current-dir" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.72rem; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;"></div>
+          <button type="button" onclick="createNewSimpleSubfolder()" style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 3px 8px; font-size: 0.71rem; font-weight: 600; color: #0f172a; cursor: pointer; white-space: nowrap;">+ New Folder</button>
+        </div>
+        <div id="simple-inline-dir-list" style="max-height: 150px; overflow-y: auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 7px; padding: 4px;"></div>
       </div>
 
       <label style="display: flex; align-items: flex-start; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 9px; padding: 10px 12px; font-size: 0.77rem; color: #334155; cursor: pointer; margin-bottom: 14px;">
@@ -1174,7 +1184,95 @@
       if (modal) modal.style.display = 'none';
     }
 
+    var _simpleCurrentBrowseDir = '';
+
+    async function loadSimpleInlineDirectories(targetPath) {
+      var box = document.getElementById('simple-inline-folder-browser');
+      if (box) box.style.display = 'block';
+      try {
+        var res = await fetch('/api/projects/builder/browse-dirs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: targetPath || '' })
+        });
+        var data = await res.json();
+        if (!data || data.status !== 'ok') return;
+        _simpleCurrentBrowseDir = data.current_path || '';
+        var inp = document.getElementById('simple-workspace-path-input');
+        if (inp && _simpleCurrentBrowseDir) {
+          inp.value = _simpleCurrentBrowseDir;
+        }
+        var curLbl = document.getElementById('simple-inline-current-dir');
+        if (curLbl) curLbl.textContent = _simpleCurrentBrowseDir;
+
+        var rootsEl = document.getElementById('simple-inline-quick-roots');
+        if (rootsEl && Array.isArray(data.quick_roots)) {
+          rootsEl.innerHTML = '';
+          data.quick_roots.forEach(function (r) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = '📁 ' + r.label;
+            b.style.cssText = 'background:#ffffff;border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:0.71rem;font-weight:600;color:#334155;cursor:pointer;';
+            b.onclick = function () { loadSimpleInlineDirectories(r.path); };
+            rootsEl.appendChild(b);
+          });
+        }
+
+        var listEl = document.getElementById('simple-inline-dir-list');
+        if (listEl) {
+          listEl.innerHTML = '';
+          if (data.parent_path) {
+            var upRow = document.createElement('div');
+            upRow.style.cssText = 'padding:5px 8px;font-size:0.76rem;color:#475569;cursor:pointer;border-radius:5px;font-weight:600;';
+            upRow.textContent = '⬆️ .. (Parent Folder)';
+            upRow.onclick = function () { loadSimpleInlineDirectories(data.parent_path); };
+            listEl.appendChild(upRow);
+          }
+          var dirs = Array.isArray(data.directories) ? data.directories : [];
+          if (dirs.length === 0) {
+            var empty = document.createElement('div');
+            empty.style.cssText = 'padding:6px 8px;font-size:0.74rem;color:#94a3b8;';
+            empty.textContent = 'No subfolders (this folder is selected)';
+            listEl.appendChild(empty);
+          } else {
+            dirs.forEach(function (d) {
+              var row = document.createElement('div');
+              row.style.cssText = 'padding:5px 8px;font-size:0.76rem;color:#0f172a;cursor:pointer;border-radius:5px;display:flex;align-items:center;gap:6px;';
+              row.textContent = '📂 ' + d.name;
+              row.onmouseenter = function () { row.style.background = '#f1f5f9'; };
+              row.onmouseleave = function () { row.style.background = 'transparent'; };
+              row.onclick = function () { loadSimpleInlineDirectories(d.path); };
+              listEl.appendChild(row);
+            });
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function createNewSimpleSubfolder() {
+      var name = window.prompt('New folder name:', 'my_project');
+      if (!name || !name.trim()) return;
+      try {
+        var inp = document.getElementById('simple-workspace-path-input');
+        var base = _simpleCurrentBrowseDir || (inp && inp.value.trim()) || '~';
+        var res = await fetch('/api/projects/builder/mkdir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parent_path: base, folder_name: name.trim() })
+        });
+        var data = await res.json();
+        if (data && data.folder_path) {
+          await loadSimpleInlineDirectories(data.folder_path);
+        }
+      } catch (e) {}
+    }
+
     async function browseNativeWorkspaceFolder(btn) {
+      var inp = document.getElementById('simple-workspace-path-input');
+      var startPath = (inp && inp.value.trim()) || '';
+      // Immediately open the inline folder picker for instant visual response
+      loadSimpleInlineDirectories(startPath);
+
       var orig = btn ? btn.textContent : '📂 Browse...';
       if (btn) { btn.disabled = true; btn.textContent = 'Opening...'; }
       try {
@@ -1185,8 +1283,8 @@
         });
         var data = await res.json();
         if (data && data.status === 'ok' && data.folder_path) {
-          var inp = document.getElementById('simple-workspace-path-input');
           if (inp) inp.value = data.folder_path;
+          loadSimpleInlineDirectories(data.folder_path);
         }
       } catch (e) {} finally {
         if (btn) { btn.disabled = false; btn.textContent = orig; }
