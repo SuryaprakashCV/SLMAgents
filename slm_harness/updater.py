@@ -28,8 +28,8 @@ DEFAULT_CENTRAL_BRANCH = os.environ.get("SLM_CENTRAL_BRANCH", "slm-agents-2.0")
 CANDIDATE_GIT_SOURCES: List[Tuple[str, str]] = [
     (DEFAULT_CENTRAL_REPO, DEFAULT_CENTRAL_BRANCH),
     (DEFAULT_CENTRAL_REPO, "main"),
-    ("t00114218-stack/SLMAgents", "slm-agents-2.0"),
-    ("t00114218-stack/SLMAgents", "main"),
+    ("SuryaprakashCV/SLMAgents", "slm-agents-2.0"),
+    ("SuryaprakashCV/SLMAgents", "main"),
 ]
 
 SYNC_ROOT = os.path.expanduser("~/.slm_harness/central_sync")

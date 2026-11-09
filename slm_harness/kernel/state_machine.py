@@ -46,6 +46,11 @@ from ..tools.file_exporter import (
 )
 from ..personalization import detect_concierge_intent, get_concierge_engine
 from ..tools.machine_control import MachineControlEngine, detect_machine_control_intent
+from ..tools.project_builder import (
+    LocalProjectBuilder,
+    is_followup_build_command,
+    should_execute_local_project_build,
+)
 from ..tools.media_doc_intelligence import (
     _DEEP_DOC_READ_INTENT_RE,
     MediaDocIntelligenceEngine,
@@ -500,6 +505,42 @@ class TurnStateMachine:
             and len(words) >= 4
         )
 
+        if is_followup_build_command(q_clean) or should_execute_local_project_build(user_query, clarification_choice):
+            steps = [
+                {
+                    "node_id": "plan_1",
+                    "agent": "slm_task_planner",
+                    "instruction": f"Step 1 — Scaffold local project directory on disk for: {q_clean[:85]}",
+                    "depends_on": [],
+                },
+                {
+                    "node_id": "plan_2",
+                    "agent": "slm_code_interpreter",
+                    "instruction": "Step 2 — Write complete source files to disk (index.html, styles.css, app.js, engine.py, server.py, tests/test_project.py)",
+                    "depends_on": ["plan_1"],
+                },
+                {
+                    "node_id": "plan_3",
+                    "agent": "slm_code_interpreter",
+                    "instruction": "Step 3 — Execute local automated unit, boundary & security test suite (`python3 -m unittest`)",
+                    "depends_on": ["plan_2"],
+                },
+                {
+                    "node_id": "plan_4",
+                    "agent": "slm_cli_agent",
+                    "instruction": "Step 4 — Mount live local web application & package downloadable project ZIP archive",
+                    "depends_on": ["plan_3"],
+                },
+            ]
+            return {
+                "needs_blocking_clarification": False,
+                "question": "",
+                "options": [],
+                "steps": steps,
+                "plan_markdown": "",
+                "plan_context": "Create all project files on local disk, execute the local automated test suite, and complete the project.",
+            }
+
         if not clarification_choice and (is_explicit_plan_cmd or is_complex_build_ask or is_complex_test_ask):
             action_focus = "building and testing" if (is_complex_build_ask and is_complex_test_ask) else (
                 "testing and verifying" if is_complex_test_ask else "building"
@@ -508,48 +549,48 @@ class TurnStateMachine:
                 {
                     "node_id": "plan_1",
                     "agent": "slm_task_planner",
-                    "instruction": f"Step 1 — Scope architecture, data contracts & interface boundaries for: {q_clean[:85]}",
+                    "instruction": f"Step 1 — Scaffold local project workspace & architecture on disk for: {q_clean[:85]}",
                     "depends_on": [],
                 },
                 {
                     "node_id": "plan_2",
                     "agent": "slm_code_interpreter",
-                    "instruction": "Step 2 — Implement clean, modular core logic with type safety & edge-case guards",
+                    "instruction": "Step 2 — Create complete source files on disk (HTML/CSS/JS frontend, Python backend engine & server)",
                     "depends_on": ["plan_1"],
                 },
                 {
                     "node_id": "plan_3",
                     "agent": "slm_code_interpreter",
-                    "instruction": "Step 3 — Build & run automated test suite (happy path, boundary cases & error handling) in sandbox",
+                    "instruction": "Step 3 — Build & run automated test suite (happy path, boundary cases & security checks) locally",
                     "depends_on": ["plan_2"],
                 },
                 {
                     "node_id": "plan_4",
                     "agent": primary_agent,
-                    "instruction": "Step 4 — Review sandbox output & walk through how to run and extend it",
+                    "instruction": "Step 4 — Mount live local web app URL & package downloadable project ZIP",
                     "depends_on": ["plan_3"],
                 },
             ]
-            question = "Does this plan look good to you, or would you like to tweak anything before I start?"
+            question = "Does this plan look good to you, or would you like to tweak anything before I build the files locally?"
             options = [
                 "✅ Looks great — go ahead and build it!",
                 "🧪 Go ahead + include an expanded test & edge-case suite",
                 "⚡ Keep it lightweight — build a clean, fast MVP first",
             ]
             plan_markdown = (
-                f"I'd love to help you with **{action_focus}** this! Since this has a few moving parts, let's quickly align on a game plan before I jump into writing and running the code:\n\n"
-                f"### 🗺️ Proposed Game Plan for: *{q_clean}*\n\n"
-                f"1. **Step 1 — Architecture & Data Contracts**\n"
-                f"   We'll lay out clean data models, interfaces, and validation rules so the foundation is solid and easy to extend.\n"
-                f"2. **Step 2 — Core Implementation & Edge-Case Guards**\n"
-                f"   I'll write self-contained, production-ready code with full type hints, structured error handling, and guards for empty, invalid, or boundary inputs.\n"
-                f"3. **Step 3 — Automated Testing & Live Sandbox Verification**\n"
-                f"   I'll build a runnable test suite covering normal workflows, edge cases, and failure modes, and execute it directly in the isolated sandbox so we know everything passes.\n"
-                f"4. **Step 4 — Clear Walkthrough & Next Steps**\n"
-                f"   Finally, I'll share the verified output, complexity notes, and how you can plug it right into your workflow.\n\n"
+                f"I'd love to help you with **{action_focus}** this locally! Since this is a multi-file project, let's quickly align on the plan before I create the files on your disk and run the test suite:\n\n"
+                f"### 🗺️ Proposed Local Build Plan for: *{q_clean}*\n\n"
+                f"1. **Step 1 — Local Project Scaffolding (`projects/<slug>/`)**\n"
+                f"   I'll create a dedicated local project directory on your machine with clean frontend, backend, and test folders.\n"
+                f"2. **Step 2 — Complete Multi-File Source Code Creation on Disk**\n"
+                f"   I'll write the working files directly to disk (`index.html`, `styles.css`, `app.js`, `engine.py`, `server.py`, and `README.md`) with full edge-case and security guards.\n"
+                f"3. **Step 3 — Automated Local Testing & Verification (`unittest`)**\n"
+                f"   I'll create `tests/test_project.py` and execute it locally on your CPU to verify that all functional, boundary, and security checks pass.\n"
+                f"4. **Step 4 — Live Local Web App & Project ZIP Package**\n"
+                f"   I'll mount the built web application at a live `http://localhost:8000/projects/...` URL so you can open it immediately, plus provide a `.zip` package of the entire project.\n\n"
                 f"---\n"
                 f"💬 **{question}**\n"
-                f"*(You can click one of the quick options below, or just reply naturally in chat — e.g. \"sounds good, go ahead\" or tell me any changes you'd like!)*"
+                f"*(Click one of the quick options below or reply **\"build it locally\"** / **\"yes, go ahead\"** to create all files and complete the project right away!)*"
             )
             return {
                 "needs_blocking_clarification": True,
@@ -729,10 +770,12 @@ class TurnStateMachine:
                         pass
                 if not clarification_choice:
                     clarification_choice = reply_clean
-                # If the user clicked an option and frontend sent chosenOption as message, restore orig_plan_query
+                # If the user clicked an option and frontend sent chosenOption or orig_plan_query as message, restore orig_plan_query
                 if (
                     is_consent_prompt
                     or reply_clean == clarification_choice
+                    or reply_clean.lower() == orig_plan_query.lower()
+                    or orig_plan_query.lower() in reply_low
                     or len(reply_clean.split()) <= 12
                     or reply_low.startswith(("yes", "looks", "sounds", "go ahead", "move forward", "proceed", "✅", "🧪", "⚡"))
                 ):
@@ -746,10 +789,12 @@ class TurnStateMachine:
                 # User moved on to a different topic/question; clear pending plan state
                 bb.put(session_id, "pending_plan_state", None)
 
+        prev_session_user_query = str(bb.get(session_id, "last_user_query") or "").strip()
+
         # Resolve conversational retry phrases ("retry", "retry it", "try again") to the last user query
         _retry_re = re.compile(r"^(?:please\s+)?(?:retry(?:\s+it|\s+this|\s+that)?|try\s+again|run\s+(?:it\s+)?again|regenerate)\s*[.!]*$", re.IGNORECASE)
         if _retry_re.match((user_query or "").strip()):
-            prev_q = str(bb.get(session_id, "last_user_query") or "").strip()
+            prev_q = prev_session_user_query
             if not prev_q:
                 for node in reversed(list(ckpt.get_branch_lineage(session_id, limit=10))):
                     if node.role == "user" and not _retry_re.match(node.content.strip()):
@@ -757,7 +802,7 @@ class TurnStateMachine:
                         break
             if prev_q:
                 user_query = prev_q
-        elif (user_query or "").strip():
+        elif (user_query or "").strip() and not is_followup_build_command(user_query):
             bb.put(session_id, "last_user_query", (user_query or "").strip())
 
         if clarification_choice:
@@ -1414,6 +1459,20 @@ class TurnStateMachine:
                 and _CREATOR_IDENTITY_RE.search(user_query or "")
             )
 
+            lineage_user_queries = [n.content for n in lineage_Preview if n.role == "user"]
+            is_local_project_build_turn = bool(
+                json_schema is None
+                and not is_pure_skill_mutation_turn
+                and not is_creator_identity_turn
+                and not is_machine_control_turn
+                and not is_concierge_turn
+                and should_execute_local_project_build(
+                    user_query=user_query,
+                    clarification_choice=clarification_choice,
+                    last_user_query=prev_session_user_query,
+                )
+            )
+
             streamed_live_tokens = False
 
             if is_pure_skill_mutation_turn:
@@ -1430,6 +1489,36 @@ class TurnStateMachine:
                 backend_used = target_spec.backend
                 ttft_ms = 8.0
                 tok_per_sec = 240.0
+
+            elif is_local_project_build_turn:
+                proj_builder = LocalProjectBuilder(workspace_dir=self.config.workspace_dir)
+
+                def _on_build_thought(agent_lbl: str, thought_msg: str) -> None:
+                    self.bus.emit(
+                        EventType.STEP_COMPLETED,
+                        rid,
+                        session_id,
+                        agent=agent_lbl or "slm_code_interpreter",
+                        message=thought_msg,
+                    )
+
+                with tracer.span(rid, "local_project_builder", "tool", parent_id=root_span.span_id):
+                    build_out = proj_builder.build_project(
+                        user_query=user_query,
+                        session_id=session_id,
+                        run_id=rid,
+                        clarification_choice=clarification_choice or "",
+                        last_user_query=prev_session_user_query,
+                        lineage_queries=lineage_user_queries,
+                        step_callback=_on_build_thought,
+                    )
+                route_dec.primary_agent = "slm_code_interpreter"
+                final_text = build_out.markdown_response
+                structured_out = build_out.structured_data
+                model_id_used = "slm-local-project-builder"
+                backend_used = "local-workspace-builder"
+                ttft_ms = 12.0
+                tok_per_sec = 285.0
 
             elif is_machine_control_turn:
                 mc_engine = MachineControlEngine(workspace_dir=self.config.workspace_dir)
@@ -1791,7 +1880,14 @@ class TurnStateMachine:
                 )
 
             # 5. Materialize real downloadable files & run Design Studio Critic
-            if json_schema is None and final_text and not is_pure_skill_mutation_turn and not is_machine_control_turn and not is_concierge_turn:
+            if (
+                json_schema is None
+                and final_text
+                and not is_pure_skill_mutation_turn
+                and not is_machine_control_turn
+                and not is_concierge_turn
+                and not is_local_project_build_turn
+            ):
                 if also_run_task and mutated_skill is not None:
                     action_verb = "Updated & Applied Skill" if is_skill_improve_turn else "Created & Applied Skill"
                     skill_banner = (
@@ -2384,7 +2480,15 @@ class TurnStateMachine:
         if _CREATOR_IDENTITY_RE.search(q_clean) and "suryaprakash" not in stripped.lower():
             return False, "creator identity query missing Suryaprakash attribution"
 
-        # 8. Detect overly brief / truncated stub responses on substantive queries
+        # 8. Detect project build requests that only printed a chat overview or simulated link instead of creating local files on disk
+        if (
+            should_execute_local_project_build(q_clean)
+            or "this is a simulated link" in stripped.lower()
+            or "want me to generate the full source code" in stripped.lower()
+        ) and "local project built & verified on disk" not in stripped.lower():
+            return False, "project build request printed chat overview instead of creating local files"
+
+        # 9. Detect overly brief / truncated stub responses on substantive queries
         if len(stripped) < 28 and len(q_clean.split()) >= 4:
             return False, f"response too brief ({len(stripped)} chars) to be helpful"
 
@@ -2447,6 +2551,20 @@ class TurnStateMachine:
 
         if "creator identity" in reason:
             return self._build_creator_identity_response(), True
+
+        if "project build" in reason:
+            try:
+                prev_q = str(get_blackboard().get(session_id, "last_user_query") or "").strip()
+                build_out = LocalProjectBuilder(workspace_dir=self.config.workspace_dir).build_project(
+                    user_query=q_clean,
+                    session_id=session_id,
+                    run_id=run_id,
+                    last_user_query=prev_q,
+                    step_callback=_on_critic_thought,
+                )
+                return build_out.markdown_response, True
+            except Exception:
+                pass
 
         if "personalization" in reason:
             try:

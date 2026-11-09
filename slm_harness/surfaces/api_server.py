@@ -1550,3 +1550,50 @@ def mount_harness_routes(app: FastAPI) -> None:
                 ctok.cancel("Stream closed")
 
         return StreamingResponse(_oai_sse(), media_type="text/event-stream")
+
+    # --- Built Local Projects Live Hosting & API (`/projects/<slug>/...`) ---
+
+    @app.post("/api/projects/autotest/evaluate")
+    async def evaluate_autotest_project_endpoint(request: Request) -> Dict[str, Any]:
+        import importlib.util
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        code = str(body.get("code") or "")
+        app_name = str(body.get("app_name") or "target_app.html")
+        profiles = body.get("profiles") or ["functional", "edge_cases", "security", "performance"]
+
+        ws_dir = os.path.abspath(get_config().workspace_dir)
+        engine_path = os.path.join(ws_dir, "projects", "autotest_hub", "engine.py")
+        if not os.path.isfile(engine_path):
+            from ..tools.project_builder import LocalProjectBuilder
+
+            LocalProjectBuilder(workspace_dir=ws_dir).build_project(
+                user_query="build a website for test suite which automatically tests and evaluates any applications",
+                session_id="autotest_init",
+            )
+        spec = importlib.util.spec_from_file_location("autotest_hub_engine", engine_path)
+        if spec and spec.loader:
+            import sys
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules["autotest_hub_engine"] = mod
+            spec.loader.exec_module(mod)
+            eng = mod.AutoTestEvaluationEngine()
+            rep = eng.evaluate_application(code=code, app_name=app_name, profiles=profiles)
+            return rep.to_dict()
+        raise HTTPException(status_code=500, detail="AutoTestHub engine unavailable")
+
+    @app.get("/projects/{project_slug}")
+    @app.get("/projects/{project_slug}/{file_path:path}")
+    async def serve_built_project_file(project_slug: str, file_path: str = "index.html") -> FileResponse:
+        clean_slug = re.sub(r"[^A-Za-z0-9_.\-]", "", project_slug or "")
+        rel = (file_path or "index.html").strip("/") or "index.html"
+        ws_dir = os.path.abspath(get_config().workspace_dir)
+        proj_root = os.path.abspath(os.path.join(ws_dir, "projects", clean_slug))
+        target = os.path.abspath(os.path.join(proj_root, rel))
+        if not target.startswith(proj_root) or not os.path.isfile(target):
+            raise HTTPException(status_code=404, detail=f"Project file not found: {clean_slug}/{rel}")
+        return FileResponse(target)
+

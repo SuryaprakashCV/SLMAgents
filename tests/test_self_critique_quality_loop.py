@@ -158,6 +158,36 @@ def test_who_built_you_returns_suryaprakash():
     assert "suryaprakash" in repaired_text.lower()
 
 
+def test_local_project_build_creates_files_runs_tests_and_completes_project():
+    import os
+
+    kernel = get_kernel()
+    # 1. Confirming a build plan creates all files on disk, runs tests, and returns live URL + ZIP
+    outcome = kernel.run_turn(
+        user_query="i want to build a website for test suitw which automaticaly test and and evaluate any applications..",
+        session_id="test_local_build_session",
+        clarification_choice="🧪 Go ahead + include an expanded test & edge-case suite",
+        client_surface="web",
+    )
+    assert "Local Project Built & Verified on Disk" in outcome.final_text
+    assert "http://localhost:8000/projects/autotest_hub/index.html" in outcome.final_text
+    assert "TESTS PASSED" in outcome.final_text
+    assert "this is a simulated link" not in outcome.final_text.lower()
+
+    proj_dir = outcome.structured_output["project_dir"]
+    for expected_file in ("index.html", "styles.css", "app.js", "engine.py", "server.py", "tests/test_project.py", "README.md"):
+        assert os.path.isfile(os.path.join(proj_dir, expected_file)), f"Missing {expected_file} in {proj_dir}"
+
+    # 2. Follow-up "build it locally" also builds and completes the project on disk
+    outcome_followup = kernel.run_turn(
+        user_query="build it locally",
+        session_id="test_local_build_session",
+        client_surface="web",
+    )
+    assert "Local Project Built & Verified on Disk" in outcome_followup.final_text
+    assert "http://localhost:8000/projects/autotest_hub/index.html" in outcome_followup.final_text
+
+
 if __name__ == "__main__":
     test_inspect_response_quality_detects_hollow_replies()
     test_document_deep_self_critique_recovery_when_source_missing()
@@ -165,7 +195,8 @@ if __name__ == "__main__":
     test_kernel_turn_readme_and_critic_repair()
     test_web_personalization_query_returns_security_notice_and_download_links()
     test_who_built_you_returns_suryaprakash()
-    print("ALL 6 SELF-CRITIQUE, WEB PERSONALIZATION & CREATOR IDENTITY TESTS PASSED!")
+    test_local_project_build_creates_files_runs_tests_and_completes_project()
+    print("ALL 7 SELF-CRITIQUE, WEB PERSONALIZATION, CREATOR IDENTITY & LOCAL PROJECT BUILD TESTS PASSED!")
 
 
 
