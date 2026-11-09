@@ -432,15 +432,24 @@ class CascadeRouter:
         margin = best_sim - second_sim
 
         stage_label = "stage2_embedding_margin"
-        # Prevent multimodal specialists from being selected without matching media attachments
+        # Prevent multimodal and narrow domain specialists from being selected without matching domain cues
         has_image_art = any(a.kind == "image" for a in artifacts)
         has_audio_art = any(a.kind == "audio" for a in artifacts)
+        has_sql_cue = bool(
+            has_active_sqlite
+            or re.search(
+                r"\b(?:sql|sqlite|postgres|postgresql|mysql|database|db|table|tables|schema|alembic|migration|column|columns|foreign\s+key)\b",
+                q_low,
+            )
+        )
         if best_agent == "slm_vision_parser" and not has_image_art:
             best_agent = "slm_rag" if has_indexed_docs else "direct_assistant"
         elif best_agent == "slm_voice" and not has_audio_art:
             best_agent = "slm_rag" if has_indexed_docs else "direct_assistant"
         elif best_agent == "slm_email" and not _EMAIL_EXPLICIT_RE.search(q_low):
             best_agent = "direct_assistant"
+        elif best_agent in ("slm_db_migration", "slm_text_to_sql") and not has_sql_cue:
+            best_agent = "slm_code_interpreter" if re.search(r"\b(?:design|ui|theme|layout|style|color|css|html|app|project|button|page)\b", q_low) else "direct_assistant"
 
         # If session has indexed RAG docs and query asks factual document questions (not code/math/sql), favor RAG grounding
         if has_indexed_docs and best_agent in ("direct_assistant", "slm_vision_parser", "slm_document_parser"):

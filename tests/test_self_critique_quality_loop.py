@@ -371,6 +371,17 @@ def test_iterative_project_edit_and_canvas_payload() -> None:
                 html_content = fh.read()
             assert "btn-theme-toggle" in html_content
             assert "btn-export-csv" in html_content
+
+            # Conversational design change follow-up ("can you change its design")
+            design_prompt = "can you change its design"
+            assert should_execute_local_project_build(design_prompt) is True
+            outcome3 = builder.build_project(user_query=design_prompt)
+            assert outcome3.project_dir == outcome1.project_dir
+            assert outcome3.structured_data.get("iterative_edit") is True
+            assert outcome3.test_passed is True
+            with open(os.path.join(outcome3.project_dir, "index.html"), "r", encoding="utf-8") as fh:
+                html3 = fh.read()
+            assert 'class="theme-royal"' in html3 or 'class="light-theme"' in html3
     finally:
         if prev_active:
             perm_mgr.grant_permission(

@@ -2146,6 +2146,10 @@ function loadChatSessionsFromStorage() {
       chatSessions = JSON.parse(raw);
       let mutated = false;
       chatSessions.forEach(sess => {
+        if (sess.isGenerating && !window.activeHarnessRunId) {
+          sess.isGenerating = false;
+          mutated = true;
+        }
         (sess.messages || []).forEach(msg => {
           if (Array.isArray(msg.thoughts) && msg.thoughts.length > 0) {
             const cleaned = dedupeThoughtSteps(msg.thoughts);
@@ -2521,11 +2525,13 @@ function renderCurrentSessionMessages() {
     appendMessageElementToViewport(msg.role, msg.text, msg.attachments, msg.routedAgent, msg.thoughts, false, msg.meta || null);
   });
 
-  // If this session is actively generating, render the live in-progress streaming card
+  // If this session is actively generating, render the live in-progress streaming card with matching selectors
   if (session.isGenerating) {
+    const activeReqId = session._activeReqId || window.activeHarnessRunId || "";
     const typingRow = document.createElement("div");
-    typingRow.className = "chat-msg-row assistant";
-    typingRow.id = "chat-typing-indicator";
+    typingRow.className = "chat-msg-row assistant typing-indicator-row";
+    if (activeReqId) typingRow.dataset.reqId = activeReqId;
+    typingRow.dataset.sessionId = session.id;
     const thoughts = session._liveThoughts || ["Analyzing query & extracting execution constraints..."];
     const activeThought = thoughts[thoughts.length - 1] || "Executing Reasoning Pipeline";
     const tokens = session._liveTokens || "";
@@ -2536,44 +2542,49 @@ function renderCurrentSessionMessages() {
       timelineHtml += `
         <div class="live-step-row ${isLast ? 'active' : 'completed'}">
           <div class="live-step-icon">
-            ${isLast ? '<div class="step-spinner"></div>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'}
+            ${isLast ? '<div class="step-spinner"></div>' : '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'}
           </div>
-          <div class="live-step-text">${th}</div>
+          <div class="live-step-text">${formatThoughtStepHtml(th)}</div>
         </div>
       `;
     });
 
     typingRow.innerHTML = `
-      <div class="chat-avatar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <div class="chat-assistant-avatar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       </div>
-      <div class="chat-bubble-container" style="width: 100%;">
-        <div class="chat-msg-meta">
-          <span>Assistant</span>
-          <span class="agent-routed-ghost" id="chat-live-routed-pill" title="Reasoning & Routing...">
-            <span class="ghost-dot" style="animation: pulseRec 1s infinite;"></span>
-            <span class="ghost-text">${session._liveRoutedAgent || 'Reasoning &amp; Routing...'}</span>
+      <div class="chat-assistant-body">
+        <div class="chat-assistant-header">
+          <span class="assistant-agent-tag live-routed-pill" title="Reasoning & Routing...">
+            <span class="tag-status-dot" style="animation: pulseRec 1s infinite;"></span>
+            <span>${escapeHtmlSafe(session._liveRoutedAgent || "Reasoning & Routing...")}</span>
           </span>
         </div>
-        <div class="live-engine-card" id="chat-live-engine-card">
+        <div class="live-engine-card">
           <div class="live-engine-header">
             <div class="live-engine-title-wrap">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              <span class="live-engine-title" id="chat-live-thought-title">${activeThought}</span>
+              <span class="live-engine-title live-thought-title">${formatThoughtStepHtml(activeThought)}</span>
             </div>
-            <div class="live-engine-timer" id="chat-live-timer">Active</div>
+            <div style="display: inline-flex; align-items: center; gap: 8px;">
+              <div class="live-engine-timer live-stopwatch-timer">Active</div>
+              <button type="button" class="btn-force-quit-inline" onclick="forceQuitActiveGeneration('${escapeHtmlSafe(activeReqId)}')" title="Force Quit Execution Immediately (Esc)">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1.5" width="9" height="9" rx="2"></rect></svg>
+                <span>Force Quit</span>
+              </button>
+            </div>
           </div>
-          <div class="live-engine-timeline" id="chat-live-timeline">
+          <div class="live-engine-timeline live-step-timeline">
             ${timelineHtml}
           </div>
         </div>
-        <div class="chat-bubble" id="chat-live-response-box" style="display: ${tokens ? 'block' : 'none'}; padding-top: 4px;">
-          <div id="chat-live-token-stream"></div>
+        <div class="chat-assistant-content live-response-bubble" style="display: ${tokens ? 'block' : 'none'}; padding-top: 4px;">
+          <div class="chat-live-token-stream"></div>
         </div>
       </div>
     `;
     viewport.appendChild(typingRow);
-    const streamEl = document.getElementById("chat-live-token-stream");
+    const streamEl = typingRow.querySelector(".chat-live-token-stream");
     if (streamEl && tokens) {
       renderLiveStreamedContent(streamEl, tokens);
     }
@@ -3814,158 +3825,219 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
       const decoder = new TextDecoder();
       let finalPayload = null;
       let streamBuffer = "";
+      session._activeReqId = reqId;
+      session._liveThoughts = accumulatedThoughts;
+      session._liveTokens = "";
+      session._liveRoutedAgent = "Reasoning & Routing...";
       
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        streamBuffer += decoder.decode(value, { stream: true });
-        const lines = streamBuffer.split("\n\n");
-        streamBuffer = lines.pop();
-        
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            let data;
-            try {
-              data = JSON.parse(line.slice(6));
-            } catch (e) {
-              continue;
-            }
-            
-            if (data.type === "thought") {
-              if (data.payload && data.payload.skill && typeof loadSkillsFromRepo === "function") {
-                loadSkillsFromRepo();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          streamBuffer += decoder.decode(value, { stream: true });
+          const lines = streamBuffer.split("\n\n");
+          streamBuffer = lines.pop();
+          
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              let data;
+              try {
+                data = JSON.parse(line.slice(6));
+              } catch (e) {
+                continue;
               }
-              if (Array.isArray(data.plan_steps) && data.plan_steps.length > 0) {
-                accumulatedPlanSteps = data.plan_steps;
-                renderInlinePlanCard(reqId, data.plan_steps, data.reasoning_effort || selectedEffort);
-              }
-              const cleanThought = stripThoughtEmojis(data.thought);
-              if (cleanThought && !accumulatedThoughts.includes(cleanThought)) {
-                accumulatedThoughts.push(cleanThought);
-              }
-              if (data.routed_agent) {
-                accumulatedRoutedAgent = formatHumanAgentName(data.routed_agent);
-              } else if (data.thought && data.thought.includes("Routed to: ")) {
-                const ag = data.thought.split("Routed to: ")[1].split(/[•·(]/)[0].trim();
-                accumulatedRoutedAgent = formatHumanAgentName(ag);
-              }
-              if (currentSessionId === targetSessionId && cleanThought) {
-                const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
-                if (activeRow) {
-                  const liveTitle = activeRow.querySelector(".live-thought-title");
-                  const liveTimeline = activeRow.querySelector(".live-step-timeline");
-                  const livePill = activeRow.querySelector(".live-routed-pill");
-                  if (liveTitle) {
-                    liveTitle.innerHTML = formatThoughtStepHtml(cleanThought);
-                  }
-                  if (livePill && accumulatedRoutedAgent) {
-                    const spans = livePill.querySelectorAll("span");
-                    const label = spans.length > 1 ? spans[spans.length - 1] : null;
-                    if (label) label.textContent = accumulatedRoutedAgent;
-                  }
-                  if (liveTimeline) {
-                    liveTimeline.querySelectorAll(".live-step-row").forEach(row => {
-                      row.className = "live-step-row completed";
-                      const icon = row.querySelector(".live-step-icon");
-                      if (icon) icon.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-                    });
-                    const newStep = document.createElement("div");
-                    newStep.className = "live-step-row active";
-                    newStep.innerHTML = `
-                      <div class="live-step-icon"><div class="step-spinner"></div></div>
-                      <div class="live-step-text">${formatThoughtStepHtml(cleanThought)}</div>
-                    `;
-                    liveTimeline.appendChild(newStep);
-                    const vp = document.getElementById("chat-messages-viewport");
-                    autoScrollChatViewport(vp, false);
-                  }
+              
+              if (data.type === "thought") {
+                if (data.payload && data.payload.skill && typeof loadSkillsFromRepo === "function") {
+                  loadSkillsFromRepo();
                 }
-              }
-            } else if (data.type === "run_started") {
-              window.activeHarnessRunId = data.run_id || reqId;
-              updateHarnessTelemetryPill(data.primary_model ? `${data.primary_model} • starting` : "CPU Running...");
-            } else if (data.type === "prefill_progress" && data.payload) {
-              const pd = data.payload.prefill_done || 0;
-              const pt = data.payload.prefill_total || 0;
-              if (pt > 0) {
-                updateHarnessTelemetryPill(`Prefill ${pd}/${pt} tok`);
-                if (currentSessionId === targetSessionId) {
+                if (Array.isArray(data.plan_steps) && data.plan_steps.length > 0) {
+                  accumulatedPlanSteps = data.plan_steps;
+                  renderInlinePlanCard(reqId, data.plan_steps, data.reasoning_effort || selectedEffort);
+                }
+                const cleanThought = stripThoughtEmojis(data.thought);
+                if (cleanThought && !accumulatedThoughts.includes(cleanThought)) {
+                  accumulatedThoughts.push(cleanThought);
+                  session._liveThoughts = [...accumulatedThoughts];
+                }
+                if (data.routed_agent) {
+                  accumulatedRoutedAgent = formatHumanAgentName(data.routed_agent);
+                  session._liveRoutedAgent = accumulatedRoutedAgent;
+                } else if (data.thought && data.thought.includes("Routed to: ")) {
+                  const ag = data.thought.split("Routed to: ")[1].split(/[•·(]/)[0].trim();
+                  accumulatedRoutedAgent = formatHumanAgentName(ag);
+                  session._liveRoutedAgent = accumulatedRoutedAgent;
+                }
+                if (currentSessionId === targetSessionId && cleanThought) {
                   const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
                   if (activeRow) {
                     const liveTitle = activeRow.querySelector(".live-thought-title");
+                    const liveTimeline = activeRow.querySelector(".live-step-timeline");
+                    const livePill = activeRow.querySelector(".live-routed-pill");
                     if (liveTitle) {
-                      liveTitle.innerHTML = `<span>Prefilling context on local CPU (${pd}/${pt} tokens)...</span>`;
+                      liveTitle.innerHTML = formatThoughtStepHtml(cleanThought);
                     }
-                  }
-                }
-              }
-            } else if (data.type === "approval_required" && data.payload) {
-              renderInlineApprovalCard(reqId, data.run_id || reqId, data.payload);
-            } else if (data.type === "clarification_needed" && data.payload) {
-              accumulatedClarification = {
-                ...data.payload,
-                original_query: data.payload.original_query || cleanMsg
-              };
-              renderInlineClarificationCard(reqId, data.run_id || reqId, accumulatedClarification);
-            } else if (data.type === "token") {
-              if (data.tok_per_sec) {
-                const ttftLbl = data.ttft_ms ? `TTFT ${Math.round(data.ttft_ms)}ms • ` : "";
-                updateHarnessTelemetryPill(`${ttftLbl}${Number(data.tok_per_sec).toFixed(1)} tok/s`);
-              }
-              if (data.token && !data.token.includes("<think>") && !data.token.includes("</think>")) {
-                accumulatedTokens += data.token;
-                if (currentSessionId === targetSessionId) {
-                  const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
-                  if (activeRow) {
-                    const liveBox = activeRow.querySelector(".live-response-bubble");
-                    const streamEl = activeRow.querySelector(".chat-live-token-stream");
-                    if (liveBox) liveBox.style.display = "block";
-                    if (streamEl) {
-                      renderLiveStreamedContent(streamEl, accumulatedTokens);
+                    if (livePill && accumulatedRoutedAgent) {
+                      const spans = livePill.querySelectorAll("span");
+                      const label = spans.length > 1 ? spans[spans.length - 1] : null;
+                      if (label) label.textContent = accumulatedRoutedAgent;
+                    }
+                    if (liveTimeline) {
+                      liveTimeline.querySelectorAll(".live-step-row").forEach(row => {
+                        row.className = "live-step-row completed";
+                        const icon = row.querySelector(".live-step-icon");
+                        if (icon) icon.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                      });
+                      const newStep = document.createElement("div");
+                      newStep.className = "live-step-row active";
+                      newStep.innerHTML = `
+                        <div class="live-step-icon"><div class="step-spinner"></div></div>
+                        <div class="live-step-text">${formatThoughtStepHtml(cleanThought)}</div>
+                      `;
+                      liveTimeline.appendChild(newStep);
                       const vp = document.getElementById("chat-messages-viewport");
                       autoScrollChatViewport(vp, false);
                     }
-                    // Update a single in-place status indicator only when a complete heading line finishes (\n)
-                    const completedHeadings = accumulatedTokens.match(/(?:^|\n)(?:#{1,3}\s+|(?:Slide\s+\d+\s*:))([^\n]{4,75})\n/gi);
-                    if (completedHeadings && completedHeadings.length > 0) {
-                      const rawLast = completedHeadings[completedHeadings.length - 1].replace(/\n$/, "");
-                      const latestHeading = stripThoughtEmojis(rawLast.replace(/^[\s#*•-]+/, ""));
-                      if (latestHeading && latestHeading.length >= 4) {
-                        const stepMsg = `Synthesizing section: ${latestHeading}`;
-                        const liveTitle = activeRow.querySelector(".live-thought-title");
-                        const liveTimeline = activeRow.querySelector(".live-step-timeline");
-                        if (liveTitle) liveTitle.innerHTML = formatThoughtStepHtml(stepMsg);
-                        if (liveTimeline) {
-                          let draftRow = liveTimeline.querySelector('.live-step-row[data-draft-progress="true"]');
-                          if (!draftRow) {
-                            liveTimeline.querySelectorAll(".live-step-row").forEach(row => {
-                              row.className = "live-step-row completed";
-                              const icon = row.querySelector(".live-step-icon");
-                              if (icon) icon.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-                            });
-                            draftRow = document.createElement("div");
-                            draftRow.className = "live-step-row active";
-                            draftRow.dataset.draftProgress = "true";
-                            draftRow.innerHTML = `
-                              <div class="live-step-icon"><div class="step-spinner"></div></div>
-                              <div class="live-step-text">${formatThoughtStepHtml(stepMsg)}</div>
-                            `;
-                            liveTimeline.appendChild(draftRow);
-                          } else {
-                            const txtEl = draftRow.querySelector(".live-step-text");
-                            if (txtEl) txtEl.innerHTML = formatThoughtStepHtml(stepMsg);
+                  }
+                }
+              } else if (data.type === "run_started") {
+                window.activeHarnessRunId = data.run_id || reqId;
+                updateHarnessTelemetryPill(data.primary_model ? `${data.primary_model} • starting` : "CPU Running...");
+              } else if (data.type === "prefill_progress" && data.payload) {
+                const pd = data.payload.prefill_done || 0;
+                const pt = data.payload.prefill_total || 0;
+                if (pt > 0) {
+                  updateHarnessTelemetryPill(`Prefill ${pd}/${pt} tok`);
+                  if (currentSessionId === targetSessionId) {
+                    const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
+                    if (activeRow) {
+                      const liveTitle = activeRow.querySelector(".live-thought-title");
+                      if (liveTitle) {
+                        liveTitle.innerHTML = `<span>Prefilling context on local CPU (${pd}/${pt} tokens)...</span>`;
+                      }
+                    }
+                  }
+                }
+              } else if (data.type === "approval_required" && data.payload) {
+                renderInlineApprovalCard(reqId, data.run_id || reqId, data.payload);
+              } else if (data.type === "clarification_needed" && data.payload) {
+                accumulatedClarification = {
+                  ...data.payload,
+                  original_query: data.payload.original_query || cleanMsg
+                };
+                renderInlineClarificationCard(reqId, data.run_id || reqId, accumulatedClarification);
+              } else if (data.type === "token") {
+                if (data.tok_per_sec) {
+                  const ttftLbl = data.ttft_ms ? `TTFT ${Math.round(data.ttft_ms)}ms • ` : "";
+                  updateHarnessTelemetryPill(`${ttftLbl}${Number(data.tok_per_sec).toFixed(1)} tok/s`);
+                }
+                if (data.token && !data.token.includes("<think>") && !data.token.includes("</think>")) {
+                  accumulatedTokens += data.token;
+                  session._liveTokens = accumulatedTokens;
+                  if (currentSessionId === targetSessionId) {
+                    const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
+                    if (activeRow) {
+                      const liveBox = activeRow.querySelector(".live-response-bubble");
+                      const streamEl = activeRow.querySelector(".chat-live-token-stream");
+                      if (liveBox) liveBox.style.display = "block";
+                      if (streamEl) {
+                        renderLiveStreamedContent(streamEl, accumulatedTokens);
+                        const vp = document.getElementById("chat-messages-viewport");
+                        autoScrollChatViewport(vp, false);
+                      }
+                      // Update a single in-place status indicator only when a complete heading line finishes (\n)
+                      const completedHeadings = accumulatedTokens.match(/(?:^|\n)(?:#{1,3}\s+|(?:Slide\s+\d+\s*:))([^\n]{4,75})\n/gi);
+                      if (completedHeadings && completedHeadings.length > 0) {
+                        const rawLast = completedHeadings[completedHeadings.length - 1].replace(/\n$/, "");
+                        const latestHeading = stripThoughtEmojis(rawLast.replace(/^[\s#*•-]+/, ""));
+                        if (latestHeading && latestHeading.length >= 4) {
+                          const stepMsg = `Synthesizing section: ${latestHeading}`;
+                          const liveTitle = activeRow.querySelector(".live-thought-title");
+                          const liveTimeline = activeRow.querySelector(".live-step-timeline");
+                          if (liveTitle) liveTitle.innerHTML = formatThoughtStepHtml(stepMsg);
+                          if (liveTimeline) {
+                            let draftRow = liveTimeline.querySelector('.live-step-row[data-draft-progress="true"]');
+                            if (!draftRow) {
+                              liveTimeline.querySelectorAll(".live-step-row").forEach(row => {
+                                row.className = "live-step-row completed";
+                                const icon = row.querySelector(".live-step-icon");
+                                if (icon) icon.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                              });
+                              draftRow = document.createElement("div");
+                              draftRow.className = "live-step-row active";
+                              draftRow.dataset.draftProgress = "true";
+                              draftRow.innerHTML = `
+                                <div class="live-step-icon"><div class="step-spinner"></div></div>
+                                <div class="live-step-text">${formatThoughtStepHtml(stepMsg)}</div>
+                              `;
+                              liveTimeline.appendChild(draftRow);
+                            } else {
+                              const txtEl = draftRow.querySelector(".live-step-text");
+                              if (txtEl) txtEl.innerHTML = formatThoughtStepHtml(stepMsg);
+                            }
                           }
                         }
                       }
                     }
                   }
                 }
+              } else if (data.type === "done" || data.type === "cancelled") {
+                finalPayload = data;
+              } else if (data.type === "error") {
+                throw new Error(data.error);
               }
-            } else if (data.type === "done" || data.type === "cancelled") {
-              finalPayload = data;
-            } else if (data.type === "error") {
-              throw new Error(data.error);
+            }
+          }
+        }
+      } catch (streamReadErr) {
+        if (window.forceQuitTriggered || (streamReadErr && streamReadErr.name === "AbortError")) {
+          throw streamReadErr;
+        }
+      }
+      
+      // If window/tab change interrupted the SSE stream while backend is still working, poll /api/runs/{reqId}/status until completion
+      if (!finalPayload && !window.forceQuitTriggered) {
+        for (let pollAttempt = 0; pollAttempt < 90 && !finalPayload && !window.forceQuitTriggered; pollAttempt++) {
+          await new Promise(r => setTimeout(r, 400));
+          try {
+            const stResp = await fetch(getApiEndpoint(`/api/runs/${encodeURIComponent(reqId)}/status`));
+            if (stResp.ok) {
+              const stData = await stResp.json();
+              if (stData && Array.isArray(stData.thoughts)) {
+                stData.thoughts.forEach(th => {
+                  const cleanTh = stripThoughtEmojis(th);
+                  if (cleanTh && !accumulatedThoughts.includes(cleanTh)) {
+                    accumulatedThoughts.push(cleanTh);
+                  }
+                });
+                session._liveThoughts = [...accumulatedThoughts];
+              }
+              if (stData && typeof stData.streamed_text === "string" && stData.streamed_text.length > accumulatedTokens.length) {
+                accumulatedTokens = stData.streamed_text;
+                session._liveTokens = accumulatedTokens;
+                if (currentSessionId === targetSessionId) {
+                  const activeRow = document.querySelector(`.typing-indicator-row[data-req-id="${reqId}"]`);
+                  if (activeRow) {
+                    const liveBox = activeRow.querySelector(".live-response-bubble");
+                    const streamEl = activeRow.querySelector(".chat-live-token-stream");
+                    if (liveBox) liveBox.style.display = "block";
+                    if (streamEl) renderLiveStreamedContent(streamEl, accumulatedTokens);
+                  }
+                }
+              }
+              if (stData && (stData.status === "completed" || stData.status === "cancelled") && stData.payload) {
+                finalPayload = stData.payload;
+                break;
+              } else if (stData && stData.status === "error") {
+                throw new Error(stData.error || "Execution error");
+              } else if (stData && stData.status === "unknown" && pollAttempt > 5) {
+                break;
+              }
+            }
+          } catch (pollErr) {
+            if (pollErr && pollErr.message && pollErr.message !== "Failed to fetch") {
+              throw pollErr;
             }
           }
         }
@@ -3973,6 +4045,10 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
       
       clearInterval(timerInterval);
       const activeTargetSession = chatSessions.find(s => s.id === targetSessionId) || session;
+      delete activeTargetSession._activeReqId;
+      delete activeTargetSession._liveThoughts;
+      delete activeTargetSession._liveTokens;
+      delete activeTargetSession._liveRoutedAgent;
       
       if (!finalPayload) {
         if (window.forceQuitTriggered) {
@@ -3981,6 +4057,13 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
             response: accumulatedTokens ? `${accumulatedTokens}\n\n*(Force quit by user)*` : "*(Execution force-quit by user)*",
             routed_agent: accumulatedRoutedAgent || "SLM Orchestrator",
             thoughts: [...accumulatedThoughts, "Execution force-quit by user"]
+          };
+        } else if (accumulatedTokens && accumulatedTokens.trim().length > 0) {
+          finalPayload = {
+            type: "done",
+            response: accumulatedTokens,
+            routed_agent: accumulatedRoutedAgent || "SLM Orchestrator",
+            thoughts: [...accumulatedThoughts]
           };
         } else {
           throw new Error("The response stream ended before a final result was received.");

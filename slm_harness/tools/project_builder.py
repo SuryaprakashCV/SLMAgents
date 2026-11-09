@@ -88,10 +88,12 @@ _PROJECT_BUILD_TOPIC_RE = re.compile(
 # Iterative coding edit intent on an existing active workspace project (Claude Code / Copilot Edit style)
 _ITERATIVE_PROJECT_EDIT_RE = re.compile(
     r"^(?:modify\s+\[[^\]]+\]\s*:|"
-    r"(?:please\s+|can\s+you\s+|now\s+)?(?:edit|modify|update|patch|refactor|enhance|add)\b.*"
+    r"(?:please\s+|can\s+you\s+|could\s+you\s+|now\s+|i\s+want\s+(?:you\s+)?to\s+|let'?s\s+)?"
+    r"(?:edit|modify|update|change|redesign|restyle|customize|improve|upgrade|modernize|beautify|patch|refactor|enhance|add|make|switch|fix)\b.*"
     r"\b(?:index\.html|styles\.css|app\.js|engine\.py|server\.py|test_project\.py|"
-    r"this\s+app|the\s+app|this\s+project|the\s+project|current\s+project|"
-    r"dark\s+mode|light\s+mode|theme\s+toggle|csv\s+export|search\s+filter)\b)",
+    r"this\s+app|the\s+app|its\s+app|this\s+project|the\s+project|current\s+project|"
+    r"its\s+design|the\s+design|app\s+design|ui\s+design|design|ui|ux|layout|look|appearance|style|styling|colors?|palette|fonts?|"
+    r"dark\s+mode|light\s+mode|theme|theme\s+toggle|glassmorphism|csv\s+export|search\s+filter|dashboard|header|topbar|buttons?|cards?)\b)",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -803,23 +805,52 @@ class LocalProjectBuilder:
         inst_low = (edit_instruction or "").lower()
         clean_note = re.sub(r"^modify\s+\[[^\]]+\]\s*:\s*", "", (edit_instruction or "").strip(), flags=re.IGNORECASE).strip()
 
-        # 1. Theme / Light-Dark toggle enhancement
-        if any(w in inst_low for w in ("theme", "dark", "light", "color", "style", "ui")):
-            if "styles.css" in existing and "body.light-theme" not in existing["styles.css"]:
+        # 1. Design / Theme / UI / Layout / Style transformation
+        if any(w in inst_low for w in ("design", "redesign", "restyle", "theme", "dark", "light", "color", "style", "ui", "ux", "layout", "look", "modern", "glass")):
+            if "styles.css" in existing and "/* Iterative Agent Enhancement: Multi-Theme Design System */" not in existing["styles.css"]:
                 existing["styles.css"] += (
-                    "\n/* Iterative Agent Enhancement: Light/Dark Theme Support */\n"
-                    "body.light-theme { background: #f8fafc !important; color: #0f172a !important; }\n"
+                    "\n/* Iterative Agent Enhancement: Multi-Theme Design System */\n"
+                    "body.light-theme { background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f0f9ff 100%) !important; color: #0f172a !important; }\n"
                     "body.light-theme .topbar, body.light-theme .panel, body.light-theme .url-launcher-card, "
-                    "body.light-theme .workspace-card, body.light-theme .score-card, body.light-theme .aspect-bar-card "
-                    "{ background: #ffffff !important; color: #0f172a !important; border-color: #cbd5e1 !important; }\n"
-                    "body.light-theme h1, body.light-theme h2, body.light-theme h3, body.light-theme .sc-value "
+                    "body.light-theme .workspace-card, body.light-theme .score-card, body.light-theme .aspect-bar-card, body.light-theme .detail-box "
+                    "{ background: rgba(255,255,255,0.92) !important; color: #0f172a !important; border-color: #cbd5e1 !important; box-shadow: 0 10px 30px -10px rgba(79,70,229,0.12) !important; backdrop-filter: blur(12px); }\n"
+                    "body.light-theme h1, body.light-theme h2, body.light-theme h3, body.light-theme .sc-value, body.light-theme .kv-val "
                     "{ color: #0f172a !important; }\n"
+                    "body.light-theme .url-input-wrap, body.light-theme .data-table th, body.light-theme .report-pre "
+                    "{ background: #f1f5f9 !important; color: #0f172a !important; border-color: #cbd5e1 !important; }\n"
+                    "body.light-theme .url-input-wrap input { color: #0f172a !important; }\n"
+                    "body.light-theme .btn-secondary, body.light-theme .aspect-chip, body.light-theme .tab-btn:not(.active) "
+                    "{ background: #f8fafc !important; color: #334155 !important; border-color: #cbd5e1 !important; }\n"
+                    "body.theme-royal { background: radial-gradient(circle at top right, #2e1065 0%, #0f172a 55%, #020617 100%) !important; color: #f8fafc !important; }\n"
+                    "body.theme-royal .topbar, body.theme-royal .url-launcher-card, body.theme-royal .workspace-card, body.theme-royal .score-card, body.theme-royal .aspect-bar-card "
+                    "{ background: rgba(30, 27, 75, 0.72) !important; border-color: rgba(139, 92, 246, 0.4) !important; box-shadow: 0 14px 36px -12px rgba(124, 58, 237, 0.28) !important; backdrop-filter: blur(14px); }\n"
+                    "body.theme-royal .btn-primary, body.theme-royal .tab-btn.active { background: linear-gradient(135deg, #8b5cf6, #ec4899) !important; border-color: #8b5cf6 !important; }\n"
+                    "body.theme-cyber { background: radial-gradient(circle at top left, #064e3b 0%, #022c22 50%, #020617 100%) !important; color: #ecfdf5 !important; }\n"
+                    "body.theme-cyber .topbar, body.theme-cyber .url-launcher-card, body.theme-cyber .workspace-card, body.theme-cyber .score-card, body.theme-cyber .aspect-bar-card "
+                    "{ background: rgba(6, 78, 59, 0.45) !important; border-color: rgba(16, 185, 129, 0.45) !important; box-shadow: 0 14px 36px -12px rgba(16, 185, 129, 0.25) !important; }\n"
+                    "body.theme-cyber .btn-primary, body.theme-cyber .tab-btn.active { background: linear-gradient(135deg, #10b981, #06b6d4) !important; border-color: #10b981 !important; }\n"
                 )
-            if "index.html" in existing and "btn-theme-toggle" not in existing["index.html"]:
-                existing["index.html"] = existing["index.html"].replace(
-                    '<div class="topbar-actions">',
-                    '<div class="topbar-actions">\n      <button class="btn-secondary" id="btn-theme-toggle" type="button" onclick="document.body.classList.toggle(\'light-theme\')">🌓 Theme</button>',
-                    1,
+            if "index.html" in existing:
+                if "btn-theme-toggle" not in existing["index.html"]:
+                    existing["index.html"] = existing["index.html"].replace(
+                        '<div class="topbar-actions">',
+                        '<div class="topbar-actions">\n'
+                        '      <button class="btn-secondary" id="btn-theme-toggle" type="button" onclick="(function(){const b=document.body;const modes=[\'light-theme\',\'theme-royal\',\'theme-cyber\',\'\'];const cur=modes.findIndex(m=>m&&b.classList.contains(m));b.classList.remove(\'light-theme\',\'theme-royal\',\'theme-cyber\');const next=modes[(cur+1)%modes.length];if(next)b.classList.add(next);})()">🎨 Switch Design</button>',
+                        1,
+                    )
+                # Activate new visual theme immediately on body so user sees the design change right away
+                target_theme = "light-theme"
+                if any(w in inst_low for w in ("cyber", "emerald", "neon", "green", "matrix")):
+                    target_theme = "theme-cyber"
+                elif any(w in inst_low for w in ("royal", "purple", "violet", "glass", "aurora")):
+                    target_theme = "theme-royal"
+                elif "body class=\"light-theme\"" in existing["index.html"]:
+                    target_theme = "theme-royal"
+                existing["index.html"] = re.sub(
+                    r"<body[^>]*>",
+                    f'<body class="{target_theme}">',
+                    existing["index.html"],
+                    count=1,
                 )
 
         # 2. CSV Export enhancement

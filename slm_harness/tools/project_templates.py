@@ -917,6 +917,29 @@ code{{{{color:#38bdf8}}}}
 <tbody>{{rows_html}}</tbody></table>
 </body></html>"""
 
+        csv_lines = ["Aspect,Check,Status,Measured,Expected,Recommendation"]
+        for c in checks:
+            esc_vals = [
+                '"' + str(c.get(k, "")).replace('"', '""') + '"'
+                for k in ("aspect", "name", "status", "measured", "expected", "recommendation")
+            ]
+            csv_lines.append(",".join(esc_vals))
+        csv_report = "\\n".join(csv_lines)
+
+        base_tag = f'<base href="{{html.escape(final_url)}}" target="_blank" />'
+        if html_text and "<head" in html_text.lower():
+            rendered_snapshot = re.sub(
+                r"(<head[^>]*>)",
+                r"\\1" + base_tag,
+                html_text[:150000],
+                count=1,
+                flags=re.IGNORECASE,
+            )
+        elif html_text:
+            rendered_snapshot = f"<!DOCTYPE html><html><head>{{base_tag}}</head><body>{{html_text[:150000]}}</body></html>"
+        else:
+            rendered_snapshot = f"<!DOCTYPE html><html><body style='font-family:sans-serif;padding:24px;'><h3>Unable to fetch HTML body for {{html.escape(final_url)}}</h3><p>{{html.escape(fetch_error or 'No HTML returned')}}</p></body></html>"
+
         report_record = {{
             "id": len(self.items) + 1,
             "title": final_url,
@@ -943,6 +966,8 @@ code{{{{color:#38bdf8}}}}
             "checks": checks,
             "markdown_report": markdown_report,
             "html_report": html_report,
+            "csv_report": csv_report,
+            "rendered_html_snapshot": rendered_snapshot,
         }}
         self.items.insert(0, report_record)
         return {{
@@ -1083,8 +1108,10 @@ if __name__ == "__main__":
       </div>
     </div>
     <div class="topbar-actions">
+      <button class="btn-secondary" id="btn-theme-toggle" type="button" onclick="(function(){{const b=document.body;const modes=['light-theme','theme-royal','theme-cyber',''];const cur=modes.findIndex(m=>m&&b.classList.contains(m));b.classList.remove('light-theme','theme-royal','theme-cyber');const next=modes[(cur+1)%modes.length];if(next)b.classList.add(next);}})()">🎨 Switch Design</button>
       <button class="btn-secondary" id="btn-export-html" type="button" disabled>⬇ HTML Report</button>
       <button class="btn-secondary" id="btn-export-md" type="button" disabled>⬇ Markdown Report</button>
+      <button class="btn-secondary" id="btn-export-csv" type="button" disabled>⬇ CSV Report</button>
       <button class="btn-secondary" id="btn-export-json" type="button" disabled>⬇ JSON Report</button>
       <button class="btn-secondary" id="btn-clear-all" type="button">↺ Clear</button>
     </div>
@@ -1291,6 +1318,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .browser-frame-container { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; display: flex; justify-content: center; min-height: 520px; }
 #live-browser-iframe { width: 100%; height: 520px; border: none; border-radius: 6px; background: #ffffff; transition: width 0.2s ease; }
 .report-pre { background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: #e2e8f0; white-space: pre-wrap; max-height: 600px; overflow-y: auto; }
+body.light-theme { background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f0f9ff 100%) !important; color: #0f172a !important; }
+body.light-theme .topbar, body.light-theme .url-launcher-card, body.light-theme .workspace-card, body.light-theme .score-card, body.light-theme .aspect-bar-card, body.light-theme .detail-box { background: rgba(255,255,255,0.94) !important; color: #0f172a !important; border-color: #cbd5e1 !important; box-shadow: 0 10px 30px -10px rgba(79,70,229,0.12) !important; }
+body.light-theme h1, body.light-theme h2, body.light-theme h3, body.light-theme .sc-value, body.light-theme .kv-val { color: #0f172a !important; }
+body.light-theme .url-input-wrap, body.light-theme .data-table th, body.light-theme .report-pre { background: #f1f5f9 !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
+body.light-theme .url-input-wrap input { color: #0f172a !important; }
+body.light-theme .btn-secondary, body.light-theme .aspect-chip, body.light-theme .tab-btn:not(.active) { background: #f8fafc !important; color: #334155 !important; border-color: #cbd5e1 !important; }
+body.theme-royal { background: radial-gradient(circle at top right, #2e1065 0%, #0f172a 55%, #020617 100%) !important; color: #f8fafc !important; }
+body.theme-royal .topbar, body.theme-royal .url-launcher-card, body.theme-royal .workspace-card, body.theme-royal .score-card, body.theme-royal .aspect-bar-card { background: rgba(30, 27, 75, 0.72) !important; border-color: rgba(139, 92, 246, 0.4) !important; box-shadow: 0 14px 36px -12px rgba(124, 58, 237, 0.28) !important; }
+body.theme-royal .btn-primary, body.theme-royal .tab-btn.active { background: linear-gradient(135deg, #8b5cf6, #ec4899) !important; border-color: #8b5cf6 !important; }
+body.theme-cyber { background: radial-gradient(circle at top left, #064e3b 0%, #022c22 50%, #020617 100%) !important; color: #ecfdf5 !important; }
+body.theme-cyber .topbar, body.theme-cyber .url-launcher-card, body.theme-cyber .workspace-card, body.theme-cyber .score-card, body.theme-cyber .aspect-bar-card { background: rgba(6, 78, 59, 0.45) !important; border-color: rgba(16, 185, 129, 0.45) !important; }
+body.theme-cyber .btn-primary, body.theme-cyber .tab-btn.active { background: linear-gradient(135deg, #10b981, #06b6d4) !important; border-color: #10b981 !important; }
 '''
 
     app_js = f'''let currentReport = null;
@@ -1404,6 +1443,8 @@ function renderReport(report) {{
   document.getElementById("checks-table-wrap").style.display = "block";
   document.getElementById("btn-export-html").disabled = false;
   document.getElementById("btn-export-md").disabled = false;
+  const csvBtn = document.getElementById("btn-export-csv");
+  if (csvBtn) csvBtn.disabled = false;
   document.getElementById("btn-export-json").disabled = false;
 
   const s = report.summary || {{}};
@@ -1443,8 +1484,14 @@ function renderReport(report) {{
 
   const iframe = document.getElementById("live-browser-iframe");
   const extLink = document.getElementById("live-browser-external-link");
-  if (iframe && d.final_url) {{
-    iframe.src = d.final_url;
+  if (iframe) {{
+    if (report.rendered_html_snapshot) {{
+      iframe.removeAttribute("src");
+      iframe.srcdoc = report.rendered_html_snapshot;
+    }} else if (d.final_url) {{
+      iframe.removeAttribute("srcdoc");
+      iframe.src = d.final_url;
+    }}
   }}
   if (extLink && d.final_url) {{
     extLink.href = d.final_url;
@@ -1543,6 +1590,15 @@ document.addEventListener("DOMContentLoaded", () => {{
     }}
   }});
 
+  const csvBtn = document.getElementById("btn-export-csv");
+  if (csvBtn) {{
+    csvBtn.addEventListener("click", () => {{
+      if (currentReport && currentReport.csv_report) {{
+        downloadFile("automation_test_report.csv", currentReport.csv_report, "text/csv");
+      }}
+    }});
+  }}
+
   document.getElementById("btn-export-json").addEventListener("click", () => {{
     if (currentReport) {{
       downloadFile("automation_test_report.json", JSON.stringify(currentReport, null, 2), "application/json");
@@ -1558,6 +1614,7 @@ document.addEventListener("DOMContentLoaded", () => {{
     document.getElementById("checks-empty").style.display = "block";
     document.getElementById("btn-export-html").disabled = true;
     document.getElementById("btn-export-md").disabled = true;
+    if (csvBtn) csvBtn.disabled = true;
     document.getElementById("btn-export-json").disabled = true;
     try {{
       await fetch(resolveActionEndpoint(), {{

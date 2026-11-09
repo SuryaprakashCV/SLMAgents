@@ -2450,9 +2450,13 @@ class TurnStateMachine:
         ) and "local project built & verified on disk" not in low_text:
             return False, "project build request printed chat overview or unrequested fibonacci instead of creating local files"
 
-        # 9. Detect overly brief / truncated stub responses on substantive queries
-        if len(stripped) < 28 and len(q_clean.split()) >= 4:
-            return False, f"response too brief ({len(stripped)} chars) to be helpful"
+        # 9. Detect overly brief / truncated stub responses or degenerate repetition on substantive queries
+        if len(stripped) < 65 and len(q_clean.split()) >= 4:
+            return False, f"response too brief or truncated ({len(stripped)} chars) to be helpful"
+        if re.search(r"'SLMAgents'\s+or\s+'SLMAgents'", stripped) or (
+            stripped.count("'") % 2 == 1 and len(stripped) < 120
+        ):
+            return False, "response contained degenerate token repetition or unclosed truncated string"
 
         return True, ""
 

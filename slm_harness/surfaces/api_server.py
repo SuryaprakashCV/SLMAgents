@@ -60,6 +60,8 @@ from ..runtime import (
 from ..runtime.constrained import extract_and_repair_json
 from ..telemetry import get_trace_store, run_doctor
 
+_RUN_STATE_CACHE: Dict[str, Dict[str, Any]] = {}
+
 
 # ---------------------------------------------------------------------------
 # Attachment Materialization Helper
@@ -294,6 +296,15 @@ def build_harness_chat_streaming_response(
     ev_queue = bus.subscribe_run_queue(run_id)
     worker_done = threading.Event()
     outcome_box: Dict[str, Any] = {}
+    _RUN_STATE_CACHE[run_id] = {
+        "status": "running",
+        "run_id": run_id,
+        "session_id": sid,
+        "started_at": time.time(),
+        "thoughts": [],
+        "streamed_text": "",
+        "payload": None,
+    }
 
     def _worker() -> None:
         try:
@@ -317,8 +328,51 @@ def build_harness_chat_streaming_response(
                 client_surface=(client_surface or "desktop").strip().lower(),
             )
             outcome_box["outcome"] = outcome
+            trace_rec = get_trace_store().get_trace(run_id)
+            done_payload = {
+                "type": "cancelled" if getattr(outcome, "cancelled", False) else "done",
+                "event_type": "run_cancelled" if getattr(outcome, "cancelled", False) else "run_completed",
+                "response": str(getattr(outcome, "final_text", "") or ""),
+                "routed_agent": str(getattr(outcome, "agent_used", "") or pinned or "SLMOrchestrator"),
+                "thoughts": list(_RUN_STATE_CACHE.get(run_id, {}).get("thoughts") or []),
+                "citations": getattr(outcome, "citations", None) or [],
+                "artifacts": getattr(outcome, "artifacts", None) or [],
+                "structured_output": getattr(outcome, "structured_output", None),
+                "mode": getattr(outcome, "mode", ""),
+                "model_id": getattr(outcome, "model_id", ""),
+                "ttft_ms": getattr(outcome, "ttft_ms", 0.0),
+                "tok_per_sec": getattr(outcome, "tok_per_sec", 0.0),
+                "total_ms": getattr(outcome, "total_ms", 0.0),
+                "rss_mb": get_process_rss_mb(),
+                "trace": trace_rec.to_dict() if trace_rec else None,
+                "session_id": sid,
+                "req_id": run_id,
+                "run_id": run_id,
+            }
+            _RUN_STATE_CACHE[run_id] = {
+                "status": "cancelled" if getattr(outcome, "cancelled", False) else "completed",
+                "run_id": run_id,
+                "session_id": sid,
+                "thoughts": done_payload["thoughts"],
+                "streamed_text": done_payload["response"],
+                "payload": done_payload,
+            }
         except Exception as exc:
             outcome_box["fatal_error"] = str(exc)
+            _RUN_STATE_CACHE[run_id] = {
+                "status": "error",
+                "run_id": run_id,
+                "session_id": sid,
+                "error": str(exc),
+                "payload": {
+                    "type": "error",
+                    "event_type": "run_error",
+                    "error": str(exc),
+                    "session_id": sid,
+                    "req_id": run_id,
+                    "run_id": run_id,
+                },
+            }
         finally:
             worker_done.set()
 
@@ -647,6 +701,9 @@ def build_harness_chat_streaming_response(
                         )
                         return
 
+                if run_id in _RUN_STATE_CACHE and _RUN_STATE_CACHE[run_id].get("status") == "running":
+                    _RUN_STATE_CACHE[run_id]["thoughts"] = list(all_thoughts)
+                    _RUN_STATE_CACHE[run_id]["streamed_text"] = "".join(streamed_text_parts)
                 await asyncio.sleep(0.005 if drained else 0.01)
 
             if "fatal_error" in outcome_box:
@@ -662,10 +719,8 @@ def build_harness_chat_streaming_response(
                     }
                 )
         finally:
-            if not worker_done.is_set():
-                get_cancellation_registry().cancel(run_id, reason="Client disconnected from SSE stream")
-                get_approval_broker().resolve(run_id, approved=False)
-                get_clarification_broker().resolve(run_id, answer="")
+            # Never cancel the background worker when the window/tab changes or SSE disconnects;
+            # let the worker complete and save the turn so the UI can seamlessly resume/poll.
             bus.unsubscribe_run_queue(run_id, ev_queue)
 
     return StreamingResponse(
@@ -988,6 +1043,13 @@ def mount_harness_routes(app: FastAPI) -> None:
             get_clarification_broker().resolve(rid, answer="")
             bus.emit(EventType.RUN_CANCELLED, rid, "default_session", reason=reason, total_ms=0)
         return {"ok": True, "cancelled_count": count, "active_runs_cancelled": active_ids, "reason": reason}
+
+    @app.get("/api/runs/{run_id}/status")
+    async def get_run_status(run_id: str) -> Dict[str, Any]:
+        cached = _RUN_STATE_CACHE.get(run_id)
+        if cached:
+            return cached
+        return {"status": "unknown", "run_id": run_id}
 
     @app.post("/api/runs/{run_id}/cancel")
     async def cancel_run(run_id: str, req: Optional[CancelRunRequest] = None) -> Dict[str, Any]:
