@@ -2240,8 +2240,9 @@ def build_dynamic_project_plan(
 
     plan_markdown = (
         f"Here is the tailored **Architecture Plan & Requirement Checklist** for **{project_name}** "
-        f"(generated directly from your request, starting with **zero pre-filled dummy data**):\n\n"
+        f"(governed by skill `application-project-builder`, starting with **zero pre-filled dummy data**):\n\n"
         f"### 🎯 1. Captured Requirements from Your Request\n"
+        f"- 🧩 **Active Skill Playbook:** `application-project-builder` (*Full-Stack Application, Project Builder & Coding Studio* — `.slm/skills/application-project-builder/SKILL.md`)\n"
         f"{reqs_md}\n\n"
         f"### 🏗️ 2. Proposed 4-Step Execution Plan\n"
         f"1. **Step 1 — Workspace & Permission Setup (`slm_task_planner`)**\n"

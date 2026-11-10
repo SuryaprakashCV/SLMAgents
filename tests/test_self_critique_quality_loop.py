@@ -433,7 +433,18 @@ def test_all_26_slm_agents_verifiers_and_harness_planes() -> None:
     mig_fast = runner._try_verified_specialist_fastpath("slm_db_migration", "Create migration to add status column")
     assert mig_fast is not None and "UP MIGRATION" in mig_fast and "DOWN MIGRATION" in mig_fast
 
-    # 5. Two-Phase Plan + Complete Requirement Clarification -> Confirmed Project Build Flow
+    # 5. Coding & Application/Project Builder Skill + Two-Phase Plan/Requirement -> Confirmed Build Flow
+    from slm_harness.orchestrator.skills import get_skill_registry
+
+    skill_reg = get_skill_registry()
+    skill_reg.reload()
+    app_builder_skill = skill_reg.get("application-project-builder")
+    assert app_builder_skill is not None and app_builder_skill.enabled is True
+    matched_app_skills = skill_reg.match_skills("create an automation test studio web app")
+    assert any(s.name == "application-project-builder" for s in matched_app_skills)
+    matched_code_skills = skill_reg.match_skills("write a python function to implement binary search with unit tests")
+    assert any(s.name in ("clean-code-architect", "application-project-builder") for s in matched_code_skills)
+
     assert should_execute_local_project_build("/goal create automation test studio web app") is False
     assert (
         should_execute_local_project_build(
@@ -452,7 +463,7 @@ def test_all_26_slm_agents_verifiers_and_harness_planes() -> None:
     with tempfile.TemporaryDirectory() as tmp_ws:
         perm_mgr.grant_permission(folder_path=tmp_ws, set_active=True)
         try:
-            # Turn 1: User asks to build a project -> Agent prepares tailored Plan & asks Requirement Questions first
+            # Turn 1: User asks to build a project -> Agent activates `application-project-builder` skill, prepares Plan & asks Requirement Questions
             turn1 = kernel.run_turn(
                 user_query="/goal create automation test studio web app that takes any url and tests all aspects and creates a report",
                 session_id="test_two_phase_plan_requirements_session",
@@ -460,6 +471,8 @@ def test_all_26_slm_agents_verifiers_and_harness_planes() -> None:
             )
             assert turn1.mode == "clarification_plan"
             assert turn1.structured_output.get("clarification_needed") is True
+            assert "application-project-builder" in turn1.structured_output.get("active_skills", [])
+            assert "application-project-builder" in turn1.final_text
             assert "Captured Requirements from Your Request" in turn1.final_text
             assert "Proposed 4-Step Execution Plan" in turn1.final_text
             assert "Quick Requirement Questions Before Proceeding" in turn1.final_text

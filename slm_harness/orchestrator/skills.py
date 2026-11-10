@@ -150,6 +150,35 @@ DEFAULT_SEED_SKILLS: List[Dict[str, Any]] = [
         ),
     },
     {
+        "name": "application-project-builder",
+        "title": "Full-Stack Application, Project Builder & Coding Studio",
+        "description": "End-to-end Claude/Copilot/Codex-style coding & project builder skill: prepares a dynamic Architecture & Execution Plan, gathers complete project requirements (features, theme, workspace path), scaffolds full-stack multi-file apps with zero pre-filled dummy data, runs automated unittest verification, and launches the Split-Screen Live Canvas.",
+        "preferred_role": "coding",
+        "preferred_agent": "slm_code_interpreter",
+        "preferred_tone": "tech",
+        "output_formats": ["html", "css", "js", "py", "zip", "md"],
+        "triggers": [
+            "build app", "create app", "build a project", "create a project", "web app",
+            "web application", "build website", "create website", "full stack",
+            "automation test studio", "test studio", "build studio", "build dashboard",
+            "build platform", "build tool", "coding requirement", "application requirement",
+            "project requirement", "change its design", "modify app", "generate the full source code",
+        ],
+        "tags": ["coding", "application", "project", "builder", "webapp", "fullstack", "frontend", "backend", "testing", "canvas"],
+        "source": "builtin",
+        "instructions": (
+            "# Full-Stack Application, Project Builder & Coding Studio\n\n"
+            "## Purpose\n"
+            "Provides a complete, production-ready coding and application/project engineering workflow modeled after Claude Artifacts, GitHub Copilot Workspace, and OpenAI Codex Canvas.\n\n"
+            "## Mandatory 5-Stage Execution Lifecycle\n"
+            "1. **Dynamic Architecture Plan & Complete Requirement Discovery (Turn 1)**: Formulate a tailored 4-step execution plan and ask clarifying requirement questions (additional features/fields, preferred visual theme palette, target workspace folder path) before writing files.\n"
+            "2. **Workspace Folder & Permission Governance**: Respect the user's selected workspace directory and verify folder permissions (`create`, `edit`, `delete`, `run`, `execute`).\n"
+            "3. **Full-Stack Multi-File Implementation (Zero Pre-Filled Dummy Data)**: Generate `engine.py`, `server.py`, `index.html`, `styles.css`, `app.js`, `tests/test_project.py`, and `README.md` with clean empty inputs, 4-theme switcher, and CSV/JSON export.\n"
+            "4. **Sandbox Execution & Automated Verification**: Run `python3 -m unittest discover -s tests -p \"test_*.py\" -v` in an isolated sandbox and verify boundary guards.\n"
+            "5. **Split-Screen Studio Canvas & Iterative Evolution**: Mount the live app at `/projects/<slug>/index.html`, package `<slug>.zip`, open the Split-Screen Live Canvas, and apply follow-up design/feature edits in place."
+        ),
+    },
+    {
         "name": "real-harness-architect",
         "title": "Real Harness Autonomous Architect & Self-Review Engine",
         "description": "Claude-Code-grade Harness skill: formulates loophole-free architectural plans, clarifies ambiguities with interactive options, performs live web research, executes sandboxed verification, manages multi-threaded CPU memory, and runs automated self-review & self-improvement.",
@@ -657,12 +686,31 @@ class SkillRegistry:
         if len(matched) >= max_matches:
             return matched[:max_matches]
 
-        # 3. Auto-match enabled skills by triggers, name, and tags
+        # 3. Auto-match enabled skills by triggers, name, tags, and coding/project intent
         q_low = (user_query or "").lower()
         noisy_single_triggers = {
             "create", "write", "make", "build", "improve", "update", "tech",
             "code", "post", "posts", "skill", "skil", "design", "help", "use",
         }
+        is_app_or_project_intent = bool(
+            re.search(
+                r"\b(?:create|build|make|develop|design|scaffold|generate|launch|modify|change|update)\b.*"
+                r"\b(?:app|application|webapp|website|web\s+app|project|studio|dashboard|portal|platform|tool|"
+                r"system|service|test\s+suite|automation|frontend|backend|ui|design|theme|layout|source\s+code)\b"
+                r"|\b(?:build\s+it\s+locally|previous\s+chat|full\s+source\s+code|change\s+its\s+design)\b",
+                q_low,
+                re.DOTALL,
+            )
+        )
+        is_coding_requirement_intent = bool(
+            re.search(
+                r"\b(?:write|implement|code|develop|debug|fix|refactor|optimize)\b.*"
+                r"\b(?:python|javascript|typescript|html|css|java|rust|go|c\+\+|function|class|method|"
+                r"script|algorithm|api|endpoint|module|code|unit\s+test|pytest|unittest)\b",
+                q_low,
+                re.DOTALL,
+            )
+        )
         scored: List[Tuple[float, SkillDefinition]] = []
         for sk in self.list_skills(enabled_only=True):
             if sk.name in seen:
@@ -670,6 +718,13 @@ class SkillRegistry:
             score = 0.0
             if sk.name in q_low or sk.name.replace("-", " ") in q_low:
                 score += 6.0
+            if sk.name == "application-project-builder":
+                if is_app_or_project_intent:
+                    score += 9.0
+                elif is_coding_requirement_intent:
+                    score += 5.0
+            elif sk.name == "clean-code-architect" and is_coding_requirement_intent:
+                score += 6.5
             for trig in sk.triggers:
                 t_low = trig.lower().strip()
                 if not t_low or t_low in noisy_single_triggers:

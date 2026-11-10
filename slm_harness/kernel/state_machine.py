@@ -986,6 +986,22 @@ class TurnStateMachine:
             # If the prompt requires plan confirmation or clarification first, return immediately with interactive options!
             if plan_info.get("needs_blocking_clarification"):
                 orig_q_for_plan = str(plan_info.get("original_query") or user_query).strip()
+                early_skills = get_skill_registry().match_skills(
+                    orig_q_for_plan,
+                    pinned_skills=active_skills,
+                    max_matches=2,
+                )
+                for esk in early_skills:
+                    self.bus.emit(
+                        EventType.STEP_COMPLETED,
+                        rid,
+                        session_id,
+                        agent=esk.preferred_agent or route_dec.primary_agent,
+                        message=f"Activated skill from repo: '{esk.title}' v{esk.version} ({esk.rel_path}) — applying domain playbook & rules.",
+                        skill=esk.to_dict(),
+                    )
+                if early_skills:
+                    bb.put(session_id, "last_active_skill_name", early_skills[0].name)
                 final_text = str(plan_info.get("plan_markdown") or "")
                 self.bus.emit(EventType.TOKEN_DELTA, rid, session_id, text=final_text, agent=route_dec.primary_agent)
                 total_ms = round((time.perf_counter() - t0) * 1000.0, 1)
@@ -1005,6 +1021,7 @@ class TurnStateMachine:
                         "question": plan_info.get("question"),
                         "options": plan_info.get("options"),
                         "original_query": orig_q_for_plan,
+                        "active_skills": [s.name for s in early_skills],
                     },
                 )
                 self.bus.emit(EventType.RUN_COMPLETED, rid, session_id, agent=route_dec.primary_agent, **outcome.to_dict())
