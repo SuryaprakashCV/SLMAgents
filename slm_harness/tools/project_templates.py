@@ -1098,50 +1098,51 @@ if __name__ == "__main__":
   <title>Automation Test Studio</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="light-theme">
   <header class="topbar">
     <div class="brand">
-      <span class="brand-badge">🧪</span>
+      <span class="brand-dot"></span>
       <div>
         <h1>Automation Test Studio</h1>
-        <p class="subtitle">Load any URL in browser · Extract DOM, Network &amp; Security Details · Run Multi-Aspect Automated Tests &amp; Generate Reports</p>
       </div>
     </div>
     <div class="topbar-actions">
-      <button class="btn-secondary" id="btn-theme-toggle" type="button" onclick="(function(){{const b=document.body;const modes=['light-theme','theme-royal','theme-cyber',''];const cur=modes.findIndex(m=>m&&b.classList.contains(m));b.classList.remove('light-theme','theme-royal','theme-cyber');const next=modes[(cur+1)%modes.length];if(next)b.classList.add(next);}})()">🎨 Switch Design</button>
-      <button class="btn-secondary" id="btn-export-html" type="button" disabled>⬇ HTML Report</button>
-      <button class="btn-secondary" id="btn-export-md" type="button" disabled>⬇ Markdown Report</button>
-      <button class="btn-secondary" id="btn-export-csv" type="button" disabled>⬇ CSV Report</button>
-      <button class="btn-secondary" id="btn-export-json" type="button" disabled>⬇ JSON Report</button>
-      <button class="btn-secondary" id="btn-clear-all" type="button">↺ Clear</button>
+      <button class="btn-secondary" id="btn-theme-toggle" type="button" onclick="(function(){{const b=document.body;const modes=['light-theme','theme-royal','theme-cyber',''];const cur=modes.findIndex(m=>m&&b.classList.contains(m));b.classList.remove('light-theme','theme-royal','theme-cyber');const next=modes[(cur+1)%modes.length];if(next)b.classList.add(next);}})()">Theme</button>
+      <button class="btn-secondary" id="btn-export-html" type="button" disabled>HTML</button>
+      <button class="btn-secondary" id="btn-export-md" type="button" disabled>Markdown</button>
+      <button class="btn-secondary" id="btn-export-csv" type="button" disabled>CSV</button>
+      <button class="btn-secondary" id="btn-export-json" type="button" disabled>JSON</button>
+      <button class="btn-secondary" id="btn-clear-all" type="button">Reset</button>
     </div>
   </header>
 
   <main class="studio-layout">
-    <!-- URL Input & Test Aspects Bar -->
+    <!-- Clean Hero URL Omnibar -->
     <section class="url-launcher-card">
+      <div class="hero-copy">
+        <h2>Test any website in seconds</h2>
+        <p>Enter a URL to inspect performance, accessibility, SEO, DOM structure, and security.</p>
+      </div>
       <form id="url-test-form" class="url-bar-row">
         <div class="url-input-wrap">
-          <span class="url-prefix-icon">🌐</span>
           <input
             type="text"
             id="target-url-input"
             value=""
-            placeholder="Enter any URL to load &amp; test in all aspects (e.g. https://example.com)..."
+            placeholder="https://example.com"
             autocomplete="off"
           />
         </div>
-        <button type="submit" class="btn-primary" id="btn-run-test">🚀 Load URL &amp; Run All Tests</button>
+        <button type="submit" class="btn-primary" id="btn-run-test">Run Audit</button>
       </form>
 
       <div class="aspects-row">
-        <span class="aspects-label">Test Aspects:</span>
-        <label class="aspect-chip"><input type="checkbox" name="aspect" value="Connectivity & HTTP" checked /> Connectivity &amp; HTTP</label>
-        <label class="aspect-chip"><input type="checkbox" name="aspect" value="Performance & Speed" checked /> Performance &amp; Speed</label>
-        <label class="aspect-chip"><input type="checkbox" name="aspect" value="DOM & Responsiveness" checked /> DOM &amp; Responsiveness</label>
-        <label class="aspect-chip"><input type="checkbox" name="aspect" value="Accessibility (WCAG)" checked /> Accessibility (WCAG)</label>
-        <label class="aspect-chip"><input type="checkbox" name="aspect" value="SEO & Metadata" checked /> SEO &amp; Metadata</label>
-        <label class="aspect-chip"><input type="checkbox" name="aspect" value="Security, TLS & Links" checked /> Security, TLS &amp; Links</label>
+        <label class="aspect-chip"><input type="checkbox" name="aspect" value="Connectivity & HTTP" checked /> Connectivity</label>
+        <label class="aspect-chip"><input type="checkbox" name="aspect" value="Performance & Speed" checked /> Performance</label>
+        <label class="aspect-chip"><input type="checkbox" name="aspect" value="DOM & Responsiveness" checked /> DOM &amp; Layout</label>
+        <label class="aspect-chip"><input type="checkbox" name="aspect" value="Accessibility (WCAG)" checked /> Accessibility</label>
+        <label class="aspect-chip"><input type="checkbox" name="aspect" value="SEO & Metadata" checked /> SEO</label>
+        <label class="aspect-chip"><input type="checkbox" name="aspect" value="Security, TLS & Links" checked /> Security</label>
       </div>
       <div id="error-banner" class="error-banner" style="display:none;"></div>
     </section>
@@ -1149,27 +1150,27 @@ if __name__ == "__main__":
     <!-- Live Scorecards Banner (Hidden until first URL is tested) -->
     <section id="scorecards-section" class="scorecards-grid" style="display:none;">
       <div class="score-card primary-score">
-        <span class="sc-label">Overall Health Score</span>
+        <span class="sc-label">Health Score</span>
         <div class="sc-value" id="sc-overall-score">—</div>
         <span class="sc-sub" id="sc-grade-badge">Grade —</span>
       </div>
       <div class="score-card">
-        <span class="sc-label">HTTP Status &amp; IP</span>
+        <span class="sc-label">Status</span>
         <div class="sc-value" id="sc-http-status">—</div>
         <span class="sc-sub" id="sc-resolved-ip">—</span>
       </div>
       <div class="score-card">
-        <span class="sc-label">Load Latency</span>
+        <span class="sc-label">Latency</span>
         <div class="sc-value" id="sc-load-time">—</div>
         <span class="sc-sub" id="sc-payload-size">—</span>
       </div>
       <div class="score-card">
-        <span class="sc-label">DOM Inventory</span>
+        <span class="sc-label">DOM Elements</span>
         <div class="sc-value" id="sc-dom-nodes">—</div>
         <span class="sc-sub" id="sc-links-imgs">—</span>
       </div>
       <div class="score-card">
-        <span class="sc-label">Test Checks Summary</span>
+        <span class="sc-label">Checks</span>
         <div class="sc-value" id="sc-checks-summary">—</div>
         <span class="sc-sub" id="sc-checks-total">—</span>
       </div>
@@ -1182,10 +1183,10 @@ if __name__ == "__main__":
     <section class="workspace-card">
       <div class="tabs-header">
         <div class="tab-buttons">
-          <button type="button" class="tab-btn active" data-tab="tab-checks">🧪 All-Aspects Test Results</button>
-          <button type="button" class="tab-btn" data-tab="tab-details">🔍 Extracted Page &amp; Browser Details</button>
-          <button type="button" class="tab-btn" data-tab="tab-browser">🖥️ Live Browser Viewport</button>
-          <button type="button" class="tab-btn" data-tab="tab-report">📄 Full Audit Report</button>
+          <button type="button" class="tab-btn active" data-tab="tab-checks">Audit Checks</button>
+          <button type="button" class="tab-btn" data-tab="tab-details">Page Details</button>
+          <button type="button" class="tab-btn" data-tab="tab-browser">Live Preview</button>
+          <button type="button" class="tab-btn" data-tab="tab-report">Markdown Report</button>
         </div>
         <div class="filter-pills" id="check-filters">
           <button type="button" class="filter-pill active" data-filter="ALL">All</button>
@@ -1198,19 +1199,18 @@ if __name__ == "__main__":
       <!-- Tab 1: All-Aspects Test Results -->
       <div id="tab-checks" class="tab-pane active">
         <div id="checks-empty" class="empty-state">
-          <div class="empty-icon">🔬</div>
-          <h3>Ready to Load &amp; Test Any URL</h3>
-          <p>Enter a URL above and click <strong>Load URL &amp; Run All Tests</strong> to inspect the page in a browser, extract DOM &amp; network details, test across all 6 aspects (Connectivity, Performance, DOM, Accessibility, SEO, Security), and generate a complete report.</p>
+          <h3>No audit running yet</h3>
+          <p>Enter any URL above and click <strong>Run Audit</strong> to see instant results across all 6 categories.</p>
         </div>
         <div id="checks-table-wrap" style="display:none;">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Aspect</th>
-                <th>Test Check</th>
+                <th>Category</th>
+                <th>Check</th>
                 <th>Status</th>
-                <th>Measured Detail</th>
-                <th>Expected / SLA</th>
+                <th>Measured</th>
+                <th>Target</th>
                 <th>Recommendation</th>
               </tr>
             </thead>
@@ -1222,7 +1222,7 @@ if __name__ == "__main__":
       <!-- Tab 2: Page & Browser Details -->
       <div id="tab-details" class="tab-pane" style="display:none;">
         <div id="details-content" class="details-grid">
-          <p class="empty-note">Run a URL test to inspect extracted browser, DOM, link, image, form, and header details.</p>
+          <p class="empty-note">Run an audit to inspect extracted DOM, link, image, form, and header details.</p>
         </div>
       </div>
 
@@ -1230,11 +1230,11 @@ if __name__ == "__main__":
       <div id="tab-browser" class="tab-pane" style="display:none;">
         <div class="browser-toolbar">
           <div class="viewport-btns">
-            <button type="button" class="vp-btn active" data-width="100%">💻 Desktop (100%)</button>
-            <button type="button" class="vp-btn" data-width="768px">📱 Tablet (768px)</button>
-            <button type="button" class="vp-btn" data-width="375px">📲 Mobile (375px)</button>
+            <button type="button" class="vp-btn active" data-width="100%">Desktop</button>
+            <button type="button" class="vp-btn" data-width="768px">Tablet</button>
+            <button type="button" class="vp-btn" data-width="375px">Mobile</button>
           </div>
-          <a id="live-browser-external-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="text-decoration:none;display:none;">↗ Open Target URL in New Tab</a>
+          <a id="live-browser-external-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="text-decoration:none;display:none;">Open URL &#8599;</a>
         </div>
         <div class="browser-frame-container">
           <iframe id="live-browser-iframe" title="Live Browser Viewport" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
@@ -1243,7 +1243,7 @@ if __name__ == "__main__":
 
       <!-- Tab 4: Full Markdown / Printable Report -->
       <div id="tab-report" class="tab-pane" style="display:none;">
-        <pre id="markdown-report-box" class="report-pre">Run a URL test to generate the complete audit report.</pre>
+        <pre id="markdown-report-box" class="report-pre">Run an audit to generate the markdown report.</pre>
       </div>
     </section>
   </main>
@@ -1254,82 +1254,83 @@ if __name__ == "__main__":
 '''
 
     styles_css = '''* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0b0f19; color: #e2e8f0; min-height: 100vh; }
-.topbar { display: flex; justify-content: space-between; align-items: center; padding: 16px 28px; background: #111827; border-bottom: 1px solid #1f2937; flex-wrap: wrap; gap: 12px; }
-.brand { display: flex; align-items: center; gap: 14px; }
-.brand-badge { font-size: 24px; background: #1e293b; padding: 10px; border-radius: 12px; border: 1px solid #334155; }
-.brand h1 { font-size: 19px; font-weight: 700; color: #f8fafc; }
-.subtitle { font-size: 12.5px; color: #94a3b8; margin-top: 2px; }
-.topbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.btn-secondary { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 8px; padding: 8px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-primary { background: linear-gradient(135deg, #4f46e5, #0ea5e9); color: #fff; border: none; border-radius: 10px; padding: 12px 20px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 32px; background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 20; flex-wrap: wrap; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-dot { width: 10px; height: 10px; border-radius: 50%; background: #0f172a; display: inline-block; }
+.brand h1 { font-size: 16px; font-weight: 600; color: #0f172a; letter-spacing: -0.01em; }
+.topbar-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn-secondary { background: #ffffff; color: #334155; border: 1px solid #e2e8f0; border-radius: 999px; padding: 6px 13px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
+.btn-secondary:hover:not(:disabled) { border-color: #cbd5e1; background: #f8fafc; color: #0f172a; }
+.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: #0f172a; color: #ffffff; border: none; border-radius: 999px; padding: 12px 24px; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: transform 0.12s ease, background 0.15s ease; }
+.btn-primary:hover:not(:disabled) { background: #1e293b; }
 .btn-primary:disabled { opacity: 0.6; cursor: wait; }
-.studio-layout { max-width: 1560px; margin: 0 auto; padding: 20px 28px; display: flex; flex-direction: column; gap: 18px; }
-.url-launcher-card { background: #111827; border: 1px solid #1f2937; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
-.url-bar-row { display: flex; gap: 12px; align-items: center; }
-.url-input-wrap { flex: 1; display: flex; align-items: center; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 0 12px; }
-.url-prefix-icon { font-size: 16px; margin-right: 8px; }
-.url-input-wrap input { flex: 1; background: transparent; border: none; color: #f8fafc; padding: 12px 4px; font-size: 14px; outline: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.aspects-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.aspects-label { font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; }
-.aspect-chip { display: inline-flex; align-items: center; gap: 6px; background: #1e293b; border: 1px solid #334155; border-radius: 999px; padding: 4px 11px; font-size: 12px; color: #cbd5e1; cursor: pointer; }
-.error-banner { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; padding: 10px 14px; border-radius: 8px; font-size: 13px; }
-.scorecards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
-.score-card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-.score-card.primary-score { background: linear-gradient(135deg, rgba(79, 70, 229, 0.22), rgba(14, 165, 233, 0.15)); border-color: #4f46e5; }
-.sc-label { font-size: 11.5px; font-weight: 600; color: #94a3b8; text-transform: uppercase; }
-.sc-value { font-size: 24px; font-weight: 800; color: #f8fafc; }
-.sc-sub { font-size: 12px; color: #38bdf8; }
-.aspect-bars-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.aspect-bar-card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 12px 14px; }
-.aspect-bar-top { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; }
-.progress-track { height: 7px; background: #1e293b; border-radius: 999px; overflow: hidden; }
-.progress-fill { height: 100%; background: linear-gradient(90deg, #10b981, #38bdf8); border-radius: 999px; }
-.workspace-card { background: #111827; border: 1px solid #1f2937; border-radius: 14px; padding: 18px 20px; }
-.tabs-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f2937; padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-.tab-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
-.tab-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
-.tab-btn.active { background: #4f46e5; color: #ffffff; border-color: #4f46e5; }
-.filter-pills { display: flex; gap: 6px; }
-.filter-pill { background: #0f172a; color: #94a3b8; border: 1px solid #334155; border-radius: 999px; padding: 4px 11px; font-size: 11.5px; font-weight: 600; cursor: pointer; }
-.filter-pill.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
-.empty-state { text-align: center; padding: 48px 20px; color: #94a3b8; max-width: 640px; margin: 0 auto; }
-.empty-icon { font-size: 40px; margin-bottom: 12px; }
-.empty-state h3 { color: #f8fafc; font-size: 18px; margin-bottom: 8px; }
+.studio-layout { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; display: flex; flex-direction: column; gap: 20px; }
+.url-launcher-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 28px 32px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.05); }
+.hero-copy h2 { font-size: 22px; font-weight: 600; color: #0f172a; letter-spacing: -0.02em; }
+.hero-copy p { font-size: 13.5px; color: #64748b; margin-top: 4px; }
+.url-bar-row { display: flex; gap: 10px; align-items: center; }
+.url-input-wrap { flex: 1; display: flex; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: 2px 18px; transition: border-color 0.15s ease, background 0.15s ease; }
+.url-input-wrap:focus-within { background: #ffffff; border-color: #0f172a; }
+.url-input-wrap input { flex: 1; background: transparent; border: none; color: #0f172a; padding: 11px 0; font-size: 14px; outline: none; }
+.aspects-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aspect-chip { display: inline-flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; user-select: none; }
+.aspect-chip input { accent-color: #0f172a; }
+.error-banner { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 10px 16px; border-radius: 12px; font-size: 13px; }
+.scorecards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.score-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+.score-card.primary-score { background: #0f172a; color: #ffffff; border-color: #0f172a; }
+.score-card.primary-score .sc-label { color: #94a3b8; }
+.score-card.primary-score .sc-value { color: #ffffff; }
+.score-card.primary-score .sc-sub { color: #38bdf8; }
+.sc-label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+.sc-value { font-size: 24px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; }
+.sc-sub { font-size: 12px; color: #64748b; }
+.aspect-bars-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.aspect-bar-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; }
+.aspect-bar-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #0f172a; margin-bottom: 8px; }
+.progress-track { height: 6px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.progress-fill { height: 100%; background: #0f172a; border-radius: 999px; }
+.workspace-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 20px 24px; box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.04); }
+.tabs-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+.tab-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab-btn { background: transparent; color: #64748b; border: none; border-radius: 999px; padding: 7px 14px; font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.tab-btn.active { background: #0f172a; color: #ffffff; font-weight: 600; }
+.filter-pills { display: flex; gap: 4px; background: #f8fafc; padding: 3px; border-radius: 999px; border: 1px solid #e2e8f0; }
+.filter-pill { background: transparent; color: #64748b; border: none; border-radius: 999px; padding: 4px 11px; font-size: 11.5px; font-weight: 500; cursor: pointer; }
+.filter-pill.active { background: #ffffff; color: #0f172a; font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,0.06); }
+.empty-state { text-align: center; padding: 48px 20px; color: #64748b; max-width: 480px; margin: 0 auto; }
+.empty-state h3 { color: #0f172a; font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.empty-state p { font-size: 13px; line-height: 1.5; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.data-table th, .data-table td { padding: 10px 12px; border-bottom: 1px solid #1f2937; text-align: left; vertical-align: top; }
-.data-table th { color: #94a3b8; font-weight: 600; background: #0f172a; }
-.badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.badge-pass { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid #059669; }
-.badge-warn { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border: 1px solid #d97706; }
-.badge-fail { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid #dc2626; }
-.details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
-.detail-box { background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 14px; }
-.detail-box h4 { font-size: 14px; color: #38bdf8; margin-bottom: 10px; border-bottom: 1px solid #1e293b; padding-bottom: 6px; }
+.data-table th, .data-table td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; text-align: left; vertical-align: top; color: #334155; }
+.data-table th { color: #64748b; font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; background: #f8fafc; }
+.badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.badge-pass { background: #ecfdf5; color: #047857; }
+.badge-warn { background: #fffbeb; color: #b45309; }
+.badge-fail { background: #fef2f2; color: #dc2626; }
+.details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 14px; }
+.detail-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; }
+.detail-box h4 { font-size: 13px; font-weight: 600; color: #0f172a; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; }
 .kv-list { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
-.kv-row { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dashed #1e293b; padding-bottom: 4px; }
-.kv-key { color: #94a3b8; font-weight: 600; }
-.kv-val { color: #f8fafc; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; text-align: right; }
+.kv-row { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 4px; border-bottom: 1px solid #f1f5f9; }
+.kv-key { color: #64748b; font-weight: 500; }
+.kv-val { color: #0f172a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; text-align: right; }
 .browser-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .viewport-btns { display: flex; gap: 6px; }
-.vp-btn { background: #0f172a; color: #cbd5e1; border: 1px solid #334155; border-radius: 6px; padding: 6px 11px; font-size: 12px; cursor: pointer; }
-.vp-btn.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; font-weight: 700; }
-.browser-frame-container { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; display: flex; justify-content: center; min-height: 520px; }
-#live-browser-iframe { width: 100%; height: 520px; border: none; border-radius: 6px; background: #ffffff; transition: width 0.2s ease; }
-.report-pre { background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: #e2e8f0; white-space: pre-wrap; max-height: 600px; overflow-y: auto; }
-body.light-theme { background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f0f9ff 100%) !important; color: #0f172a !important; }
-body.light-theme .topbar, body.light-theme .url-launcher-card, body.light-theme .workspace-card, body.light-theme .score-card, body.light-theme .aspect-bar-card, body.light-theme .detail-box { background: rgba(255,255,255,0.94) !important; color: #0f172a !important; border-color: #cbd5e1 !important; box-shadow: 0 10px 30px -10px rgba(79,70,229,0.12) !important; }
-body.light-theme h1, body.light-theme h2, body.light-theme h3, body.light-theme .sc-value, body.light-theme .kv-val { color: #0f172a !important; }
-body.light-theme .url-input-wrap, body.light-theme .data-table th, body.light-theme .report-pre { background: #f1f5f9 !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
-body.light-theme .url-input-wrap input { color: #0f172a !important; }
-body.light-theme .btn-secondary, body.light-theme .aspect-chip, body.light-theme .tab-btn:not(.active) { background: #f8fafc !important; color: #334155 !important; border-color: #cbd5e1 !important; }
+.vp-btn { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 500; cursor: pointer; }
+.vp-btn.active { background: #0f172a; color: #ffffff; border-color: #0f172a; }
+.browser-frame-container { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; display: flex; justify-content: center; min-height: 500px; }
+#live-browser-iframe { width: 100%; height: 500px; border: none; border-radius: 8px; background: #ffffff; transition: width 0.2s ease; }
+.report-pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: #0f172a; white-space: pre-wrap; max-height: 600px; overflow-y: auto; }
 body.theme-royal { background: radial-gradient(circle at top right, #2e1065 0%, #0f172a 55%, #020617 100%) !important; color: #f8fafc !important; }
-body.theme-royal .topbar, body.theme-royal .url-launcher-card, body.theme-royal .workspace-card, body.theme-royal .score-card, body.theme-royal .aspect-bar-card { background: rgba(30, 27, 75, 0.72) !important; border-color: rgba(139, 92, 246, 0.4) !important; box-shadow: 0 14px 36px -12px rgba(124, 58, 237, 0.28) !important; }
-body.theme-royal .btn-primary, body.theme-royal .tab-btn.active { background: linear-gradient(135deg, #8b5cf6, #ec4899) !important; border-color: #8b5cf6 !important; }
+body.theme-royal .topbar, body.theme-royal .url-launcher-card, body.theme-royal .workspace-card, body.theme-royal .score-card, body.theme-royal .aspect-bar-card, body.theme-royal .detail-box { background: rgba(30, 27, 75, 0.72) !important; color: #f8fafc !important; border-color: rgba(139, 92, 246, 0.35) !important; }
+body.theme-royal h1, body.theme-royal h2, body.theme-royal h3, body.theme-royal h4, body.theme-royal .sc-value, body.theme-royal .kv-val, body.theme-royal .data-table td { color: #f8fafc !important; }
+body.theme-royal .btn-primary, body.theme-royal .tab-btn.active { background: linear-gradient(135deg, #8b5cf6, #ec4899) !important; color: #fff !important; }
 body.theme-cyber { background: radial-gradient(circle at top left, #064e3b 0%, #022c22 50%, #020617 100%) !important; color: #ecfdf5 !important; }
-body.theme-cyber .topbar, body.theme-cyber .url-launcher-card, body.theme-cyber .workspace-card, body.theme-cyber .score-card, body.theme-cyber .aspect-bar-card { background: rgba(6, 78, 59, 0.45) !important; border-color: rgba(16, 185, 129, 0.45) !important; }
-body.theme-cyber .btn-primary, body.theme-cyber .tab-btn.active { background: linear-gradient(135deg, #10b981, #06b6d4) !important; border-color: #10b981 !important; }
+body.theme-cyber .topbar, body.theme-cyber .url-launcher-card, body.theme-cyber .workspace-card, body.theme-cyber .score-card, body.theme-cyber .aspect-bar-card, body.theme-cyber .detail-box { background: rgba(6, 78, 59, 0.45) !important; color: #ecfdf5 !important; border-color: rgba(16, 185, 129, 0.4) !important; }
+body.theme-cyber .btn-primary, body.theme-cyber .tab-btn.active { background: linear-gradient(135deg, #10b981, #06b6d4) !important; color: #fff !important; }
 '''
 
     app_js = f'''let currentReport = null;
@@ -1395,7 +1396,7 @@ function renderPageDetails(report) {{
 
   container.innerHTML = `
     <div class="detail-box">
-      <h4>🌐 Document &amp; Metadata Details</h4>
+      <h4>Document &amp; Metadata</h4>
       <div class="kv-list">
         <div class="kv-row"><span class="kv-key">Requested URL</span><span class="kv-val">${{escapeHtml(d.requested_url)}}</span></div>
         <div class="kv-row"><span class="kv-key">Final Resolved URL</span><span class="kv-val">${{escapeHtml(d.final_url)}}</span></div>
@@ -1407,7 +1408,7 @@ function renderPageDetails(report) {{
       </div>
     </div>
     <div class="detail-box">
-      <h4>📊 DOM Element Inventory</h4>
+      <h4>DOM Element Inventory</h4>
       <div class="kv-list">
         <div class="kv-row"><span class="kv-key">Total DOM Elements</span><span class="kv-val">${{counts.links_total != null ? d.total_dom_elements : 0}}</span></div>
         <div class="kv-row"><span class="kv-key">Links (Internal / External / Empty)</span><span class="kv-val">${{counts.links_total || 0}} (${{counts.links_internal || 0}} in / ${{counts.links_external || 0}} ext / ${{counts.links_empty || 0}} empty)</span></div>
@@ -1418,19 +1419,19 @@ function renderPageDetails(report) {{
       </div>
     </div>
     <div class="detail-box">
-      <h4>📑 Headings Outline (H1–H6)</h4>
+      <h4>Headings Outline (H1–H6)</h4>
       <div class="kv-list">${{hList}}</div>
     </div>
     <div class="detail-box">
-      <h4>🔗 Discovered Page Links (Top 12)</h4>
+      <h4>Discovered Page Links (Top 12)</h4>
       <div class="kv-list">${{linksRows}}</div>
     </div>
     <div class="detail-box">
-      <h4>🎛️ Interactive Forms &amp; Inputs</h4>
+      <h4>Interactive Forms &amp; Inputs</h4>
       <div class="kv-list">${{formsInputsRows}}</div>
     </div>
     <div class="detail-box">
-      <h4>📡 HTTP Response Headers</h4>
+      <h4>HTTP Response Headers</h4>
       <div class="kv-list">${{headersRows}}</div>
     </div>
   `;
@@ -1928,30 +1929,29 @@ if __name__ == "__main__":
   <title>{project_name}</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="light-theme">
   <header class="topbar">
     <div class="brand">
-      <span class="brand-badge">⚡</span>
+      <span class="brand-dot"></span>
       <div>
         <h1>{project_name}</h1>
-        <p class="subtitle">{resolved_goal}</p>
       </div>
     </div>
     <div class="topbar-actions">
-      <button class="btn-secondary" id="btn-clear-all" type="button">↺ Clear All</button>
-      <button class="btn-secondary" id="btn-export-json" type="button">⬇ Export Report JSON</button>
+      <button class="btn-secondary" id="btn-clear-all" type="button">Reset</button>
+      <button class="btn-secondary" id="btn-export-json" type="button">Export JSON</button>
     </div>
   </header>
 
   <main class="workspace">
     <section class="panel">
       <div class="panel-header">
-        <h2>{project_name} Input</h2>
-        <span class="hint">Generated on request — enter your input below</span>
+        <h2>{project_name}</h2>
+        <span class="hint">Ready</span>
       </div>
       <form id="entry-form" class="form-stack">
         <div class="control-row">
-          <label for="entry-title">{label_primary} <span class="req">*</span></label>
+          <label for="entry-title">{label_primary}</label>
           <input type="text" id="entry-title" value="" placeholder="Enter {label_primary.lower()}..." autocomplete="off" />
         </div>
         <div class="control-row">
@@ -1960,19 +1960,19 @@ if __name__ == "__main__":
         </div>
         <div class="control-row">
           <label for="entry-details">{label_details}</label>
-          <textarea id="entry-details" rows="5" placeholder="Enter {label_details.lower()}..."></textarea>
+          <textarea id="entry-details" rows="4" placeholder="Enter {label_details.lower()}..."></textarea>
         </div>
-        <button type="submit" class="btn-primary">⚡ {btn_action}</button>
+        <button type="submit" class="btn-primary">{btn_action}</button>
       </form>
     </section>
 
     <section class="panel">
       <div class="panel-header">
-        <h2>Live Output &amp; Report</h2>
+        <h2>Output</h2>
         <span class="status-pill" id="count-pill">0 Results</span>
       </div>
       <div id="entries-list" class="entries-list">
-        <p class="empty-note">No runs yet. Submit an input on the left to execute and view results.</p>
+        <p class="empty-note">Submit an input on the left to run and view results.</p>
       </div>
     </section>
   </main>
@@ -1983,28 +1983,28 @@ if __name__ == "__main__":
 '''
 
     styles_css = '''* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0b0f19; color: #e2e8f0; min-height: 100vh; }
-.topbar { display: flex; justify-content: space-between; align-items: center; padding: 16px 28px; background: #111827; border-bottom: 1px solid #1f2937; }
-.brand { display: flex; align-items: center; gap: 14px; }
-.brand-badge { font-size: 26px; background: #1e293b; padding: 10px; border-radius: 12px; border: 1px solid #334155; }
-.brand h1 { font-size: 19px; font-weight: 700; color: #f8fafc; }
-.subtitle { font-size: 13px; color: #94a3b8; margin-top: 2px; }
-.topbar-actions { display: flex; gap: 10px; }
-.btn-secondary { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 8px; padding: 8px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.btn-primary { background: #4f46e5; color: #fff; border: none; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
-.workspace { display: grid; grid-template-columns: 420px 1fr; gap: 20px; padding: 20px 28px; max-width: 1560px; margin: 0 auto; }
-.panel { background: #111827; border: 1px solid #1f2937; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-.panel-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #1f2937; }
-.panel-header h2 { font-size: 16px; font-weight: 600; color: #f8fafc; }
-.hint { font-size: 12px; color: #94a3b8; }
-.status-pill { font-size: 12px; background: #1e293b; color: #38bdf8; padding: 4px 10px; border-radius: 999px; border: 1px solid #334155; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 32px; background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-dot { width: 10px; height: 10px; border-radius: 50%; background: #0f172a; display: inline-block; }
+.brand h1 { font-size: 16px; font-weight: 600; color: #0f172a; letter-spacing: -0.01em; }
+.topbar-actions { display: flex; gap: 8px; }
+.btn-secondary { background: #ffffff; color: #334155; border: 1px solid #e2e8f0; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; }
+.btn-primary { background: #0f172a; color: #ffffff; border: none; border-radius: 999px; padding: 11px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.workspace { display: grid; grid-template-columns: 380px 1fr; gap: 20px; padding: 28px 24px; max-width: 1180px; margin: 0 auto; }
+.panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.04); }
+.panel-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9; }
+.panel-header h2 { font-size: 15px; font-weight: 600; color: #0f172a; }
+.hint { font-size: 12px; color: #64748b; }
+.status-pill { font-size: 11.5px; font-weight: 500; background: #f8fafc; color: #475569; padding: 3px 10px; border-radius: 999px; border: 1px solid #e2e8f0; }
 .form-stack { display: flex; flex-direction: column; gap: 12px; }
-.control-row { display: flex; flex-direction: column; gap: 6px; }
-.control-row label { font-size: 12.5px; font-weight: 600; color: #cbd5e1; }
-input[type="text"], textarea { background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; font-size: 13.5px; outline: none; }
+.control-row { display: flex; flex-direction: column; gap: 5px; }
+.control-row label { font-size: 12px; font-weight: 500; color: #475569; }
+input[type="text"], textarea { background: #f8fafc; color: #0f172a; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; outline: none; font-family: inherit; }
+input[type="text"]:focus, textarea:focus { background: #ffffff; border-color: #0f172a; }
 .entries-list { display: flex; flex-direction: column; gap: 10px; }
-.entry-card { background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 14px; }
-.empty-note { color: #64748b; font-style: italic; }
+.entry-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
+.empty-note { color: #64748b; font-size: 13px; }
 '''
 
     app_js = f'''const appItems = [];
