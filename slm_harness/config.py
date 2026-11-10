@@ -323,19 +323,21 @@ class HarnessConfig:
 
         if role == "sql":
             if effort == "high":
-                return ["qwen2.5-text2sql-onnx", "qwen3-4b-gguf", "qwen2.5-coder-3b-onnx"]
-            return ["qwen2.5-text2sql-onnx", "qwen2.5-coder-1.5b-onnx", "qwen3.5-0.8b-onnx"]
+                return ["qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen2.5-coder-1.5b-onnx", "qwen2.5-text2sql-onnx"]
+            if effort == "low":
+                return ["qwen2.5-coder-1.5b-onnx", "qwen2.5-text2sql-onnx", "qwen2.5-coder-3b-onnx"]
+            return ["qwen2.5-coder-3b-onnx", "qwen3-4b-gguf", "qwen2.5-coder-1.5b-onnx", "qwen2.5-text2sql-onnx"]
 
         if role == "math":
             if effort == "low":
-                return ["qwen2.5-math-1.5b-onnx", "qwen3.5-0.8b-onnx", "qwen2.5-coder-1.5b-onnx"]
+                return ["qwen2.5-math-1.5b-onnx", "qwen2.5-coder-1.5b-onnx", "qwen3.5-0.8b-onnx"]
             if effort == "high":
                 return ["qwen3-4b-gguf", "qwen2.5-math-1.5b-onnx", "qwen2.5-coder-3b-onnx"]
-            return ["qwen2.5-math-1.5b-onnx", "qwen3-4b-gguf", "qwen3.5-0.8b-onnx"]
+            return ["qwen2.5-math-1.5b-onnx", "qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen3.5-0.8b-onnx"]
 
         if role == "coding":
             if effort == "low":
-                return ["qwen2.5-coder-1.5b-onnx", "qwen2.5-coder-3b-onnx", "qwen3.5-0.8b-onnx", "qwen3-4b-gguf"]
+                return ["qwen2.5-coder-1.5b-onnx", "qwen2.5-coder-3b-onnx", "qwen3-4b-gguf", "qwen3.5-0.8b-onnx"]
             if effort == "high":
                 if available_ram_mb >= 5400:
                     return ["qwen3-8b-gguf", "qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen2.5-coder-1.5b-onnx"]
@@ -345,7 +347,7 @@ class HarnessConfig:
 
         # primary / general
         if effort == "low":
-            return ["qwen3.5-0.8b-onnx", "qwen2.5-1.5b-onnx", "qwen2.5-coder-1.5b-onnx", "qwen2.5-coder-3b-onnx", "qwen3-4b-gguf"]
+            return ["qwen2.5-coder-1.5b-onnx", "qwen2.5-1.5b-onnx", "qwen2.5-coder-3b-onnx", "qwen3-4b-gguf", "qwen3.5-0.8b-onnx"]
         if effort == "high":
             if available_ram_mb >= 5400:
                 return ["qwen3-8b-gguf", "qwen3-4b-gguf", "qwen2.5-coder-3b-onnx", "qwen2.5-1.5b-onnx"]

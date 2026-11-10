@@ -104,7 +104,7 @@ AGENT_PROTOTYPES: Dict[str, Tuple[str, str]] = {
         "security audit vulnerability OWASP SQL injection XSS command injection hardcoded secret CVE review",
     ),
     "slm_db_migration": (
-        "sql",
+        "coding",
         "database schema migration ALTER TABLE Alembic Flyway SQL DDL upgrade rollback script",
     ),
     "slm_translation": (
@@ -344,16 +344,37 @@ class CascadeRouter:
             has_active_sqlite and re.search(r"\b(?:table|rows|count|average|sum|top|group by|query)\b", q_low)
         ):
             if "migration" in q_low or "alembic" in q_low or "alter table" in q_low:
-                return self._finish(t0, "slm_db_migration", forced_mode or ExecutionMode.FAST_DIRECT, "sql", 0.94, "stage1_migration")
+                return self._finish(t0, "slm_db_migration", forced_mode or ExecutionMode.EVALUATOR_OPTIMIZER, "coding", 0.94, "stage1_migration")
             return self._finish(t0, "slm_text_to_sql", forced_mode or ExecutionMode.EVALUATOR_OPTIMIZER, "sql", 0.96, "stage1_sql")
+
+        if re.search(r"\b(?:alembic|flyway|database\s+migration|schema\s+migration|alter\s+table\b.*\badd\s+column)\b", q_low):
+            return self._finish(t0, "slm_db_migration", forced_mode or ExecutionMode.EVALUATOR_OPTIMIZER, "coding", 0.95, "stage1_migration")
 
         if re.search(r"\b(?:fix|clean|repair|parse)\b.*\bjson\b", q_low) or (
             "{" in q and re.search(r"\bvalid\s+json\b", q_low)
         ):
             return self._finish(t0, "slm_json_cleaner", forced_mode or ExecutionMode.EVALUATOR_OPTIMIZER, "primary", 0.96, "stage1_json")
 
-        if re.search(r"\btranslate\b.*\b(?:to|into)\s+(?:spanish|french|german|hindi|tamil|telugu|japanese|chinese|arabic|italian|portuguese)\b", q_low):
+        if re.search(r"\btranslate\b.*\b(?:to|into)\s+(?:spanish|french|german|hindi|tamil|telugu|japanese|chinese|arabic|italian|portuguese|korean|russian)\b", q_low):
             return self._finish(t0, "slm_translation", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.96, "stage1_translation")
+
+        if re.search(r"\b(?:compute\s+embedding|vector\s+embedding|embedding\s+vector|cosine\s+similarity\s+between|embed\s+this\s+sentence)\b", q_low):
+            return self._finish(t0, "slm_embeddings", forced_mode or ExecutionMode.FAST_DIRECT, "embeddings", 0.96, "stage1_embeddings")
+
+        if re.search(r"\b(?:remember\s+that|save\s+to\s+memory|what\s+do\s+you\s+remember\s+about\s+me|recall\s+my\s+preferences)\b", q_low):
+            return self._finish(t0, "slm_memory", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.95, "stage1_memory")
+
+        if re.search(r"\b(?:personal\s+knowledge\s+base|second\s+brain|zettelkasten|save\s+this\s+note\s+to\s+pkb)\b", q_low):
+            return self._finish(t0, "slm_pkb", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.95, "stage1_pkb", needs_rag=True)
+
+        if re.search(r"\b(?:milestone\s+plan|project\s+roadmap|work\s+breakdown\s+structure|launch\s+roadmap)\b", q_low) and not _CODING_INTENT_RE.search(q):
+            return self._finish(t0, "slm_task_planner", forced_mode or ExecutionMode.EVALUATOR_OPTIMIZER, "primary", 0.95, "stage1_task_planner")
+
+        if re.search(r"\b(?:summarize\s+this\s+(?:article|passage|text)|tl;?dr\s+of|condense\s+this\s+text)\b", q_low) and not _CODING_INTENT_RE.search(q):
+            return self._finish(t0, "slm_summarizer", forced_mode or ExecutionMode.FAST_DIRECT, "primary", 0.95, "stage1_summarizer")
+
+        if re.search(r"\b(?:analyze\s+(?:this\s+)?(?:csv|dataset|dataframe|spreadsheet)|cohort\s+analysis)\b", q_low):
+            return self._finish(t0, "slm_data", forced_mode or ExecutionMode.FAST_DIRECT, "coding", 0.95, "stage1_data")
 
         if re.search(r"\b(?:solve|derivative|integral|integrate|differentiate|eigenvalue|quadratic|equation|simplify)\b", q_low) or re.fullmatch(
             r"[\d\sxXyY+\-*/^().=?]+", q
@@ -435,6 +456,7 @@ class CascadeRouter:
         # Prevent multimodal and narrow domain specialists from being selected without matching domain cues
         has_image_art = any(a.kind == "image" for a in artifacts)
         has_audio_art = any(a.kind == "audio" for a in artifacts)
+        has_pdf_art = any(a.kind == "pdf" for a in artifacts)
         has_sql_cue = bool(
             has_active_sqlite
             or re.search(
@@ -442,14 +464,15 @@ class CascadeRouter:
                 q_low,
             )
         )
-        if best_agent == "slm_vision_parser" and not has_image_art:
-            best_agent = "slm_rag" if has_indexed_docs else "direct_assistant"
-        elif best_agent == "slm_voice" and not has_audio_art:
-            best_agent = "slm_rag" if has_indexed_docs else "direct_assistant"
-        elif best_agent == "slm_email" and not _EMAIL_EXPLICIT_RE.search(q_low):
-            best_agent = "direct_assistant"
-        elif best_agent in ("slm_db_migration", "slm_text_to_sql") and not has_sql_cue:
-            best_agent = "slm_code_interpreter" if re.search(r"\b(?:design|ui|theme|layout|style|color|css|html|app|project|button|page)\b", q_low) else "direct_assistant"
+        best_agent = self._validate_domain_specialist_guard(
+            best_agent,
+            q_low=q_low,
+            has_image_art=has_image_art,
+            has_audio_art=has_audio_art,
+            has_pdf_art=has_pdf_art,
+            has_sql_cue=has_sql_cue,
+            has_indexed_docs=has_indexed_docs,
+        )
 
         # If session has indexed RAG docs and query asks factual document questions (not code/math/sql), favor RAG grounding
         if has_indexed_docs and best_agent in ("direct_assistant", "slm_vision_parser", "slm_document_parser"):
@@ -477,8 +500,15 @@ class CascadeRouter:
                 )
                 picked = res.text.strip()
                 if picked in AGENT_PROTOTYPES:
-                    if picked == "slm_email" and not _EMAIL_EXPLICIT_RE.search(q_low):
-                        picked = "direct_assistant"
+                    picked = self._validate_domain_specialist_guard(
+                        picked,
+                        q_low=q_low,
+                        has_image_art=has_image_art,
+                        has_audio_art=has_audio_art,
+                        has_pdf_art=has_pdf_art,
+                        has_sql_cue=has_sql_cue,
+                        has_indexed_docs=has_indexed_docs,
+                    )
                     best_agent = picked
                     stage_label = "stage3_onnx_enum_tiebreak"
             except Exception:
@@ -503,6 +533,76 @@ class CascadeRouter:
             latency_ms=(time.perf_counter() - t0) * 1000.0,
         )
 
+    @staticmethod
+    def _validate_domain_specialist_guard(
+        agent: str,
+        *,
+        q_low: str,
+        has_image_art: bool,
+        has_audio_art: bool,
+        has_pdf_art: bool,
+        has_sql_cue: bool,
+        has_indexed_docs: bool,
+    ) -> str:
+        """
+        Ensures narrow domain specialists selected via Stage-2 embeddings or Stage-3 tie-breakers
+        have matching domain cues in the prompt or attachments, falling back to `direct_assistant`
+        (or `slm_code_interpreter` / `slm_rag` when appropriate) if not.
+        """
+        if agent == "slm_vision_parser" and not (
+            has_image_art or re.search(r"\b(?:image|photo|screenshot|picture|diagram|ocr)\b", q_low)
+        ):
+            return "slm_rag" if has_indexed_docs else "direct_assistant"
+        if agent == "slm_voice" and not (
+            has_audio_art or re.search(r"\b(?:audio|voice|speech|transcribe|whisper|wav|mp3|recording)\b", q_low)
+        ):
+            return "slm_rag" if has_indexed_docs else "direct_assistant"
+        if agent == "slm_pdf" and not (has_pdf_art or re.search(r"\bpdf\b", q_low)):
+            return "slm_rag" if has_indexed_docs else "direct_assistant"
+        if agent == "slm_email" and not _EMAIL_EXPLICIT_RE.search(q_low):
+            return "direct_assistant"
+        if agent in ("slm_db_migration", "slm_text_to_sql") and not has_sql_cue:
+            if re.search(r"\b(?:design|ui|theme|layout|style|color|css|html|app|project|button|page)\b", q_low):
+                return "slm_code_interpreter"
+            return "direct_assistant"
+        if agent == "slm_json_cleaner" and not ("{" in q_low or re.search(r"\b(?:json|schema)\b", q_low)):
+            return "direct_assistant"
+        if agent == "slm_embeddings" and not re.search(
+            r"\b(?:embedding|embeddings|cosine\s+similarity|vector\s+similarity|semantic\s+distance)\b", q_low
+        ):
+            return "direct_assistant"
+        if agent == "slm_translation" and not re.search(
+            r"\b(?:translat|spanish|french|german|hindi|tamil|telugu|japanese|chinese|arabic|italian|portuguese|korean|russian)\b",
+            q_low,
+        ):
+            return "direct_assistant"
+        if agent == "slm_git_repo_manager" and not re.search(
+            r"\b(?:git|commit|diff|branch|rebase|merge\s+conflict|pull\s+request|changelog)\b", q_low
+        ):
+            return "direct_assistant"
+        if agent == "slm_security" and not re.search(
+            r"\b(?:security|vulnerabilit|owasp|injection|xss|csrf|cve|cwe|exploit|pentest|secret|threat\s+model)\b",
+            q_low,
+        ):
+            return "direct_assistant"
+        if agent == "slm_math" and not (
+            re.search(
+                r"\b(?:solve|math|equation|calculus|derivative|integral|integrate|differentiate|algebra|probability|statistics|matrix|eigenvalue|quadratic|simplify|factor|polynomial|root|roots|formula|theorem|proof|arithmetic)\b",
+                q_low,
+            )
+            or re.search(r"\d+\s*[+\-*/^=]\s*\d+", q_low)
+        ):
+            return "direct_assistant"
+        if agent == "slm_meeting" and not re.search(
+            r"\b(?:meeting|transcript|minutes|action\s+items|standup|attendees)\b", q_low
+        ):
+            return "direct_assistant"
+        if agent == "slm_web_scraper" and not re.search(
+            r"\b(?:scrape|scraper|scraping|html|dom|xpath|css\s+selector|beautifulsoup)\b", q_low
+        ):
+            return "direct_assistant"
+        return agent
+
     def _select_mode(
         self,
         agent: str,
@@ -513,7 +613,7 @@ class CascadeRouter:
             return ExecutionMode.PLAN_DAG
         if _WORKSPACE_TOOL_RE.search(query):
             return ExecutionMode.REACT_LOOP
-        if agent in ("slm_text_to_sql", "slm_code_interpreter", "slm_math", "slm_json_cleaner"):
+        if agent in ("slm_text_to_sql", "slm_db_migration", "slm_code_interpreter", "slm_math", "slm_json_cleaner"):
             return ExecutionMode.EVALUATOR_OPTIMIZER
         if agent == "slm_data" and artifacts:
             return ExecutionMode.REACT_LOOP

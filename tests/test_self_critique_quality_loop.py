@@ -391,6 +391,52 @@ def test_iterative_project_edit_and_canvas_payload() -> None:
             )
 
 
+def test_all_26_slm_agents_verifiers_and_harness_planes() -> None:
+    from slm_harness.orchestrator.cascade_router import AGENT_PROTOTYPES, get_cascade_router
+    from slm_harness.orchestrator.skills import SPECIALIST_SYSTEM_PROMPTS, get_subagent_runner
+    from slm_harness.runtime.constrained import extract_and_repair_json
+    from slm_harness.tools.project_builder import should_execute_local_project_build
+    from slm_harness.verifiers.code_sql_json import verify_and_execute_sql
+    from slm_harness.verifiers.grounding_math import try_deterministic_math_solve
+
+    # 1. All 26 agents have dedicated system prompts and valid prototype bindings
+    assert len(AGENT_PROTOTYPES) == 26
+    for agent_name in AGENT_PROTOTYPES:
+        assert agent_name in SPECIALIST_SYSTEM_PROMPTS, f"Missing system prompt for {agent_name}"
+
+    # 2. CascadeRouter routes specialist intents accurately and guards narrow specialists
+    router = get_cascade_router()
+    assert router.route("SELECT customer_id, SUM(total) FROM orders GROUP BY customer_id").primary_agent == "slm_text_to_sql"
+    assert router.route("Write an Alembic database schema migration to add column status").primary_agent == "slm_db_migration"
+    assert router.route("Fix this broken JSON: {'name': 'Alice', 'active': True,}").primary_agent == "slm_json_cleaner"
+    assert router.route("Compute vector embedding for this sentence").primary_agent == "slm_embeddings"
+    assert router.route("Solve 3*x^2 + 6*x - 24 = 0 for x").primary_agent == "slm_math"
+    assert router.route("Write a Python function for binary search").primary_agent == "slm_code_interpreter"
+    # Guard check: UI design query must never route to slm_db_migration or slm_text_to_sql
+    r_design = router.route("can you change its design and colors")
+    assert r_design.primary_agent not in ("slm_db_migration", "slm_text_to_sql", "slm_embeddings", "slm_json_cleaner")
+
+    # 3. Verifiers: SQL syntax validation without attached DB, JSON repair, SymPy math
+    v_sql = verify_and_execute_sql("SELECT product_id, SUM(amount) FROM sales GROUP BY product_id;")
+    assert v_sql.passed is True
+
+    parsed_j, err_j = extract_and_repair_json("{name: 'Suryaprakash', active: True, roles: ['architect', 'creator'],}")
+    assert err_j is None and isinstance(parsed_j, dict) and parsed_j["name"] == "Suryaprakash" and parsed_j["active"] is True
+
+    math_res = try_deterministic_math_solve("Solve 2*x + 10 = 24 for x")
+    assert math_res is not None and "7" in math_res
+
+    # 4. Specialist fast-paths (JSON cleaner, DB migration, Math)
+    runner = get_subagent_runner()
+    json_fast = runner._try_verified_specialist_fastpath("slm_json_cleaner", "Fix this JSON: {'a': 1, 'b': True,}")
+    assert json_fast is not None and '"b": true' in json_fast
+    mig_fast = runner._try_verified_specialist_fastpath("slm_db_migration", "Create migration to add status column")
+    assert mig_fast is not None and "UP MIGRATION" in mig_fast and "DOWN MIGRATION" in mig_fast
+
+    # 5. /goal prefix on project build executes immediately without pre-prepared plan blocking
+    assert should_execute_local_project_build("/goal create automation test studio web app") is True
+
+
 if __name__ == "__main__":
     test_inspect_response_quality_detects_hollow_replies()
     test_document_deep_self_critique_recovery_when_source_missing()
@@ -401,7 +447,8 @@ if __name__ == "__main__":
     test_local_project_build_creates_files_runs_tests_and_completes_project()
     test_project_builder_custom_folder_and_permissions()
     test_iterative_project_edit_and_canvas_payload()
-    print("ALL 9 SELF-CRITIQUE, WEB PERSONALIZATION, CREATOR IDENTITY, PROJECT BUILDER, ITERATIVE CANVAS & FOLDER PERMISSION TESTS PASSED!")
+    test_all_26_slm_agents_verifiers_and_harness_planes()
+    print("ALL 10 SELF-CRITIQUE, 26-AGENT ROUTER, VERIFIER, PROJECT BUILDER, ITERATIVE CANVAS & FOLDER PERMISSION TESTS PASSED!")
 
 
 

@@ -13,7 +13,6 @@ from typing import Any, Dict, List
 
 from ..config import get_config
 from ..context.artifacts import get_artifact_store
-from ..governance.brokers import get_clarification_broker
 from ..governance.policy import RiskLevel, WorkspaceJail, run_sandboxed_subprocess
 from ..governance.privacy import scrub_secrets_and_pii
 from ..memory.blackboard import get_blackboard
@@ -572,6 +571,8 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
 
     # 15. ask_clarification
     def _ask_clarification(args: Dict[str, Any], ctx: ToolExecutionContext) -> str:
+        from ..governance.brokers import get_clarification_broker
+
         question = str(args.get("question") or "Could you clarify your preference?")
         raw_opts = args.get("options")
         opts = [str(o) for o in raw_opts[:4]] if isinstance(raw_opts, list) else []

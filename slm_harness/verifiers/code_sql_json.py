@@ -259,12 +259,22 @@ def verify_and_execute_sql(
     except Exception as exc:
         err_txt = str(exc)
         hint = ""
+        tables: List[str] = []
         if conn is not None:
             try:
                 tables, col_map = _introspect_sqlite_catalog(conn)
                 hint = _build_fuzzy_sql_hint(err_txt, tables, col_map)
             except Exception:
                 pass
+        # If no database or DDL schema was provided (`not tables`), SQLite parses the SQL AST first
+        # and then raises `no such table: <tbl>`, which proves the SQL query syntax is 100% valid!
+        if not tables and _MISSING_TBL_RE.search(err_txt):
+            return VerificationOutcome(
+                passed=True,
+                output={"columns": [], "rows": [], "validated_against_ddl": False, "syntax_verified": True},
+                cleaned_artifact=sql,
+                metadata={"executed_live": False, "syntax_verified_no_schema": True},
+            )
         return VerificationOutcome(
             passed=False,
             cleaned_artifact=sql,

@@ -541,7 +541,7 @@ class TurnStateMachine:
                 "plan_context": "Create all project files on local disk, execute the local automated test suite, and complete the project.",
             }
 
-        if not clarification_choice and (is_explicit_plan_cmd or is_complex_build_ask or is_complex_test_ask):
+        if not clarification_choice and is_explicit_plan_cmd:
             from ..tools.project_builder import _derive_project_identity
             from ..tools.project_templates import build_dynamic_project_plan
 
@@ -642,12 +642,12 @@ class TurnStateMachine:
         cancels = get_cancellation_registry()
         ctok = cancel_token or cancels.create(rid)
 
-        # Parse inline reasoning effort overrides (/low, /medium, /high, /fast, /deep)
+        # Parse inline reasoning effort overrides (/low, /medium, /high, /fast, /deep, /goal, /boost)
         raw_q = (user_query or "").strip()
-        inline_effort_match = re.match(r"^/(low|medium|high|fast|deep)\b\s*(.*)$", raw_q, flags=re.IGNORECASE | re.DOTALL)
+        inline_effort_match = re.match(r"^/(low|medium|high|fast|deep|goal|boost)\b\s*(.*)$", raw_q, flags=re.IGNORECASE | re.DOTALL)
         if inline_effort_match:
             tag = inline_effort_match.group(1).lower()
-            reasoning_effort = "low" if tag in ("low", "fast") else ("high" if tag in ("high", "deep") else "medium")
+            reasoning_effort = "low" if tag in ("low", "fast") else ("high" if tag in ("high", "deep", "goal", "boost") else "medium")
             if inline_effort_match.group(2).strip():
                 user_query = inline_effort_match.group(2).strip()
 
@@ -2451,7 +2451,8 @@ class TurnStateMachine:
             return False, "project build request printed chat overview or unrequested fibonacci instead of creating local files"
 
         # 9. Detect overly brief / truncated stub responses or degenerate repetition on substantive queries
-        if len(stripped) < 65 and len(q_clean.split()) >= 4:
+        is_valid_json_obj = stripped.startswith("{") and stripped.endswith("}")
+        if not is_valid_json_obj and len(stripped) < 65 and len(q_clean.split()) >= 4:
             return False, f"response too brief or truncated ({len(stripped)} chars) to be helpful"
         if re.search(r"'SLMAgents'\s+or\s+'SLMAgents'", stripped) or (
             stripped.count("'") % 2 == 1 and len(stripped) < 120

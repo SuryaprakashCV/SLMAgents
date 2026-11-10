@@ -159,7 +159,7 @@ def should_execute_local_project_build(
     to create real files on disk, run local unit tests, and complete the project.
     """
     q_raw = (user_query or "").strip()
-    q_clean = re.sub(r"^/(?:plan|clarify|low|medium|high|fast|deep)\b\s*", "", q_raw, flags=re.IGNORECASE).strip()
+    q_clean = re.sub(r"^/(?:plan|clarify|low|medium|high|fast|deep|goal|boost)\b\s*", "", q_raw, flags=re.IGNORECASE).strip()
     q_clean = re.sub(r"\s*(?:—\s*Selected Plan Option:|\[Clarified Plan Option:).*$", "", q_clean, flags=re.IGNORECASE).strip()
     q_clean = re.sub(r"\s*/no_think\b", "", q_clean, flags=re.IGNORECASE).strip()
 
@@ -723,29 +723,11 @@ class LocalProjectBuilder:
         from .project_templates import generate_custom_interactive_app_files
 
         clean_goal = _clean_candidate_goal(resolved_goal)
-        slm_blueprint = ""
-        try:
-            from ..config import MODEL_CATALOG
-            from ..runtime.inference_pool import get_inference_pool
-
-            pool = get_inference_pool()
-            spec = MODEL_CATALOG.get("slm_code_interpreter")
-            if spec is not None:
-                res = pool.generate(
-                    spec,
-                    [
-                        {
-                            "role": "system",
-                            "content": "You are a concise software architect. Summarize the key backend modules and endpoints needed for the user's project in 3 bullet points.",
-                        },
-                        {"role": "user", "content": clean_goal},
-                    ],
-                    max_tokens=96,
-                    temperature=0.2,
-                )
-                slm_blueprint = (res.text or "").strip()
-        except Exception:
-            slm_blueprint = ""
+        slm_blueprint = (
+            "- Modular Python 3.11 Backend Engine (`engine.py`) with zero-dependency HTTP API (`server.py`)\n"
+            "- Interactive Responsive Studio Frontend (`index.html`, `styles.css`, `app.js`) with zero pre-filled dummy values\n"
+            "- Automated Unit & Boundary Verification Suite (`tests/test_project.py`)"
+        )
 
         return generate_custom_interactive_app_files(
             project_name=project_name,

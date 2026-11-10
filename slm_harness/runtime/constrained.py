@@ -247,12 +247,14 @@ def _extract_balanced_json_span(text: str) -> Optional[str]:
 
 
 def _seal_truncated_json(candidate: str) -> str:
-    """Deterministically closes unclosed strings, trailing commas, and open brackets/braces."""
+    """Deterministically closes unclosed strings, trailing commas, unquoted keys, and open brackets/braces."""
     s = candidate.strip()
     # Replace Python literals outside strings cautiously
     s = re.sub(r"\bTrue\b", "true", s)
     s = re.sub(r"\bFalse\b", "false", s)
     s = re.sub(r"\bNone\b", "null", s)
+    # Quote bare unquoted object keys: `{name: "Alice", age: 30}` -> `{"name": "Alice", "age": 30}`
+    s = re.sub(r"([{,]\s*)([A-Za-z_][A-Za-z0-9_\-]*)(\s*:)", r'\1"\2"\3', s)
     # Remove trailing commas before closing braces/brackets
     s = re.sub(r",\s*([}\]])", r"\1", s)
 
@@ -380,6 +382,8 @@ def extract_and_repair_json(
         candidates.append(span)
     candidates.append(cleaned.strip())
 
+    import ast as _ast
+
     last_err = "No JSON object or array found"
     for cand in candidates:
         for attempt in (cand, _seal_truncated_json(cand)):
@@ -391,5 +395,19 @@ def extract_and_repair_json(
                 last_err = "; ".join(schema_errs)
             except Exception as exc:
                 last_err = str(exc)
+        # Fallback for single-quoted / unquoted-key Python dict/list literals (e.g. `{name: 'Alice', 'active': True,}`)
+        for lit_cand in (cand, _seal_truncated_json(cand)):
+            try:
+                py_lit = re.sub(r"\btrue\b", "True", lit_cand)
+                py_lit = re.sub(r"\bfalse\b", "False", py_lit)
+                py_lit = re.sub(r"\bnull\b", "None", py_lit)
+                parsed_lit = _ast.literal_eval(py_lit)
+                if isinstance(parsed_lit, (dict, list)):
+                    ok, schema_errs = validate_against_minimal_schema(parsed_lit, schema)
+                    if ok:
+                        return parsed_lit, None
+                    last_err = "; ".join(schema_errs)
+            except Exception:
+                pass
 
     return None, last_err

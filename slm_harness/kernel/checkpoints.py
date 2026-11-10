@@ -354,6 +354,10 @@ class CheckpointStore:
         lineage.reverse()
         return lineage
 
+    def get_lineage(self, session_id: str, limit: int = 40) -> List[Dict[str, Any]]:
+        """Returns session branch lineage as a list of turn dictionaries."""
+        return [n.to_dict() for n in self.get_branch_lineage(session_id, limit=limit)]
+
     def fork_branch(self, session_id: str, new_branch_name: str) -> Dict[str, Any]:
         """Creates or switches to `new_branch_name` anchored at current `head_turn_id`."""
         sess = self.ensure_session(session_id)

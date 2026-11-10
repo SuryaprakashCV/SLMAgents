@@ -15,7 +15,6 @@ import numpy as np
 
 from ..config import get_config
 from ..context.artifacts import get_artifact_store
-from ..governance.brokers import get_approval_broker
 from ..governance.policy import RiskLevel, classify_shell_command_risk, evaluate_capability
 from ..governance.privacy import run_lifecycle_hooks, scrub_secrets_and_pii
 from ..kernel.checkpoints import get_shadow_vfs
@@ -287,6 +286,8 @@ class ToolRegistry:
                     preview = json.dumps(args, indent=2)
             else:
                 preview = cmd_hint or json.dumps(args, indent=2)
+
+            from ..governance.brokers import get_approval_broker
 
             approved = get_approval_broker().request_approval(
                 run_id=ctx.run_id,

@@ -152,7 +152,7 @@ def verify_or_solve_sympy(
 
 
 _INLINE_EQUATION_RE = re.compile(
-    r"(?:solve|evaluate|calculate|compute|simplify)\s+([0-9A-Za-z_+\-*/^().=\s]{3,80})",
+    r"(?:solve|evaluate|calculate|compute|simplify|differentiate|integrate|derivative\s+of|integral\s+of)\s+([0-9A-Za-z_+\-*/^().=\s]{2,80})",
     re.IGNORECASE,
 )
 
@@ -160,16 +160,31 @@ _INLINE_EQUATION_RE = re.compile(
 def try_deterministic_math_solve(user_query: str) -> Optional[str]:
     """Attempts to extract and pre-solve an explicit arithmetic/algebraic expression via SymPy."""
     q = user_query.strip().rstrip("?.!")
+    q_low = q.lower()
+    op = "auto"
+    if "differentiate" in q_low or "derivative" in q_low:
+        op = "differentiate"
+    elif "integrate" in q_low or "integral" in q_low:
+        op = "integrate"
+
     # Direct bare arithmetic/equation like `(145 * 38) + 912 / 4` or `2*x + 7 = 19`
     candidates: List[str] = []
     if re.fullmatch(r"[0-9xXyYzZ+\-*/^().=\s]{3,90}", q):
         candidates.append(q)
     m = _INLINE_EQUATION_RE.search(q)
     if m:
-        candidates.append(m.group(1).strip())
+        raw_cand = m.group(1).strip()
+        raw_cand = re.sub(
+            r"\s+\b(?:for\s+[a-zA-Z]|with\s+respect\s+to\s+[a-zA-Z]|step\s+by\s+step|and\s+verify.*|and\s+show.*)$",
+            "",
+            raw_cand,
+            flags=re.IGNORECASE,
+        ).strip()
+        if raw_cand:
+            candidates.append(raw_cand)
 
     for cand in candidates:
-        out = verify_or_solve_sympy(cand)
+        out = verify_or_solve_sympy(cand, operation=op)
         if out.passed and out.cleaned_artifact:
             return f"SymPy Exact Verification for `{cand}`: `{out.cleaned_artifact}`"
     return None
