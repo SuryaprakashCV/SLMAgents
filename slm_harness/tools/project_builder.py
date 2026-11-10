@@ -173,28 +173,44 @@ def should_execute_local_project_build(
     if is_followup_build_command(q_clean):
         return True
 
-    # 2. Direct project / web app / studio build request — generate and build immediately on request
-    # (no pre-prepared plan card unless user explicitly typed /plan or /clarify)
-    is_explicit_plan_only = bool(re.match(r"^/(?:plan|clarify)\b", q_raw, flags=re.IGNORECASE))
-    if not is_explicit_plan_only and (_PROJECT_BUILD_TOPIC_RE.search(q_clean) or _ITERATIVE_PROJECT_EDIT_RE.search(q_clean)):
+    # 2. Iterative edit on an already-built project in the workspace ("can you change its design", "Modify [App]: ...")
+    is_new_project_request = bool(
+        re.search(
+            r"\b(?:build|create|develop|architect|scaffold|construct)\s+(?:a\s+|an\s+|new\s+|my\s+|the\s+)?(?:[a-z0-9_\-]+\s+){0,4}"
+            r"(?:website|web\s+app|web\s+application|application|app|platform|dashboard|portal|test\s+suite|studio|project|system|workbench)\b",
+            q_clean,
+            re.IGNORECASE,
+        )
+    )
+    if _ITERATIVE_PROJECT_EDIT_RE.search(q_clean) and not is_new_project_request:
         return True
 
     # 3. User explicitly asked to build locally & create files in a single turn
     q_low = q_clean.lower()
     if (
-        any(p in q_low for p in ("build it locally", "create files and build", "create the files and build", "build locally and complete"))
+        any(p in q_low for p in ("build it locally", "create files and build", "create the files and build", "build locally and complete", "skip plan and build"))
         and not _PURE_ALGORITHM_SNIPPET_RE.match(q_clean)
     ):
         return True
 
-    # 4. User confirmed a complex build/test plan (clicked one of the plan options or replied yes/go ahead)
+    # 4. User confirmed a complex build/test plan or answered the requirement questions (clicked an option or replied in chat)
     has_plan_confirmation = bool(
         clarification_choice
         or "[clarified plan option:" in q_raw.lower()
+        or "— selected plan option:" in q_raw.lower()
+        or "— user requirements & preferences:" in q_raw.lower()
     )
     if has_plan_confirmation:
         combined_topic = f"{q_clean} {last_user_query}".strip()
-        if _PROJECT_BUILD_TOPIC_RE.search(combined_topic) or is_followup_build_command(combined_topic):
+        if (
+            _PROJECT_BUILD_TOPIC_RE.search(combined_topic)
+            or is_followup_build_command(combined_topic)
+            or re.search(
+                r"\b(?:build|create|develop|architect|implement|scaffold|construct|make|test|suite|app|website|studio|dashboard|platform|api|service)\b",
+                combined_topic,
+                re.IGNORECASE,
+            )
+        ):
             return True
 
     return False
@@ -729,12 +745,36 @@ class LocalProjectBuilder:
             "- Automated Unit & Boundary Verification Suite (`tests/test_project.py`)"
         )
 
-        return generate_custom_interactive_app_files(
+        files = generate_custom_interactive_app_files(
             project_name=project_name,
             project_slug=project_slug,
             resolved_goal=clean_goal,
             slm_blueprint=slm_blueprint,
         )
+
+        combined_prefs = f"{resolved_goal} {clarification_choice}".lower()
+        chosen_body_class = ""
+        if "light theme" in combined_prefs or "light mode" in combined_prefs:
+            chosen_body_class = "light-theme"
+        elif "royal indigo" in combined_prefs or "royal theme" in combined_prefs:
+            chosen_body_class = "theme-royal"
+        elif "emerald cyber" in combined_prefs or "cyber theme" in combined_prefs:
+            chosen_body_class = "theme-cyber"
+
+        if chosen_body_class:
+            updated_files: List[tuple[str, str, str]] = []
+            for rel_path, role_desc, content in files:
+                if rel_path == "index.html":
+                    content = re.sub(
+                        r"<body(?:\s+class=\"[^\"]*\")?>",
+                        f'<body class="{chosen_body_class}">',
+                        content,
+                        count=1,
+                    )
+                updated_files.append((rel_path, role_desc, content))
+            return updated_files
+
+        return files
 
     def _find_latest_existing_project(self, perm_mgr: Any) -> tuple[str, str, str]:
         """Finds the most recently built project directory in the active workspace."""

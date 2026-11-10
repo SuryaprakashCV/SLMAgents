@@ -541,7 +541,7 @@ class TurnStateMachine:
                 "plan_context": "Create all project files on local disk, execute the local automated test suite, and complete the project.",
             }
 
-        if not clarification_choice and is_explicit_plan_cmd:
+        if not clarification_choice and (is_explicit_plan_cmd or is_complex_build_ask or is_complex_test_ask):
             from ..tools.project_builder import _derive_project_identity
             from ..tools.project_templates import build_dynamic_project_plan
 
@@ -701,25 +701,46 @@ class TurnStateMachine:
                 self.bus.emit(EventType.RUN_COMPLETED, rid, session_id, agent="slm_personal_concierge", **outcome.to_dict())
                 return outcome
 
+            is_cancel_plan = bool(
+                not is_consent_prompt
+                and re.match(r"^(?:cancel|stop|abort|never\s*mind|forget\s+it|don'?t\s+build)\b", reply_low)
+            )
             is_confirm_reply = bool(
                 clarification_choice
                 or re.match(
-                    r"^(?:✅|🧪|⚡)?\s*(?:yes|yep|yeah|yup|sure|ok|okay|k|i\s+consent|consent|link|sounds?\s+good|looks?\s+good|looks?\s+great|"
-                    r"go\s+ahead|move\s+forward|proceed|build\s+it|test\s+it|do\s+it|run\s+it|start|"
-                    r"let'?s\s+go|let'?s\s+do\s+it|confirm(?:ed)?|approve[d]?|perfect|awesome|great|fine|1|2|3)\b",
+                    r"^(?:✅|🧪|⚡|🎨)?\s*(?:yes|yep|yeah|yup|sure|ok|okay|k|i\s+consent|consent|link|sounds?\s+good|looks?\s+good|looks?\s+great|"
+                    r"requirements?\s+&\s+plan\s+look|go\s+ahead|move\s+forward|proceed|build\s+it|test\s+it|do\s+it|run\s+it|start|"
+                    r"let'?s\s+go|let'?s\s+do\s+it|confirm(?:ed)?|approve[d]?|perfect|awesome|great|fine|1|2|3|4)\b",
                     reply_low,
                 )
                 or (is_consent_prompt and ("consent" in reply_low or "link" in reply_low))
             )
             is_plan_revision_request = bool(
                 not is_confirm_reply
+                and not is_cancel_plan
                 and re.search(
                     r"\b(?:update\s+the\s+plan|change\s+the\s+plan|modify\s+the\s+plan|revise\s+the\s+plan|"
-                    r"instead\s+of|change\s+step|in\s+the\s+plan)\b",
+                    r"show\s+updated\s+plan|in\s+the\s+plan\s+only)\b",
                     reply_low,
                 )
             )
-            if is_confirm_reply:
+            is_requirement_answer = bool(
+                not is_consent_prompt
+                and not is_cancel_plan
+                and not is_plan_revision_request
+                and not is_followup_build_command(reply_clean)
+                and not _CREATOR_IDENTITY_RE.search(reply_clean)
+                and (
+                    reply_low == orig_plan_query.lower()
+                    or re.search(
+                        r"\b(?:theme|dark|light|royal|cyber|csv|json|export|markdown|sqlite|database|tab|tabs|chart|charts|"
+                        r"filter|search|auth|login|folder|path|workspace|minimal|mvp|full|complete|all\s+aspects|"
+                        r"no\s+pre\s*filled|zero\s+pre\s*filled|include|add|with|use|keep|build|create|proceed|approve)\b",
+                        reply_low,
+                    )
+                )
+            )
+            if is_confirm_reply or is_requirement_answer:
                 bb.put(session_id, "pending_plan_state", None)
                 if is_consent_prompt:
                     try:
@@ -735,11 +756,11 @@ class TurnStateMachine:
                     or reply_clean.lower() == orig_plan_query.lower()
                     or orig_plan_query.lower() in reply_low
                     or len(reply_clean.split()) <= 12
-                    or reply_low.startswith(("yes", "looks", "sounds", "go ahead", "move forward", "proceed", "✅", "🧪", "⚡"))
+                    or reply_low.startswith(("yes", "looks", "sounds", "go ahead", "move forward", "proceed", "✅", "🧪", "⚡", "🎨"))
                 ):
                     user_query = orig_plan_query
                 else:
-                    user_query = f"{orig_plan_query} ({reply_clean})"
+                    user_query = f"{orig_plan_query} — User Requirements & Preferences: {reply_clean}"
             elif is_plan_revision_request:
                 user_query = f"{orig_plan_query} — Plan update requested by user: {reply_clean}"
                 bb.put(session_id, "pending_plan_state", None)

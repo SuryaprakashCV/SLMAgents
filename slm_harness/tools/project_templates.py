@@ -2141,6 +2141,39 @@ if __name__ == "__main__":
     ]
 
 
+def _extract_dynamic_requirements_from_query(q_clean: str, project_name: str) -> List[str]:
+    """
+    Dynamically extracts functional requirements and capabilities from the user's specific request
+    so the proposed plan and requirement checklist reflect their exact prompt.
+    """
+    q = (q_clean or "").strip()
+    q_low = q.lower()
+    reqs: List[str] = []
+
+    if _is_url_browser_automation_test_request(q):
+        reqs.append("Accept any target URL (`http://` or `https://`) and load/inspect the live webpage in the browser & backend DOM inspector.")
+        reqs.append("Extract complete page details: HTTP status, latency, SSL/TLS cipher, headings (`H1`–`H6`), links, images, forms, scripts, landmarks, and SEO/OpenGraph tags.")
+        reqs.append("Execute multi-aspect automated testing across 8 dimensions (Availability, Performance, DOM/HTML, SEO, Accessibility, Security Headers, Forms, and Links).")
+        reqs.append("Render a live visual browser preview (`iframe` snapshot bypassing `X-Frame-Options`) and generate exportable JSON, CSV, and Markdown reports.")
+    else:
+        # Split user prompt into meaningful requirement clauses
+        clauses = [
+            c.strip(" .,;:-")
+            for c in re.split(r"(?:\.\.+|;|\band\s+(?:can|try|should|also|create|get|make|test|load|generate|support)\b|\bwhich\s+|\bthat\s+)", q, flags=re.IGNORECASE)
+            if len(c.strip(" .,;:-")) >= 8
+        ]
+        for cl in clauses[:4]:
+            normalized = cl[0].upper() + cl[1:] if cl else ""
+            if normalized and normalized not in reqs:
+                reqs.append(f"Implement requested capability: **{normalized}**.")
+        if not reqs:
+            reqs.append(f"Design and implement core domain workflow for **{project_name}** based on: `{q[:120]}`.")
+        reqs.append("Provide clean, empty input forms with **zero pre-filled dummy data** and real-time validation.")
+        reqs.append("Expose REST JSON endpoints (`GET /api/health`, `POST /api/action`) with full unit & boundary test coverage.")
+
+    return reqs
+
+
 def build_dynamic_project_plan(
     q_clean: str,
     project_name: str,
@@ -2150,40 +2183,88 @@ def build_dynamic_project_plan(
     action_focus: str = "building",
 ) -> Dict:
     """
-    Constructs a direct execution plan without blocking the user with pre-prepared templates.
+    Dynamically synthesizes a tailored Architecture & Execution Plan and asks complete
+    requirement clarification questions before proceeding to build the project on disk.
     """
+    import os
+    from ..config import get_config
+    from ..governance.policy import get_folder_permission_manager
+
+    perm_mgr = get_folder_permission_manager()
+    active_ws = perm_mgr.get_active_folder() or os.path.join(get_config().workspace_dir, "projects")
+    if os.path.basename(active_ws).lower() == project_slug.lower():
+        target_dir = active_ws
+    else:
+        target_dir = os.path.join(active_ws, project_slug)
+
     live_url = f"http://localhost:8000/projects/{project_slug}/index.html"
+    extracted_reqs = _extract_dynamic_requirements_from_query(q_clean, project_name)
+    reqs_md = "\n".join(f"- ✅ {r}" for r in extracted_reqs)
+
     steps = [
         {
             "node_id": "plan_1",
             "agent": "slm_task_planner",
-            "instruction": f"Step 1 — Analyze request & scaffold workspace for {project_name}: {q_clean[:85]}",
+            "instruction": f"Step 1 — Finalize requirements & scaffold workspace at '{target_dir}' for {project_name}",
             "depends_on": [],
         },
         {
             "node_id": "plan_2",
             "agent": "slm_code_interpreter",
-            "instruction": f"Step 2 — Synthesize & write full-stack source files on disk for {project_name}",
+            "instruction": f"Step 2 — Build backend engine (`engine.py`) & HTTP server (`server.py`) for: {q_clean[:80]}",
             "depends_on": ["plan_1"],
         },
         {
             "node_id": "plan_3",
             "agent": "slm_code_interpreter",
-            "instruction": "Step 3 — Execute local automated test suite (`python3 -m unittest`)",
+            "instruction": f"Step 3 — Build interactive frontend (`index.html`, `styles.css`, `app.js`) with zero pre-filled data & theme switcher",
             "depends_on": ["plan_2"],
         },
         {
             "node_id": "plan_4",
             "agent": primary_agent,
-            "instruction": f"Step 4 — Mount live web application at {live_url}",
+            "instruction": f"Step 4 — Run automated `unittest` suite (`tests/test_project.py`) & open live Split-Screen Canvas at {live_url}",
             "depends_on": ["plan_3"],
         },
     ]
+
+    question = (
+        f"Before I build and launch **{project_name}**, please review this plan and confirm or share any additional requirements:"
+    )
+    options = [
+        "✅ Requirements & plan look complete — go ahead and build it now!",
+        "🎨 Build with 4-Theme Design Switcher (Dark / Light / Royal / Cyber) + CSV & JSON Export",
+        "🧪 Build with Extended Edge-Case, Security & Performance Test Suite",
+        "⚡ Build Clean Minimal MVP First (Core Engine + UI with Zero Pre-Filled Data)",
+    ]
+
+    plan_markdown = (
+        f"Here is the tailored **Architecture Plan & Requirement Checklist** for **{project_name}** "
+        f"(generated directly from your request, starting with **zero pre-filled dummy data**):\n\n"
+        f"### 🎯 1. Captured Requirements from Your Request\n"
+        f"{reqs_md}\n\n"
+        f"### 🏗️ 2. Proposed 4-Step Execution Plan\n"
+        f"1. **Step 1 — Workspace & Permission Setup (`slm_task_planner`)**\n"
+        f"   Scaffold `{target_dir}` with full local folder permissions (`create` · `edit` · `delete` · `run` · `execute`).\n"
+        f"2. **Step 2 — Backend Engine & REST API (`engine.py`, `server.py`)**\n"
+        f"   Implement core domain processing, boundary validation guards, and zero-dependency HTTP JSON endpoints tailored to: *{q_clean}*.\n"
+        f"3. **Step 3 — Interactive Studio UI & Multi-Theme Design (`index.html`, `styles.css`, `app.js`)**\n"
+        f"   Build a responsive interface starting with clean, empty inputs (zero pre-filled data), live state updates, 4-theme design switcher (`Midnight Dark`, `Clean Light`, `Royal Purple`, `Cyber Emerald`), and `JSON`/`CSV` report exports.\n"
+        f"4. **Step 4 — Automated Verification & Split-Screen Live Canvas (`tests/test_project.py`)**\n"
+        f"   Execute `python3 -m unittest discover -s tests -v` locally, mount the live app at `{live_url}`, and open the **Split-Screen Preview, Code & Terminal Canvas**.\n\n"
+        f"### ❓ 3. Quick Requirement Questions Before Proceeding\n"
+        f"- **Additional Features / Fields:** Would you like any specific extra inputs, tabs, or custom rules included?\n"
+        f"- **Preferred Visual Theme:** Should I start with **Midnight Dark**, **Clean Light**, **Royal Purple**, or **Cyber Emerald**?\n"
+        f"- **Target Folder Path:** Proceed in `{target_dir}`, or would you like a different folder?\n\n"
+        f"💬 **{question}**\n"
+        f"*(Click an option below, or type your specific requirements in the box / chat to build immediately!)*"
+    )
+
     return {
-        "needs_blocking_clarification": False,
-        "question": "",
-        "options": [],
+        "needs_blocking_clarification": True,
+        "question": question,
+        "options": options,
         "steps": steps,
-        "plan_markdown": "",
+        "plan_markdown": plan_markdown,
         "plan_context": f"Synthesize and build {project_name} on local disk for: {q_clean}",
     }

@@ -433,8 +433,54 @@ def test_all_26_slm_agents_verifiers_and_harness_planes() -> None:
     mig_fast = runner._try_verified_specialist_fastpath("slm_db_migration", "Create migration to add status column")
     assert mig_fast is not None and "UP MIGRATION" in mig_fast and "DOWN MIGRATION" in mig_fast
 
-    # 5. /goal prefix on project build executes immediately without pre-prepared plan blocking
-    assert should_execute_local_project_build("/goal create automation test studio web app") is True
+    # 5. Two-Phase Plan + Complete Requirement Clarification -> Confirmed Project Build Flow
+    assert should_execute_local_project_build("/goal create automation test studio web app") is False
+    assert (
+        should_execute_local_project_build(
+            "/goal create automation test studio web app",
+            clarification_choice="✅ Requirements & plan look complete — build & launch now (Slate Dark Theme)",
+        )
+        is True
+    )
+
+    import os
+    import tempfile
+    from slm_harness.governance.policy import get_folder_permission_manager
+
+    perm_mgr = get_folder_permission_manager()
+    kernel = get_kernel()
+    with tempfile.TemporaryDirectory() as tmp_ws:
+        perm_mgr.grant_permission(folder_path=tmp_ws, set_active=True)
+        try:
+            # Turn 1: User asks to build a project -> Agent prepares tailored Plan & asks Requirement Questions first
+            turn1 = kernel.run_turn(
+                user_query="/goal create automation test studio web app that takes any url and tests all aspects and creates a report",
+                session_id="test_two_phase_plan_requirements_session",
+                client_surface="web",
+            )
+            assert turn1.mode == "clarification_plan"
+            assert turn1.structured_output.get("clarification_needed") is True
+            assert "Captured Requirements from Your Request" in turn1.final_text
+            assert "Proposed 4-Step Execution Plan" in turn1.final_text
+            assert "Quick Requirement Questions Before Proceeding" in turn1.final_text
+            assert len(turn1.structured_output.get("options", [])) >= 4
+
+            # Turn 2: User replies with custom requirement answers ("use Royal Indigo theme and add CSV export") -> Agent builds on disk
+            turn2 = kernel.run_turn(
+                user_query="use Royal Indigo theme and add CSV export, go ahead and build it",
+                session_id="test_two_phase_plan_requirements_session",
+                client_surface="web",
+            )
+            assert "Local Project Built & Verified on Disk" in turn2.final_text
+            assert turn2.structured_output.get("open_canvas") is True
+            proj_dir = turn2.structured_output.get("project_dir", "")
+            assert os.path.isfile(os.path.join(proj_dir, "index.html"))
+            with open(os.path.join(proj_dir, "index.html"), "r", encoding="utf-8") as fh:
+                built_html = fh.read()
+            assert 'class="theme-royal"' in built_html
+        finally:
+            perm_mgr.revoke_permission(tmp_ws)
+            perm_mgr.set_active_folder(None)
 
 
 if __name__ == "__main__":
