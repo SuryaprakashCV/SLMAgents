@@ -377,12 +377,14 @@ class LocalProjectBuilder:
             if custom_slug:
                 project_slug = custom_slug
 
-        # Resolve target project directory: explicit target_folder > path in user_query > active permitted folder > default projects_root
+        # Resolve target project directory: explicit target_folder > path in user_query/clarification_choice > active permitted folder > default projects_root
         explicit_folder = (target_folder or "").strip()
         if not explicit_folder:
-            m_path = re.search(r"(?:\bin|\bat|\binto|\bfolder|\bpath)\s+([~/][A-Za-z0-9_.\-/]+)", user_query or "")
+            combined_path_search = f"{user_query or ''} {clarification_choice or ''}"
+            m_path = re.search(r"(?:\bin|\bat|\binto|\bfolder|\bpath|\bworkspace)\s+([~/][A-Za-z0-9_.\-/]+)", combined_path_search, re.IGNORECASE)
             if m_path:
-                explicit_folder = m_path.group(1).strip()
+                explicit_folder = m_path.group(1).strip().rstrip(".,;)")
+                grant_permission = True
 
         if explicit_folder:
             norm_base = perm_mgr.normalize_folder_path(explicit_folder)
@@ -739,27 +741,33 @@ class LocalProjectBuilder:
         from .project_templates import generate_custom_interactive_app_files
 
         clean_goal = _clean_candidate_goal(resolved_goal)
+        custom_req_note = ""
+        if clarification_choice and not clarification_choice.strip().startswith(("✅", "🧪", "⚡", "🎨")):
+            custom_req_note = f"\n- Confirmed User Requirements: {clarification_choice.strip()[:240]}"
         slm_blueprint = (
             "- Modular Python 3.11 Backend Engine (`engine.py`) with zero-dependency HTTP API (`server.py`)\n"
             "- Interactive Responsive Studio Frontend (`index.html`, `styles.css`, `app.js`) with zero pre-filled dummy values\n"
-            "- Automated Unit & Boundary Verification Suite (`tests/test_project.py`)"
+            f"- Automated Unit & Boundary Verification Suite (`tests/test_project.py`){custom_req_note}"
         )
 
+        goal_with_prefs = f"{clean_goal} {clarification_choice}".strip() if custom_req_note else clean_goal
         files = generate_custom_interactive_app_files(
             project_name=project_name,
             project_slug=project_slug,
-            resolved_goal=clean_goal,
+            resolved_goal=goal_with_prefs,
             slm_blueprint=slm_blueprint,
         )
 
         combined_prefs = f"{resolved_goal} {clarification_choice}".lower()
         chosen_body_class = ""
-        if "light theme" in combined_prefs or "light mode" in combined_prefs:
+        if "light theme" in combined_prefs or "light mode" in combined_prefs or "clean light" in combined_prefs:
             chosen_body_class = "light-theme"
-        elif "royal indigo" in combined_prefs or "royal theme" in combined_prefs:
+        elif "royal indigo" in combined_prefs or "royal theme" in combined_prefs or "royal purple" in combined_prefs:
             chosen_body_class = "theme-royal"
-        elif "emerald cyber" in combined_prefs or "cyber theme" in combined_prefs:
+        elif "emerald cyber" in combined_prefs or "cyber theme" in combined_prefs or "cyber emerald" in combined_prefs:
             chosen_body_class = "theme-cyber"
+        elif "dark theme" in combined_prefs or "dark mode" in combined_prefs or "slate dark" in combined_prefs or "midnight dark" in combined_prefs:
+            chosen_body_class = "theme-dark"
 
         if chosen_body_class:
             updated_files: List[tuple[str, str, str]] = []

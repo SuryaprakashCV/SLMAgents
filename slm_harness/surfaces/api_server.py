@@ -296,6 +296,8 @@ def build_harness_chat_streaming_response(
     ev_queue = bus.subscribe_run_queue(run_id)
     worker_done = threading.Event()
     outcome_box: Dict[str, Any] = {}
+    recorded_thoughts: List[str] = []
+    recorded_tokens: List[str] = []
     _RUN_STATE_CACHE[run_id] = {
         "status": "running",
         "run_id": run_id,
@@ -305,6 +307,47 @@ def build_harness_chat_streaming_response(
         "streamed_text": "",
         "payload": None,
     }
+
+    def _record_run_event(ev: HarnessEvent) -> None:
+        if ev.run_id != run_id:
+            return
+        et = ev.event_type
+        p = ev.payload
+        msg_to_add = ""
+        if et == EventType.ROUTE_DECIDED:
+            msg_to_add = _human_routing_thought(str(p.get("primary_agent") or pinned or "SLMOrchestrator"), message)
+        elif et == EventType.PLAN_CREATED:
+            steps = p.get("steps") or []
+            if steps and isinstance(steps[0], dict):
+                msg_to_add = f"Compiled {len(steps)}-step topological DAG: " + " -> ".join(
+                    f"{s.get('node_id')}:{s.get('agent')}" for s in steps
+                )
+            else:
+                msg_to_add = f"Formulated {len(steps)}-step Execution Plan ({p.get('reasoning_effort', eff_norm).upper()} reasoning)"
+        elif et in (EventType.STEP_STARTED, EventType.STEP_COMPLETED):
+            msg_to_add = str(p.get("message") or f"Executing {p.get('agent', 'step')} on CPU...")
+        elif et == EventType.TOOL_EXEC_STARTED:
+            t_args = json.dumps(p.get("arguments") or {}, ensure_ascii=False)[:110]
+            msg_to_add = f"Tool call: {p.get('tool')}({t_args})"
+        elif et == EventType.TOOL_RESULT:
+            status_lbl = "ok" if p.get("ok") else "failed"
+            msg_to_add = f"Tool result: {p.get('tool')} [{status_lbl}] ({p.get('duration_ms')}ms)"
+        elif et == EventType.VERIFIER_PASSED:
+            msg_to_add = f"Deterministic verifier passed ({p.get('agent', 'check')})"
+        elif et == EventType.TOKEN_DELTA:
+            tok = str(p.get("text") or "")
+            if tok:
+                recorded_tokens.append(tok)
+
+        if msg_to_add and msg_to_add not in recorded_thoughts:
+            recorded_thoughts.append(msg_to_add)
+        state_entry = _RUN_STATE_CACHE.get(run_id)
+        if state_entry and state_entry.get("status") == "running":
+            state_entry["thoughts"] = list(recorded_thoughts)
+            if recorded_tokens:
+                state_entry["streamed_text"] = "".join(recorded_tokens)
+
+    unsub_recorder = bus.subscribe(_record_run_event)
 
     def _worker() -> None:
         try:
@@ -329,12 +372,13 @@ def build_harness_chat_streaming_response(
             )
             outcome_box["outcome"] = outcome
             trace_rec = get_trace_store().get_trace(run_id)
+            merged_thoughts = list(recorded_thoughts or _RUN_STATE_CACHE.get(run_id, {}).get("thoughts") or [])
             done_payload = {
                 "type": "cancelled" if getattr(outcome, "cancelled", False) else "done",
                 "event_type": "run_cancelled" if getattr(outcome, "cancelled", False) else "run_completed",
                 "response": str(getattr(outcome, "final_text", "") or ""),
                 "routed_agent": str(getattr(outcome, "agent_used", "") or pinned or "SLMOrchestrator"),
-                "thoughts": list(_RUN_STATE_CACHE.get(run_id, {}).get("thoughts") or []),
+                "thoughts": merged_thoughts,
                 "citations": getattr(outcome, "citations", None) or [],
                 "artifacts": getattr(outcome, "artifacts", None) or [],
                 "structured_output": getattr(outcome, "structured_output", None),
@@ -374,6 +418,10 @@ def build_harness_chat_streaming_response(
                 },
             }
         finally:
+            try:
+                unsub_recorder()
+            except Exception:
+                pass
             worker_done.set()
 
     lane = "fast" if eff_norm == "low" else "compute"
@@ -406,6 +454,7 @@ def build_harness_chat_streaming_response(
             }
         )
 
+        last_keepalive = time.monotonic()
         try:
             while not worker_done.is_set() or not ev_queue.empty():
                 drained = False
@@ -702,8 +751,16 @@ def build_harness_chat_streaming_response(
                         return
 
                 if run_id in _RUN_STATE_CACHE and _RUN_STATE_CACHE[run_id].get("status") == "running":
-                    _RUN_STATE_CACHE[run_id]["thoughts"] = list(all_thoughts)
-                    _RUN_STATE_CACHE[run_id]["streamed_text"] = "".join(streamed_text_parts)
+                    if len(all_thoughts) > len(_RUN_STATE_CACHE[run_id].get("thoughts") or []):
+                        _RUN_STATE_CACHE[run_id]["thoughts"] = list(all_thoughts)
+                    if streamed_text_parts:
+                        _RUN_STATE_CACHE[run_id]["streamed_text"] = "".join(streamed_text_parts)
+                now_mono = time.monotonic()
+                if not drained and (now_mono - last_keepalive) >= 2.0:
+                    last_keepalive = now_mono
+                    yield ": keepalive\n\n"
+                elif drained:
+                    last_keepalive = now_mono
                 await asyncio.sleep(0.005 if drained else 0.01)
 
             if "fatal_error" in outcome_box:

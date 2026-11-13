@@ -496,6 +496,170 @@ def test_all_26_slm_agents_verifiers_and_harness_planes() -> None:
             perm_mgr.set_active_folder(None)
 
 
+def test_production_readiness_cross_check_all_requirements() -> None:
+    """
+    11th Production-Readiness Cross-Check across all cumulative user requirements:
+      1. Zero pre-filled dummy values in UI (`website/chat.html`) & zero pre-built dummy apps.
+      2. Zero intent hijacking (`PersonalConcierge` vs `LocalProjectBuilder`, `MachineControl` vs `LocalProjectBuilder`).
+      3. Custom non-URL project Turn-1 Plan + Requirement Clarification -> Turn-2 Build with inline folder path,
+         Slate Dark theme (`theme-dark`), 4-theme high-contrast CSS, CSV/JSON export, live filter, and 4/4 unit tests.
+      4. FastAPI `TestClient` end-to-end verification of Browse Dirs, Folder Permissions, Built App Actions (`list`,
+         `create`, `delete`, `clear`), Live Mounted Static Serving, and Window-Switch Resilient `/api/runs/<id>/status`.
+    """
+    import os
+    import tempfile
+    import uuid
+    from fastapi.testclient import TestClient
+
+    import main as main_app_mod
+    from slm_harness.governance.policy import get_folder_permission_manager
+    from slm_harness.kernel.state_machine import get_kernel
+    from slm_harness.personalization.concierge import detect_concierge_intent
+    from slm_harness.tools.machine_control import detect_machine_control_intent
+
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    chat_html_path = os.path.join(repo_root, "website", "chat.html")
+    with open(chat_html_path, "r", encoding="utf-8") as fh:
+        chat_html = fh.read()
+
+    # 1. Zero pre-filled values in chat.html
+    for forbidden_prefill in (
+        'value="5"',
+        'value="Remote"',
+        'value="08:30"',
+        'value="imap.gmail.com"',
+        "'my_project'",
+    ):
+        assert forbidden_prefill not in chat_html, f"Found leftover pre-filled value in chat.html: {forbidden_prefill}"
+
+    # 2. Zero intent hijacking on dashboard/automation/folder-path project prompts
+    assert detect_concierge_intent("build a sales dashboard web app") is None
+    assert detect_concierge_intent("create an analytics dashboard project") is None
+    assert detect_concierge_intent("build my daily dashboard") == "daily_dashboard"
+
+    assert detect_machine_control_intent("build a web app to automate tasks and workflows") is None
+    assert detect_machine_control_intent("create app [Clarified Plan Option: use folder path /tmp/x]") is None
+    assert detect_machine_control_intent("use folder path /tmp/custom_ws and build it") is None
+
+    # 3. Custom non-URL project 2-phase Plan -> Build with inline folder path & Slate Dark theme
+    perm_mgr = get_folder_permission_manager()
+    kernel = get_kernel()
+    session_id = f"prod_crosscheck_{uuid.uuid4().hex[:8]}"
+
+    with tempfile.TemporaryDirectory() as inline_ws:
+        try:
+            turn1 = kernel.run_turn(
+                user_query="create a sales pipeline tracker web app that tracks leads and exports reports",
+                session_id=session_id,
+                client_surface="web",
+            )
+            assert turn1.mode == "clarification_plan"
+            assert turn1.structured_output.get("clarification_needed") is True
+            assert "application-project-builder" in turn1.structured_output.get("active_skills", [])
+            assert "Quick Requirement Questions Before Proceeding" in turn1.final_text
+
+            turn2 = kernel.run_turn(
+                user_query=f"use folder path {inline_ws} and Slate Dark theme, include lead stage notes, go ahead and build now",
+                session_id=session_id,
+                client_surface="web",
+            )
+            assert "Local Project Built & Verified on Disk" in turn2.final_text
+            so = turn2.structured_output or {}
+            assert so.get("open_canvas") is True
+            assert so.get("test_passed") is True
+            assert int(so.get("tests_run", 0)) >= 4
+            proj_dir = so.get("project_dir", "")
+            proj_slug = so.get("project_slug", "")
+            assert proj_dir.startswith(os.path.realpath(inline_ws)) or proj_dir.startswith(os.path.abspath(inline_ws))
+
+            with open(os.path.join(proj_dir, "index.html"), "r", encoding="utf-8") as fh:
+                custom_html = fh.read()
+            with open(os.path.join(proj_dir, "styles.css"), "r", encoding="utf-8") as fh:
+                custom_css = fh.read()
+
+            assert 'class="theme-dark"' in custom_html
+            assert 'id="btn-theme-toggle"' in custom_html
+            assert 'id="btn-export-csv"' in custom_html
+            assert 'id="btn-export-json"' in custom_html
+            assert 'id="search-filter-input"' in custom_html
+            assert 'value=""' in custom_html
+            assert "body.theme-dark" in custom_css
+            assert "body.theme-royal" in custom_css
+            assert "body.theme-cyber" in custom_css
+            # Ensure no hardcoded light gray #cbd5e1 text on default light-theme body
+            default_body_block = custom_css.split("body.theme-dark")[0]
+            assert "color: #cbd5e1" not in default_body_block
+
+            # 4. End-to-End FastAPI HTTP + Window-Switch Resilient Run Status Verification
+            client = TestClient(main_app_mod.app)
+
+            browse_res = client.post("/api/projects/builder/browse-dirs", json={"path": proj_dir})
+            assert browse_res.status_code == 200
+            browse_json = browse_res.json()
+            assert browse_json["status"] == "ok"
+            assert "tests" in [d["name"] for d in browse_json["directories"]]
+
+            grant_res = client.post(
+                "/api/projects/builder/grant-permission",
+                json={"folder_path": inline_ws, "set_active": True},
+            )
+            assert grant_res.status_code == 200
+            assert grant_res.json()["status"] == "ok"
+
+            # Verify live static serving & zero-prefilled backend state -> create -> delete -> clear
+            live_html_res = client.get(f"/projects/{proj_slug}/index.html")
+            assert live_html_res.status_code == 200
+            assert "btn-theme-toggle" in live_html_res.text
+
+            list_init = client.post(f"/api/projects/{proj_slug}/action", json={"action": "list"}).json()
+            assert list_init["count"] == 0
+            assert list_init["items"] == []
+
+            created_res = client.post(
+                f"/api/projects/{proj_slug}/action",
+                json={"action": "create", "title": "Enterprise Deal", "category": "Qualified", "details": "Q4"},
+            ).json()
+            assert created_res["status"] == "ok"
+            assert created_res["count"] == 1
+            item_id = created_res["item"]["id"]
+
+            del_res = client.post(
+                f"/api/projects/{proj_slug}/action",
+                json={"action": "delete", "id": item_id},
+            ).json()
+            assert del_res["count"] == 0
+
+            client.post(f"/api/projects/{proj_slug}/action", json={"action": "create", "title": "Second Lead"})
+            clear_res = client.post(f"/api/projects/{proj_slug}/action", json={"action": "clear"}).json()
+            assert clear_res["count"] == 0
+
+            # Verify `/api/chat` + `/api/runs/<req_id>/status` records thoughts & payload for window-switch recovery
+            req_id = f"run_ws_resilience_{uuid.uuid4().hex[:8]}"
+            chat_sse = client.post(
+                "/api/chat",
+                json={
+                    "message": "create an inventory audit web app",
+                    "session_id": f"sse_sess_{uuid.uuid4().hex[:6]}",
+                    "req_id": req_id,
+                    "client_surface": "web",
+                },
+            )
+            assert chat_sse.status_code == 200
+            run_status_res = client.get(f"/api/runs/{req_id}/status")
+            assert run_status_res.status_code == 200
+            run_state = run_status_res.json()
+            assert run_state["status"] == "completed"
+            assert isinstance(run_state.get("thoughts"), list) and len(run_state["thoughts"]) >= 1
+            assert run_state["payload"]["type"] == "done"
+            assert run_state["payload"]["structured_output"]["clarification_needed"] is True
+            assert "application-project-builder" in run_state["payload"]["structured_output"]["active_skills"]
+        finally:
+            if "proj_dir" in locals() and proj_dir:
+                perm_mgr.revoke_permission(proj_dir)
+            perm_mgr.revoke_permission(inline_ws)
+            perm_mgr.set_active_folder(None)
+
+
 if __name__ == "__main__":
     test_inspect_response_quality_detects_hollow_replies()
     test_document_deep_self_critique_recovery_when_source_missing()
@@ -507,7 +671,9 @@ if __name__ == "__main__":
     test_project_builder_custom_folder_and_permissions()
     test_iterative_project_edit_and_canvas_payload()
     test_all_26_slm_agents_verifiers_and_harness_planes()
-    print("ALL 10 SELF-CRITIQUE, 26-AGENT ROUTER, VERIFIER, PROJECT BUILDER, ITERATIVE CANVAS & FOLDER PERMISSION TESTS PASSED!")
+    test_production_readiness_cross_check_all_requirements()
+    print("ALL 11 PRODUCTION-READINESS, 26-AGENT ROUTER, SKILL, PLAN+REQUIREMENTS, CANVAS & RESILIENCE TESTS PASSED!")
+
 
 
 

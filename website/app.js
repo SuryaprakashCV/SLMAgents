@@ -2839,7 +2839,7 @@ function appendMessageElementToViewport(role, text, attachments = [], routedAgen
         if (!fPath) return "";
         const fLines = (typeof f === "object" && f.lines) ? ` <span style="opacity:0.65;">(${f.lines}L)</span>` : "";
         const safePath = escapeHtmlSafe(fPath).replace(/'/g, "\\'");
-        return `<button type="button" onclick="(function(){const d=JSON.parse(decodeURIComponent('${soJson}')); if(window.openAgenticCodeCanvas){window.openAgenticCodeCanvas(d,'code'); setTimeout(()=>{if(window.loadCanvasFileContent)window.loadCanvasFileContent('${safePath}');},120);}})()" style="padding:4px 9px; border-radius:6px; border:1px solid rgba(99,102,241,0.3); background:rgba(99,102,241,0.08); color:#4f46e5; font-size:11px; font-weight:600; font-family:'JetBrains Mono',monospace; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">📄 ${escapeHtmlSafe(fPath)}${fLines}</button>`;
+        return `<button type="button" onclick="(function(){const d=JSON.parse(decodeURIComponent('${soJson}')); if(window.openAgenticCodeCanvas){window.openAgenticCodeCanvas(d,'code'); setTimeout(()=>{if(window.loadCanvasFileContent&&d.project_dir){window.loadCanvasFileContent(d.project_dir,'${safePath}'); if(window.loadCanvasFileTree)window.loadCanvasFileTree(d.project_dir,'${safePath}');}},120);}})()" style="padding:4px 9px; border-radius:6px; border:1px solid rgba(99,102,241,0.3); background:rgba(99,102,241,0.08); color:#4f46e5; font-size:11px; font-weight:600; font-family:'JetBrains Mono',monospace; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">📄 ${escapeHtmlSafe(fPath)}${fLines}</button>`;
       }).join("");
 
       const canvasCard = document.createElement("div");
@@ -3830,10 +3830,44 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
       session._liveTokens = "";
       session._liveRoutedAgent = "Reasoning & Routing...";
       
+      let watchdogFatalError = null;
+      const _syncRunStatusFromWatchdog = async () => {
+        if (finalPayload || window.forceQuitTriggered) return;
+        try {
+          const stResp = await fetch(getApiEndpoint(`/api/runs/${encodeURIComponent(reqId)}/status`));
+          if (!stResp.ok) return;
+          const stData = await stResp.json();
+          if (stData && Array.isArray(stData.thoughts)) {
+            stData.thoughts.forEach(th => {
+              const cleanTh = stripThoughtEmojis(th);
+              if (cleanTh && !accumulatedThoughts.includes(cleanTh)) {
+                accumulatedThoughts.push(cleanTh);
+              }
+            });
+            session._liveThoughts = [...accumulatedThoughts];
+          }
+          if (stData && (stData.status === "completed" || stData.status === "cancelled") && stData.payload) {
+            finalPayload = stData.payload;
+            try { reader.cancel().catch(() => {}); } catch (_) {}
+          } else if (stData && stData.status === "error") {
+            watchdogFatalError = stData.error || "Execution error";
+            try { reader.cancel().catch(() => {}); } catch (_) {}
+          }
+        } catch (_) {}
+      };
+      const _onWindowResume = () => {
+        if (document.visibilityState === "visible") {
+          _syncRunStatusFromWatchdog();
+        }
+      };
+      document.addEventListener("visibilitychange", _onWindowResume);
+      window.addEventListener("focus", _onWindowResume);
+      const statusWatchdogInterval = setInterval(_syncRunStatusFromWatchdog, 2500);
+
       try {
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done || finalPayload || watchdogFatalError) break;
           
           streamBuffer += decoder.decode(value, { stream: true });
           const lines = streamBuffer.split("\n\n");
@@ -3994,11 +4028,18 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
         if (window.forceQuitTriggered || (streamReadErr && streamReadErr.name === "AbortError")) {
           throw streamReadErr;
         }
+      } finally {
+        clearInterval(statusWatchdogInterval);
+        document.removeEventListener("visibilitychange", _onWindowResume);
+        window.removeEventListener("focus", _onWindowResume);
+      }
+      if (watchdogFatalError && !finalPayload) {
+        throw new Error(watchdogFatalError);
       }
       
       // If window/tab change interrupted the SSE stream while backend is still working, poll /api/runs/{reqId}/status until completion
       if (!finalPayload && !window.forceQuitTriggered) {
-        for (let pollAttempt = 0; pollAttempt < 90 && !finalPayload && !window.forceQuitTriggered; pollAttempt++) {
+        for (let pollAttempt = 0; pollAttempt < 450 && !finalPayload && !window.forceQuitTriggered; pollAttempt++) {
           await new Promise(r => setTimeout(r, 400));
           try {
             const stResp = await fetch(getApiEndpoint(`/api/runs/${encodeURIComponent(reqId)}/status`));
@@ -4085,6 +4126,19 @@ async function handleChatSubmit(event, overrideMessage = null, clarificationChoi
       }
       if (typeof rawResp === "string") {
         rawResp = rawResp.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>/g, "").replace(/<\/think>/g, "").trim();
+      }
+
+      if (
+        !accumulatedClarification &&
+        finalPayload &&
+        finalPayload.structured_output &&
+        finalPayload.structured_output.clarification_needed
+      ) {
+        accumulatedClarification = {
+          question: finalPayload.structured_output.question || "Does this plan look good to you?",
+          options: finalPayload.structured_output.options || [],
+          original_query: finalPayload.structured_output.original_query || cleanMsg
+        };
       }
 
       const turnMeta = {

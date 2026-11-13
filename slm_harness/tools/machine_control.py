@@ -98,7 +98,7 @@ _MACHINE_INTENT_PATTERNS = [
         re.compile(
             r"\b(?:find|search|locate|where\s+is|where\s+are|look\s+for|scan\s+for)\b.*\b(?:in\s+(?:my\s+|the\s+)?(?:machine|computer|mac|pc|laptop|system|disk|workspace|folder|directory|desktop|documents|downloads)|on\s+(?:my\s+|the\s+)?(?:machine|computer|mac|pc|laptop|system|disk|desktop))\b"
             r"|\b(?:search\s+(?:and\s+find|for)?|find\s+(?:out\s+)?(?:all\s+)?|locate|scan\s+for)\b.*\b(?:files?|folders?|director(?:y|ies)|documents?|pdfs?|spreadsheets?|scripts?|apps?|applications?|projects?|repos?|\*\.[a-z0-9]+)\b"
-            r"|\b(?:give\s+me\s+(?:the\s+)?path|what\s+is\s+(?:the\s+)?path|path\s+(?:for|of|to)|folder\s+path|directory\s+path)\b"
+            r"|\b(?:give\s+me\s+(?:the\s+)?(?:folder\s+|directory\s+)?path|what\s+is\s+(?:the\s+)?(?:folder\s+|directory\s+)?path|(?:show|get|tell\s+me)\s+(?:the\s+)?(?:folder|directory)?\s*path\s+(?:for|of|to))\b"
             r"|\b(?:any\s+(?:similar\s+)?folders?|folders?\s+named\s+like\s+that|any\s+folder\s+named|any\s+files?\s+named|is\s+there\s+(?:a|any)\s+(?:folder|file|directory))\b"
             r"|\b(?:search(?:ed)?\s+for\s+all\s+(?:combinations|variations)\s+of|all\s+(?:combinations|variations)\s+of)\b"
             r"|\b(?:i\s+mean\s+in\s+(?:my\s+)?machine|what\s+is\s+the\s+command\s+you\s+ran)\b"
@@ -180,8 +180,22 @@ def detect_machine_control_intent(query: str) -> Optional[str]:
     q = (query or "").strip()
     if not q:
         return None
-    # Do not hijack pure algorithm coding requests like "Write a Python script to compute Fibonacci"
+    # Do not hijack pure algorithm coding requests or application/project builder prompts & confirmations
     q_low = q.lower()
+    if (
+        "[clarified plan option:" in q_low
+        or "— selected plan option:" in q_low
+        or "— user requirements & preferences:" in q_low
+        or q_low.startswith("modify [")
+        or re.search(r"\b(?:use|in|under|into|save\s+to|set)\s+(?:workspace\s+|target\s+|project\s+)?(?:folder|directory|path)\b", q_low)
+        or re.search(r"\b(?:go\s+ahead\s+and\s+build|build\s+(?:it|now)|launch\s+now)\b", q_low)
+    ):
+        return None
+    if re.search(
+        r"\b(?:create|build|develop|scaffold|design|make)\s+(?:a\s+|an\s+|the\s+|my\s+)?(?:full[\s\-]*stack\s+|local\s+|interactive\s+|responsive\s+)*(?:web\s*app|webapp|website|application|app|project|studio|dashboard|portal|platform|test\s+suite)\b",
+        q_low,
+    ) and not any(w in q_low for w in ("merge excel", "git checkout", "play music", "screen traverse")):
+        return None
     if re.match(
         r"^(?:write|implement)\s+(?:a\s+|an\s+)?(?:python|java|c\+\+|javascript|typescript|rust|go)\s+(?:function|class|program|algorithm)\s+to\s+(?:compute|calculate|sort|reverse|implement)\b",
         q_low,

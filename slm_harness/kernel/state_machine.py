@@ -1460,14 +1460,15 @@ class TurnStateMachine:
                 json_schema is None
                 and not is_pure_skill_mutation_turn
                 and not is_creator_identity_turn
-                and not is_machine_control_turn
-                and not is_concierge_turn
                 and should_execute_local_project_build(
                     user_query=user_query,
                     clarification_choice=clarification_choice,
                     last_user_query=prev_session_user_query,
                 )
             )
+            if is_local_project_build_turn:
+                is_machine_control_turn = False
+                is_concierge_turn = False
 
             streamed_live_tokens = False
 

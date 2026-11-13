@@ -67,7 +67,7 @@ _CONCIERGE_INTENT_PATTERNS: List[Tuple[str, re.Pattern[str]]] = [
     (
         "daily_dashboard",
         re.compile(
-            r"\b(?:build|show|run|generate|open|refresh|create)\s+(?:my\s+|the\s+|a\s+)?(?:daily\s+|personal(?:ized)?\s+|morning\s+|executive\s+)*(?:dashboard|briefing|digest|concierge)\b"
+            r"\b(?:build|show|run|generate|open|refresh|create)\s+(?:my\s+|the\s+|a\s+)?(?:daily\s+|personal(?:ized)?\s+|morning\s+|executive\s+)+(?:dashboard|briefing|digest|concierge)\b"
             r"|\bpull\s+my\s+interesting\s+things\b"
             r"|\bsocial\s+media.*news.*dashboard\b",
             re.IGNORECASE | re.DOTALL,

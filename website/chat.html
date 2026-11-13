@@ -992,13 +992,13 @@
           <button type="button" id="pers-tab-btn-profile"></button>
           <button type="button" id="pers-tab-btn-accounts"></button>
           <button type="button" id="pers-tab-btn-dashboard"></button>
-          <input type="text" id="pers-exp-years" value="5">
-          <input type="text" id="pers-locations" value="Remote">
+          <input type="text" id="pers-exp-years" value="">
+          <input type="text" id="pers-locations" value="">
           <input type="text" id="pers-target-roles" value="">
           <input type="text" id="pers-interests" value="">
           <input type="text" id="pers-learning-goals" value="">
           <input type="text" id="pers-vip-senders" value="">
-          <input type="time" id="pers-daily-time" value="08:30">
+          <input type="time" id="pers-daily-time" value="">
           <input type="checkbox" id="pers-daily-job-enabled">
           <input type="text" id="cred-twitter-user">
           <input type="password" id="cred-twitter-pass">
@@ -1006,7 +1006,7 @@
           <input type="password" id="cred-hn-pass">
           <input type="email" id="cred-email-addr">
           <input type="password" id="cred-email-pass">
-          <input type="text" id="cred-email-host" value="imap.gmail.com">
+          <input type="text" id="cred-email-host" value="">
           <input type="text" id="cred-naukri-user">
           <input type="password" id="cred-naukri-pass">
           <span id="pers-chrome-count-badge"></span>
@@ -1181,7 +1181,7 @@
     }
 
     async function createNewSimpleSubfolder() {
-      var name = window.prompt('New folder name:', 'my_project');
+      var name = window.prompt('New folder name:', '');
       if (!name || !name.trim()) return;
       try {
         var inp = document.getElementById('simple-workspace-path-input');

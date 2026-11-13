@@ -1107,7 +1107,7 @@ if __name__ == "__main__":
       </div>
     </div>
     <div class="topbar-actions">
-      <button class="btn-secondary" id="btn-theme-toggle" type="button" onclick="(function(){{const b=document.body;const modes=['light-theme','theme-royal','theme-cyber',''];const cur=modes.findIndex(m=>m&&b.classList.contains(m));b.classList.remove('light-theme','theme-royal','theme-cyber');const next=modes[(cur+1)%modes.length];if(next)b.classList.add(next);}})()">Theme</button>
+      <button class="btn-secondary" id="btn-theme-toggle" type="button" onclick="(function(){{const b=document.body;const modes=['light-theme','theme-dark','theme-royal','theme-cyber'];const cur=modes.findIndex(m=>b.classList.contains(m));b.classList.remove('light-theme','theme-dark','theme-royal','theme-cyber');b.classList.add(modes[(cur+1)%modes.length]);}})()">🎨 Theme</button>
       <button class="btn-secondary" id="btn-export-html" type="button" disabled>HTML</button>
       <button class="btn-secondary" id="btn-export-md" type="button" disabled>Markdown</button>
       <button class="btn-secondary" id="btn-export-csv" type="button" disabled>CSV</button>
@@ -1324,12 +1324,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Robo
 .browser-frame-container { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; display: flex; justify-content: center; min-height: 500px; }
 #live-browser-iframe { width: 100%; height: 500px; border: none; border-radius: 8px; background: #ffffff; transition: width 0.2s ease; }
 .report-pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: #0f172a; white-space: pre-wrap; max-height: 600px; overflow-y: auto; }
+body.theme-dark { background: #0b1120 !important; color: #f8fafc !important; }
+body.theme-dark .topbar, body.theme-dark .url-launcher-card, body.theme-dark .workspace-card, body.theme-dark .score-card, body.theme-dark .aspect-bar-card, body.theme-dark .detail-box { background: rgba(15, 23, 42, 0.92) !important; color: #f8fafc !important; border-color: #334155 !important; }
+body.theme-dark h1, body.theme-dark h2, body.theme-dark h3, body.theme-dark h4, body.theme-dark .sc-value, body.theme-dark .kv-val, body.theme-dark .data-table td, body.theme-dark .aspect-bar-top { color: #f8fafc !important; }
+body.theme-dark .url-input-wrap, body.theme-dark .data-table th, body.theme-dark .report-pre, body.theme-dark .filter-pills { background: #1e293b !important; color: #e2e8f0 !important; border-color: #334155 !important; }
+body.theme-dark .url-input-wrap input { color: #f8fafc !important; }
+body.theme-dark .btn-secondary, body.theme-dark .aspect-chip, body.theme-dark .vp-btn:not(.active) { background: #1e293b !important; color: #e2e8f0 !important; border-color: #334155 !important; }
+body.theme-dark .btn-primary, body.theme-dark .tab-btn.active { background: #3b82f6 !important; color: #ffffff !important; }
 body.theme-royal { background: radial-gradient(circle at top right, #2e1065 0%, #0f172a 55%, #020617 100%) !important; color: #f8fafc !important; }
-body.theme-royal .topbar, body.theme-royal .url-launcher-card, body.theme-royal .workspace-card, body.theme-royal .score-card, body.theme-royal .aspect-bar-card, body.theme-royal .detail-box { background: rgba(30, 27, 75, 0.72) !important; color: #f8fafc !important; border-color: rgba(139, 92, 246, 0.35) !important; }
-body.theme-royal h1, body.theme-royal h2, body.theme-royal h3, body.theme-royal h4, body.theme-royal .sc-value, body.theme-royal .kv-val, body.theme-royal .data-table td { color: #f8fafc !important; }
+body.theme-royal .topbar, body.theme-royal .url-launcher-card, body.theme-royal .workspace-card, body.theme-royal .score-card, body.theme-royal .aspect-bar-card, body.theme-royal .detail-box { background: rgba(30, 27, 75, 0.78) !important; color: #f8fafc !important; border-color: rgba(139, 92, 246, 0.4) !important; }
+body.theme-royal h1, body.theme-royal h2, body.theme-royal h3, body.theme-royal h4, body.theme-royal .sc-value, body.theme-royal .kv-val, body.theme-royal .data-table td, body.theme-royal .aspect-bar-top { color: #f8fafc !important; }
+body.theme-royal .url-input-wrap, body.theme-royal .data-table th, body.theme-royal .report-pre, body.theme-royal .filter-pills { background: rgba(15, 23, 42, 0.75) !important; color: #e2e8f0 !important; border-color: rgba(139, 92, 246, 0.35) !important; }
+body.theme-royal .url-input-wrap input { color: #f8fafc !important; }
+body.theme-royal .btn-secondary, body.theme-royal .aspect-chip, body.theme-royal .vp-btn:not(.active) { background: rgba(30, 27, 75, 0.85) !important; color: #e2e8f0 !important; border-color: rgba(139, 92, 246, 0.4) !important; }
 body.theme-royal .btn-primary, body.theme-royal .tab-btn.active { background: linear-gradient(135deg, #8b5cf6, #ec4899) !important; color: #fff !important; }
 body.theme-cyber { background: radial-gradient(circle at top left, #064e3b 0%, #022c22 50%, #020617 100%) !important; color: #ecfdf5 !important; }
-body.theme-cyber .topbar, body.theme-cyber .url-launcher-card, body.theme-cyber .workspace-card, body.theme-cyber .score-card, body.theme-cyber .aspect-bar-card, body.theme-cyber .detail-box { background: rgba(6, 78, 59, 0.45) !important; color: #ecfdf5 !important; border-color: rgba(16, 185, 129, 0.4) !important; }
+body.theme-cyber .topbar, body.theme-cyber .url-launcher-card, body.theme-cyber .workspace-card, body.theme-cyber .score-card, body.theme-cyber .aspect-bar-card, body.theme-cyber .detail-box { background: rgba(6, 78, 59, 0.52) !important; color: #ecfdf5 !important; border-color: rgba(16, 185, 129, 0.42) !important; }
+body.theme-cyber h1, body.theme-cyber h2, body.theme-cyber h3, body.theme-cyber h4, body.theme-cyber .sc-value, body.theme-cyber .kv-val, body.theme-cyber .data-table td, body.theme-cyber .aspect-bar-top { color: #ecfdf5 !important; }
+body.theme-cyber .url-input-wrap, body.theme-cyber .data-table th, body.theme-cyber .report-pre, body.theme-cyber .filter-pills { background: rgba(2, 44, 34, 0.8) !important; color: #d1fae5 !important; border-color: rgba(16, 185, 129, 0.35) !important; }
+body.theme-cyber .url-input-wrap input { color: #ecfdf5 !important; }
+body.theme-cyber .btn-secondary, body.theme-cyber .aspect-chip, body.theme-cyber .vp-btn:not(.active) { background: rgba(6, 78, 59, 0.65) !important; color: #d1fae5 !important; border-color: rgba(16, 185, 129, 0.4) !important; }
 body.theme-cyber .btn-primary, body.theme-cyber .tab-btn.active { background: linear-gradient(135deg, #10b981, #06b6d4) !important; color: #fff !important; }
 '''
 
@@ -1839,6 +1853,12 @@ class CustomAppEngine:
             self.items.append(record)
             return {{"status": "ok", "item": record, "items": list(self.items), "count": len(self.items)}}
 
+        if action == "delete":
+            target_id = payload.get("id")
+            before = len(self.items)
+            self.items = [it for it in self.items if str(it.get("id")) != str(target_id)]
+            return {{"status": "ok", "deleted": before - len(self.items), "items": list(self.items), "count": len(self.items)}}
+
         if action == "clear":
             self.items.clear()
             return {{"status": "ok", "items": [], "count": 0}}
@@ -1938,8 +1958,10 @@ if __name__ == "__main__":
       </div>
     </div>
     <div class="topbar-actions">
+      <button class="btn-secondary" id="btn-theme-toggle" type="button" onclick="(function(){{const b=document.body;const modes=['light-theme','theme-dark','theme-royal','theme-cyber'];const cur=modes.findIndex(m=>b.classList.contains(m));b.classList.remove('light-theme','theme-dark','theme-royal','theme-cyber');b.classList.add(modes[(cur+1)%modes.length]);}})()">🎨 Theme</button>
+      <button class="btn-secondary" id="btn-export-csv" type="button">📊 Export CSV</button>
+      <button class="btn-secondary" id="btn-export-json" type="button">⬇ Export JSON</button>
       <button class="btn-secondary" id="btn-clear-all" type="button">Reset</button>
-      <button class="btn-secondary" id="btn-export-json" type="button">Export JSON</button>
     </div>
   </header>
 
@@ -1962,14 +1984,18 @@ if __name__ == "__main__":
           <label for="entry-details">{label_details}</label>
           <textarea id="entry-details" rows="4" placeholder="Enter {label_details.lower()}..."></textarea>
         </div>
+        <div id="form-error" class="form-error" style="display:none;"></div>
         <button type="submit" class="btn-primary">{btn_action}</button>
       </form>
     </section>
 
     <section class="panel">
       <div class="panel-header">
-        <h2>Output</h2>
+        <h2>Workspace Output</h2>
         <span class="status-pill" id="count-pill">0 Results</span>
+      </div>
+      <div class="filter-bar">
+        <input type="text" id="search-filter-input" value="" placeholder="Filter results..." autocomplete="off" />
       </div>
       <div id="entries-list" class="entries-list">
         <p class="empty-note">Submit an input on the left to run and view results.</p>
@@ -1983,15 +2009,18 @@ if __name__ == "__main__":
 '''
 
     styles_css = '''* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; min-height: 100vh; -webkit-font-smoothing: antialiased; }
-.topbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 32px; background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; min-height: 100vh; -webkit-font-smoothing: antialiased; transition: background 0.2s ease, color 0.2s ease; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 32px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px; }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: #0f172a; display: inline-block; }
 .brand h1 { font-size: 16px; font-weight: 600; color: #0f172a; letter-spacing: -0.01em; }
-.topbar-actions { display: flex; gap: 8px; }
-.btn-secondary { background: #ffffff; color: #334155; border: 1px solid #e2e8f0; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; }
-.btn-primary { background: #0f172a; color: #ffffff; border: none; border-radius: 999px; padding: 11px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.topbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-secondary { background: #ffffff; color: #334155; border: 1px solid #e2e8f0; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
+.btn-secondary:hover { border-color: #94a3b8; }
+.btn-primary { background: #0f172a; color: #ffffff; border: none; border-radius: 999px; padding: 11px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: opacity 0.15s ease; }
+.btn-primary:hover { opacity: 0.92; }
 .workspace { display: grid; grid-template-columns: 380px 1fr; gap: 20px; padding: 28px 24px; max-width: 1180px; margin: 0 auto; }
+@media (max-width: 860px) { .workspace { grid-template-columns: 1fr; } }
 .panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.04); }
 .panel-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9; }
 .panel-header h2 { font-size: 15px; font-weight: 600; color: #0f172a; }
@@ -2000,53 +2029,147 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Robo
 .form-stack { display: flex; flex-direction: column; gap: 12px; }
 .control-row { display: flex; flex-direction: column; gap: 5px; }
 .control-row label { font-size: 12px; font-weight: 500; color: #475569; }
-input[type="text"], textarea { background: #f8fafc; color: #0f172a; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; outline: none; font-family: inherit; }
+input[type="text"], textarea { background: #f8fafc; color: #0f172a; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; outline: none; font-family: inherit; width: 100%; }
 input[type="text"]:focus, textarea:focus { background: #ffffff; border-color: #0f172a; }
+.form-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 8px 12px; border-radius: 8px; font-size: 12.5px; }
 .entries-list { display: flex; flex-direction: column; gap: 10px; }
-.entry-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
+.entry-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.entry-details { color: #475569; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; }
+.entry-meta { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #64748b; margin-top: 2px; }
+.btn-delete-item { background: transparent; border: none; color: #ef4444; font-size: 12px; cursor: pointer; font-weight: 500; }
 .empty-note { color: #64748b; font-size: 13px; }
+body.theme-dark { background: #0b1120 !important; color: #f8fafc !important; }
+body.theme-dark .topbar, body.theme-dark .panel { background: rgba(15, 23, 42, 0.92) !important; color: #f8fafc !important; border-color: #334155 !important; }
+body.theme-dark h1, body.theme-dark h2, body.theme-dark strong { color: #f8fafc !important; }
+body.theme-dark .entry-card, body.theme-dark input[type="text"], body.theme-dark textarea, body.theme-dark .btn-secondary, body.theme-dark .status-pill { background: #1e293b !important; color: #f8fafc !important; border-color: #334155 !important; }
+body.theme-dark .entry-details, body.theme-dark .control-row label, body.theme-dark .hint { color: #cbd5e1 !important; }
+body.theme-dark .btn-primary { background: #3b82f6 !important; color: #ffffff !important; }
+body.theme-royal { background: radial-gradient(circle at top right, #2e1065 0%, #0f172a 55%, #020617 100%) !important; color: #f8fafc !important; }
+body.theme-royal .topbar, body.theme-royal .panel { background: rgba(30, 27, 75, 0.78) !important; color: #f8fafc !important; border-color: rgba(139, 92, 246, 0.4) !important; }
+body.theme-royal h1, body.theme-royal h2, body.theme-royal strong { color: #f8fafc !important; }
+body.theme-royal .entry-card, body.theme-royal input[type="text"], body.theme-royal textarea, body.theme-royal .btn-secondary, body.theme-royal .status-pill { background: rgba(15, 23, 42, 0.78) !important; color: #f8fafc !important; border-color: rgba(139, 92, 246, 0.35) !important; }
+body.theme-royal .entry-details, body.theme-royal .control-row label, body.theme-royal .hint { color: #e2e8f0 !important; }
+body.theme-royal .btn-primary { background: linear-gradient(135deg, #8b5cf6, #ec4899) !important; color: #ffffff !important; }
+body.theme-cyber { background: radial-gradient(circle at top left, #064e3b 0%, #022c22 50%, #020617 100%) !important; color: #ecfdf5 !important; }
+body.theme-cyber .topbar, body.theme-cyber .panel { background: rgba(6, 78, 59, 0.52) !important; color: #ecfdf5 !important; border-color: rgba(16, 185, 129, 0.42) !important; }
+body.theme-cyber h1, body.theme-cyber h2, body.theme-cyber strong { color: #ecfdf5 !important; }
+body.theme-cyber .entry-card, body.theme-cyber input[type="text"], body.theme-cyber textarea, body.theme-cyber .btn-secondary, body.theme-cyber .status-pill { background: rgba(2, 44, 34, 0.8) !important; color: #ecfdf5 !important; border-color: rgba(16, 185, 129, 0.38) !important; }
+body.theme-cyber .entry-details, body.theme-cyber .control-row label, body.theme-cyber .hint { color: #d1fae5 !important; }
+body.theme-cyber .btn-primary { background: linear-gradient(135deg, #10b981, #06b6d4) !important; color: #ffffff !important; }
 '''
 
     app_js = f'''const appItems = [];
+let filterText = "";
+
+function resolveActionEndpoint() {{
+  if (window.location.pathname.indexOf("/projects/") !== -1) {{
+    return "/api/projects/{project_slug}/action";
+  }}
+  return "/api/action";
+}}
 
 function escapeHtml(s) {{
-  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }}
 
 function renderItems() {{
   const list = document.getElementById("entries-list");
-  document.getElementById("count-pill").textContent = `${{appItems.length}} Results`;
-  if (appItems.length === 0) {{
+  const q = filterText.trim().toLowerCase();
+  const visible = q
+    ? appItems.filter(it => `${{it.title || ""}} ${{it.category || ""}} ${{it.details || ""}}`.toLowerCase().includes(q))
+    : appItems;
+  document.getElementById("count-pill").textContent = `${{visible.length}} Results`;
+  if (visible.length === 0) {{
     list.innerHTML = '<p class="empty-note">No runs yet. Submit an input on the left to execute and view results.</p>';
     return;
   }}
-  list.innerHTML = appItems.map(item => `
+  list.innerHTML = visible.map(item => `
     <div class="entry-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
         <strong>${{escapeHtml(item.title)}}</strong>
         <span class="status-pill">${{escapeHtml(item.category || "Processed")}}</span>
       </div>
-      <p style="margin-top:6px;color:#cbd5e1;font-size:13.5px;">${{escapeHtml(item.details || "")}}</p>
+      ${{item.details ? `<p class="entry-details">${{escapeHtml(item.details)}}</p>` : ""}}
+      <div class="entry-meta">
+        <span>${{escapeHtml(item.created_at || "")}}</span>
+        <button type="button" class="btn-delete-item" data-id="${{escapeHtml(item.id)}}">Delete</button>
+      </div>
     </div>
   `).join("");
+
+  list.querySelectorAll(".btn-delete-item").forEach(btn => {{
+    btn.addEventListener("click", async () => {{
+      const idVal = btn.getAttribute("data-id");
+      const idx = appItems.findIndex(x => String(x.id) === String(idVal));
+      if (idx !== -1) appItems.splice(idx, 1);
+      try {{
+        await fetch(resolveActionEndpoint(), {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{ action: "delete", id: idVal }}),
+        }});
+      }} catch (_) {{}}
+      renderItems();
+    }});
+  }});
 }}
 
-document.addEventListener("DOMContentLoaded", () => {{
+function downloadBlob(filename, content, mimeType) {{
+  const blob = new Blob([content], {{ type: mimeType }});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}}
+
+document.addEventListener("DOMContentLoaded", async () => {{
+  try {{
+    const initRes = await fetch(resolveActionEndpoint(), {{
+      method: "POST",
+      headers: {{ "Content-Type": "application/json" }},
+      body: JSON.stringify({{ action: "list" }}),
+    }});
+    const initData = await initRes.json();
+    if (initData && Array.isArray(initData.items) && initData.items.length > 0) {{
+      appItems.splice(0, appItems.length, ...initData.items.slice().reverse());
+      renderItems();
+    }}
+  }} catch (_) {{}}
+
+  const filterEl = document.getElementById("search-filter-input");
+  if (filterEl) {{
+    filterEl.addEventListener("input", () => {{
+      filterText = filterEl.value || "";
+      renderItems();
+    }});
+  }}
+
   document.getElementById("entry-form").addEventListener("submit", async (e) => {{
     e.preventDefault();
+    const errEl = document.getElementById("form-error");
+    if (errEl) errEl.style.display = "none";
     const titleEl = document.getElementById("entry-title");
     const catEl = document.getElementById("entry-category");
     const detEl = document.getElementById("entry-details");
     const title = (titleEl.value || "").trim();
-    if (!title) return;
+    if (!title) {{
+      if (errEl) {{
+        errEl.textContent = "Please enter a value before submitting.";
+        errEl.style.display = "block";
+      }}
+      return;
+    }}
     const item = {{
+      id: Date.now(),
       title,
       category: (catEl.value || "").trim() || "General",
       details: (detEl.value || "").trim(),
-      created_at: new Date().toISOString(),
+      created_at: new Date().toLocaleString(),
     }};
     try {{
-      const res = await fetch("/api/projects/{project_slug}/action", {{
+      const res = await fetch(resolveActionEndpoint(), {{
         method: "POST",
         headers: {{ "Content-Type": "application/json" }},
         body: JSON.stringify({{ action: "create", ...item }}),
@@ -2066,19 +2189,29 @@ document.addEventListener("DOMContentLoaded", () => {{
     renderItems();
   }});
 
-  document.getElementById("btn-clear-all").addEventListener("click", () => {{
+  document.getElementById("btn-clear-all").addEventListener("click", async () => {{
     appItems.length = 0;
     renderItems();
+    try {{
+      await fetch(resolveActionEndpoint(), {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify({{ action: "clear" }}),
+      }});
+    }} catch (_) {{}}
+  }});
+
+  document.getElementById("btn-export-csv").addEventListener("click", () => {{
+    const rows = [["ID", "Title", "Category", "Details", "Created At"]];
+    appItems.forEach(it => {{
+      rows.push([it.id || "", it.title || "", it.category || "", it.details || "", it.created_at || ""]);
+    }});
+    const csv = rows.map(r => r.map(v => `"${{String(v).replace(/"/g, '""')}}"`).join(",")).join("\\n");
+    downloadBlob("{project_slug}_report.csv", csv, "text/csv;charset=utf-8;");
   }});
 
   document.getElementById("btn-export-json").addEventListener("click", () => {{
-    const blob = new Blob([JSON.stringify(appItems, null, 2)], {{ type: "application/json" }});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "{project_slug}_report.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob("{project_slug}_report.json", JSON.stringify(appItems, null, 2), "application/json");
   }});
 }});
 '''
@@ -2116,6 +2249,15 @@ class TestCustomAppEngine(unittest.TestCase):
     def test_03_empty_title_rejected(self) -> None:
         res = self.engine.handle_action({"action": "create", "title": "   "})
         self.assertEqual(res["status"], "error")
+
+    def test_04_delete_and_clear_items(self) -> None:
+        created = self.engine.handle_action({"action": "create", "title": "Temp Item", "details": "To delete"})
+        item_id = created["item"]["id"]
+        deleted = self.engine.handle_action({"action": "delete", "id": item_id})
+        self.assertEqual(deleted["count"], 0)
+        self.engine.handle_action({"action": "create", "title": "Another Item"})
+        cleared = self.engine.handle_action({"action": "clear"})
+        self.assertEqual(cleared["count"], 0)
 
 
 if __name__ == "__main__":
